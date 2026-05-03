@@ -53,6 +53,17 @@ npm install
 npm run dev
 ```
 
+## Deploy
+
+El proyecto incluye `Dockerfile` para despliegue directo en Easypanel.
+
+Variables utiles:
+
+```bash
+NODE_ENV=production
+PORT=3000
+```
+
 ## Validación
 
 ```bash
