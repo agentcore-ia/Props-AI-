@@ -20,7 +20,7 @@ export default async function LoginPage({
   if (current) {
     redirect(
       (current.profile.role === "customer"
-        ? buildMarketplaceUrl("/cuenta", requestHeaders)
+        ? buildMarketplaceUrl("/", requestHeaders)
         : buildAppUrl("/dashboard", requestHeaders)
       ).toString()
     );

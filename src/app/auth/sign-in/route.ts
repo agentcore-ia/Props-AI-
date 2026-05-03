@@ -62,7 +62,7 @@ export async function POST(request: Request) {
 
   return NextResponse.redirect(
     role === "customer"
-      ? buildMarketplaceUrl(targetPath ?? "/cuenta", request.headers)
+      ? buildMarketplaceUrl(targetPath ?? "/", request.headers)
       : buildAppUrl(targetPath ?? "/dashboard", request.headers),
     {
       status: 303,

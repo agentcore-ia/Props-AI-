@@ -27,7 +27,7 @@ export default async function PublicSignupPage({
     );
   }
 
-  const redirectTo = searchParams.redirectTo ?? "/cuenta";
+  const redirectTo = searchParams.redirectTo ?? "/";
   const error =
     searchParams.error === "user_exists"
       ? "Ya existe una cuenta con ese email."

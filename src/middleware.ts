@@ -56,7 +56,7 @@ export async function middleware(request: NextRequest) {
     if (pathname === "/") {
       const target = session.user
         ? role === "customer"
-          ? buildMarketplaceUrl("/cuenta", request.headers)
+          ? buildMarketplaceUrl("/", request.headers)
           : buildAbsoluteUrlFromNextRequest("/dashboard", request)
         : buildAbsoluteUrlFromNextRequest("/auth/login", request);
       const redirectResponse = NextResponse.redirect(target);
@@ -66,7 +66,7 @@ export async function middleware(request: NextRequest) {
 
     if (isProtectedRoute && session.user && role === "customer") {
       const redirectResponse = NextResponse.redirect(
-        buildMarketplaceUrl("/cuenta", request.headers)
+        buildMarketplaceUrl("/", request.headers)
       );
       session.copyCookies(redirectResponse);
       return redirectResponse;
@@ -83,7 +83,7 @@ export async function middleware(request: NextRequest) {
     if (isAuthRoute && session.user && !isLogoutRoute) {
       const redirectResponse = NextResponse.redirect(
         role === "customer"
-          ? buildMarketplaceUrl("/cuenta", request.headers)
+          ? buildMarketplaceUrl("/", request.headers)
           : buildAbsoluteUrlFromNextRequest("/dashboard", request)
       );
       session.copyCookies(redirectResponse);

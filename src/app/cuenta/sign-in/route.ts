@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const redirectTo = String(formData.get("redirectTo") ?? "/cuenta");
+  const redirectTo = String(formData.get("redirectTo") ?? "/");
 
   const loginUrl = buildAbsoluteUrl("/cuenta/login", request.headers);
   if (redirectTo) {
@@ -56,10 +56,7 @@ export async function POST(request: Request) {
     });
   }
 
-  return NextResponse.redirect(
-    buildMarketplaceUrl(redirectTo || "/cuenta", request.headers),
-    {
-      status: 303,
-    }
-  );
+  return NextResponse.redirect(buildMarketplaceUrl(redirectTo || "/", request.headers), {
+    status: 303,
+  });
 }

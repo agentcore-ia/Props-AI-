@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   const fullName = String(formData.get("fullName") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const redirectTo = String(formData.get("redirectTo") ?? "/cuenta");
+  const redirectTo = String(formData.get("redirectTo") ?? "/");
 
   const signupUrl = buildAbsoluteUrl("/cuenta/registro", request.headers);
   if (redirectTo) {
@@ -66,6 +66,6 @@ export async function POST(request: Request) {
   }
 
   const loginUrl = buildAbsoluteUrl("/cuenta/login", request.headers);
-  loginUrl.searchParams.set("redirectTo", redirectTo || "/cuenta");
+  loginUrl.searchParams.set("redirectTo", redirectTo || "/");
   return NextResponse.redirect(loginUrl, { status: 303 });
 }

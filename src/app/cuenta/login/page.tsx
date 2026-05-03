@@ -27,7 +27,7 @@ export default async function PublicLoginPage({
     );
   }
 
-  const redirectTo = searchParams.redirectTo ?? "/cuenta";
+  const redirectTo = searchParams.redirectTo ?? "/";
   const error =
     searchParams.error === "invalid_credentials"
       ? "Email o password incorrectos."
