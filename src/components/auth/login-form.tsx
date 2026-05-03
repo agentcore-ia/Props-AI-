@@ -1,17 +1,54 @@
 "use client";
 
-import { useFormState } from "react-dom";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { LockKeyhole, Mail } from "lucide-react";
 
-import { login } from "@/app/auth/login/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { createClient } from "@/lib/supabase/client";
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
-  const [state, formAction] = useFormState(login, undefined);
+  const router = useRouter();
+  const supabase = createClient();
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(formData: FormData) {
+    setError(null);
+    setIsSubmitting(true);
+
+    const email = String(formData.get("email") ?? "").trim().toLowerCase();
+    const password = String(formData.get("password") ?? "");
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error("Supabase login failed", {
+        email,
+        message: error.message,
+        code: error.code,
+        status: error.status,
+      });
+      setError("Email o password incorrectos.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    router.replace(redirectTo || "/dashboard");
+    router.refresh();
+  }
 
   return (
-    <form className="space-y-5" action={formAction}>
+    <form
+      className="space-y-5"
+      action={async (formData) => {
+        await handleSubmit(formData);
+      }}
+    >
       <input type="hidden" name="redirectTo" value={redirectTo} />
 
       <div className="space-y-2">
@@ -42,14 +79,18 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
         </div>
       </div>
 
-      {state?.error ? (
+      {error ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {state.error}
+          {error}
         </div>
       ) : null}
 
-      <Button type="submit" className="h-12 w-full rounded-2xl text-sm font-semibold">
-        Ingresar
+      <Button
+        type="submit"
+        disabled={isSubmitting}
+        className="h-12 w-full rounded-2xl text-sm font-semibold"
+      >
+        {isSubmitting ? "Ingresando..." : "Ingresar"}
       </Button>
     </form>
   );
