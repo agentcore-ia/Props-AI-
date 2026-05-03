@@ -1,4 +1,9 @@
 import type { Agency, Property } from "@/lib/mock-data";
+import type {
+  RentalAdjustmentSummary,
+  RentalContractSummary,
+  RentalDashboardSummary,
+} from "@/lib/rental-types";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type AgencyRow = {
@@ -14,6 +19,7 @@ type AgencyRow = {
   status: Agency["status"];
   city: string;
   tagline: string;
+  messaging_instance: string;
   created_at: string;
   updated_at: string;
 };
@@ -33,6 +39,48 @@ type PropertyRow = {
   created_at: string;
   updated_at: string;
   agencies: Pick<AgencyRow, "slug" | "name"> | null;
+};
+
+type RentalContractRow = {
+  id: string;
+  property_id: string;
+  agency_id: string;
+  tenant_name: string;
+  tenant_phone: string;
+  tenant_email: string | null;
+  current_rent: number;
+  currency: "ARS";
+  index_type: "IPC" | "ICL";
+  adjustment_frequency_months: number;
+  contract_start_date: string;
+  rent_reference_date: string;
+  next_adjustment_date: string;
+  last_adjustment_date: string | null;
+  auto_notify: boolean;
+  notification_channel: "whatsapp";
+  status: "Activo" | "Pausado" | "Finalizado";
+  notes: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type RentalAdjustmentRow = {
+  id: string;
+  contract_id: string;
+  property_id: string;
+  agency_id: string;
+  index_type: "IPC" | "ICL";
+  applied_on: string;
+  reference_start_date: string;
+  reference_end_date: string;
+  factor: number;
+  previous_rent: number;
+  new_rent: number;
+  source_label: string;
+  notification_status: "Pendiente" | "Enviado" | "Fallido";
+  notified_at: string | null;
+  created_at: string;
 };
 
 export type AgencySummary = Agency & {
@@ -111,10 +159,58 @@ function mapAgency(row: AgencyRow): Agency {
     status: row.status,
     city: row.city,
     tagline: row.tagline,
+    messagingInstance: row.messaging_instance,
   };
 }
 
-function mapProperty(row: PropertyRow): Property {
+function mapRentalContract(row: RentalContractRow, agencyMessagingInstance = "agentcore"): RentalContractSummary {
+  return {
+    id: row.id,
+    propertyId: row.property_id,
+    agencyId: row.agency_id,
+    tenantName: row.tenant_name,
+    tenantPhone: row.tenant_phone,
+    tenantEmail: row.tenant_email,
+    currentRent: Number(row.current_rent),
+    currency: row.currency,
+    indexType: row.index_type,
+    adjustmentFrequencyMonths: row.adjustment_frequency_months,
+    contractStartDate: row.contract_start_date,
+    rentReferenceDate: row.rent_reference_date,
+    nextAdjustmentDate: row.next_adjustment_date,
+    lastAdjustmentDate: row.last_adjustment_date,
+    autoNotify: row.auto_notify,
+    notificationChannel: row.notification_channel,
+    status: row.status,
+    notes: row.notes,
+    agencyMessagingInstance,
+  };
+}
+
+function mapRentalAdjustment(row: RentalAdjustmentRow): RentalAdjustmentSummary {
+  return {
+    id: row.id,
+    contractId: row.contract_id,
+    propertyId: row.property_id,
+    agencyId: row.agency_id,
+    indexType: row.index_type,
+    appliedOn: row.applied_on,
+    referenceStartDate: row.reference_start_date,
+    referenceEndDate: row.reference_end_date,
+    factor: Number(row.factor),
+    previousRent: Number(row.previous_rent),
+    newRent: Number(row.new_rent),
+    sourceLabel: row.source_label,
+    notificationStatus: row.notification_status,
+    notifiedAt: row.notified_at,
+    createdAt: row.created_at,
+  };
+}
+
+function mapProperty(
+  row: PropertyRow,
+  rentalContract: RentalContractSummary | null = null
+): Property {
   return {
     id: row.id,
     tenantSlug: row.agencies?.slug ?? "",
@@ -129,6 +225,7 @@ function mapProperty(row: PropertyRow): Property {
       row.images && row.images.length > 0
         ? row.images
         : [row.image, row.image, row.image],
+    rentalContract,
   };
 }
 
@@ -199,7 +296,48 @@ export async function listProperties(options?: { tenantSlug?: string }) {
     throw error;
   }
 
-  return ((data ?? []) as unknown as PropertyRow[]).map(mapProperty);
+  const rows = (data ?? []) as unknown as PropertyRow[];
+  const propertyIds = rows.map((row) => row.id);
+  const agencyIds = Array.from(new Set(rows.map((row) => row.agency_id)));
+
+  const [contractsResult, agenciesResult] = await Promise.all([
+    propertyIds.length > 0
+      ? admin
+          .from("rental_contracts")
+          .select("*")
+          .in("property_id", propertyIds)
+          .in("agency_id", agencyIds)
+      : Promise.resolve({ data: [], error: null }),
+    agencyIds.length > 0
+      ? admin.from("agencies").select("id, messaging_instance").in("id", agencyIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (contractsResult.error) {
+    throw contractsResult.error;
+  }
+
+  if (agenciesResult.error) {
+    throw agenciesResult.error;
+  }
+
+  const messagingInstanceByAgency = new Map<string, string>(
+    ((agenciesResult.data ?? []) as Array<{ id: string; messaging_instance: string }>).map((agency) => [
+      agency.id,
+      agency.messaging_instance,
+    ])
+  );
+
+  const rentalByPropertyId = new Map<string, RentalContractSummary>();
+
+  for (const contract of (contractsResult.data ?? []) as RentalContractRow[]) {
+    rentalByPropertyId.set(
+      contract.property_id,
+      mapRentalContract(contract, messagingInstanceByAgency.get(contract.agency_id) ?? "agentcore")
+    );
+  }
+
+  return rows.map((row) => mapProperty(row, rentalByPropertyId.get(row.id) ?? null));
 }
 
 export async function getAgencyBySlug(slug: string) {
@@ -232,7 +370,135 @@ export async function getPropertyBySlugAndId(slug: string, propertyId: string) {
     throw error;
   }
 
-  return data ? mapProperty(data as unknown as PropertyRow) : null;
+  if (!data) {
+    return null;
+  }
+
+  const [contractResult, agencyResult] = await Promise.all([
+    admin.from("rental_contracts").select("*").eq("property_id", propertyId).maybeSingle(),
+    admin.from("agencies").select("id, messaging_instance").eq("slug", slug).maybeSingle(),
+  ]);
+
+  if (contractResult.error) {
+    throw contractResult.error;
+  }
+
+  if (agencyResult.error) {
+    throw agencyResult.error;
+  }
+
+  return mapProperty(
+    data as unknown as PropertyRow,
+    contractResult.data
+      ? mapRentalContract(
+          contractResult.data as RentalContractRow,
+          agencyResult.data?.messaging_instance ?? "agentcore"
+        )
+      : null
+  );
+}
+
+export async function listRentalContracts(options?: { agencySlug?: string }) {
+  const admin = createAdminClient();
+  const agenciesResult = options?.agencySlug
+    ? await admin
+        .from("agencies")
+        .select("id, slug, messaging_instance")
+        .eq("slug", options.agencySlug)
+    : await admin.from("agencies").select("id, slug, messaging_instance");
+
+  if (agenciesResult.error) {
+    throw agenciesResult.error;
+  }
+
+  const agencies = agenciesResult.data ?? [];
+  const agencyIds = agencies.map((agency) => agency.id);
+
+  if (agencyIds.length === 0) {
+    return [];
+  }
+
+  const contractsResult = await admin
+    .from("rental_contracts")
+    .select("*")
+    .in("agency_id", agencyIds)
+    .order("next_adjustment_date", { ascending: true });
+
+  if (contractsResult.error) {
+    throw contractsResult.error;
+  }
+
+  const instanceByAgency = new Map(
+    agencies.map((agency) => [agency.id, agency.messaging_instance])
+  );
+
+  return ((contractsResult.data ?? []) as RentalContractRow[]).map((contract) =>
+    mapRentalContract(contract, instanceByAgency.get(contract.agency_id) ?? "agentcore")
+  );
+}
+
+export async function listRecentRentalAdjustments(options?: { agencySlug?: string; limit?: number }) {
+  const admin = createAdminClient();
+  let agencyIds: string[] | null = null;
+
+  if (options?.agencySlug) {
+    const agencyResult = await admin
+      .from("agencies")
+      .select("id")
+      .eq("slug", options.agencySlug);
+
+    if (agencyResult.error) {
+      throw agencyResult.error;
+    }
+
+    agencyIds = (agencyResult.data ?? []).map((agency) => agency.id);
+
+    if (agencyIds.length === 0) {
+      return [];
+    }
+  }
+
+  let query = admin
+    .from("rental_adjustments")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(options?.limit ?? 12);
+
+  if (agencyIds) {
+    query = query.in("agency_id", agencyIds);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as RentalAdjustmentRow[]).map(mapRentalAdjustment);
+}
+
+export async function getRentalDashboardSummary(options?: { agencySlug?: string }): Promise<RentalDashboardSummary> {
+  const contracts = await listRentalContracts(options);
+  const adjustments = await listRecentRentalAdjustments({ agencySlug: options?.agencySlug, limit: 50 });
+
+  const today = new Date().toISOString().slice(0, 10);
+  const inSevenDays = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  return {
+    totalActiveContracts: contracts.filter((contract) => contract.status === "Activo").length,
+    dueToday: contracts.filter(
+      (contract) => contract.status === "Activo" && contract.nextAdjustmentDate <= today
+    ).length,
+    dueThisWeek: contracts.filter(
+      (contract) =>
+        contract.status === "Activo" &&
+        contract.nextAdjustmentDate > today &&
+        contract.nextAdjustmentDate <= inSevenDays
+    ).length,
+    failedNotifications: adjustments.filter(
+      (adjustment) => adjustment.notificationStatus === "Fallido"
+    ).length,
+  };
 }
 
 export async function listMarketplaceConversationSummaries(customerId: string) {

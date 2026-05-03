@@ -25,6 +25,7 @@ create table if not exists public.agencies (
   status text not null default 'Activa' check (status in ('Activa', 'En onboarding')),
   city text not null,
   tagline text not null default '',
+  messaging_instance text not null default 'agentcore',
   created_at timestamptz not null default timezone('utc'::text, now()),
   updated_at timestamptz not null default timezone('utc'::text, now())
 );
@@ -80,12 +81,62 @@ create table if not exists public.marketplace_messages (
   created_at timestamptz not null default timezone('utc'::text, now())
 );
 
+create table if not exists public.rental_contracts (
+  id uuid primary key default gen_random_uuid(),
+  property_id uuid not null unique references public.properties (id) on delete cascade,
+  agency_id uuid not null references public.agencies (id) on delete cascade,
+  tenant_name text not null,
+  tenant_phone text not null,
+  tenant_email text,
+  current_rent numeric(14, 2) not null default 0,
+  currency text not null default 'ARS' check (currency in ('ARS')),
+  index_type text not null check (index_type in ('IPC', 'ICL')),
+  adjustment_frequency_months integer not null check (adjustment_frequency_months > 0),
+  contract_start_date date not null,
+  rent_reference_date date not null,
+  next_adjustment_date date not null,
+  last_adjustment_date date,
+  auto_notify boolean not null default true,
+  notification_channel text not null default 'whatsapp' check (notification_channel in ('whatsapp')),
+  status text not null default 'Activo' check (status in ('Activo', 'Pausado', 'Finalizado')),
+  notes text not null default '',
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now())
+);
+
+create table if not exists public.rental_adjustments (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references public.rental_contracts (id) on delete cascade,
+  property_id uuid not null references public.properties (id) on delete cascade,
+  agency_id uuid not null references public.agencies (id) on delete cascade,
+  index_type text not null check (index_type in ('IPC', 'ICL')),
+  applied_on date not null,
+  reference_start_date date not null,
+  reference_end_date date not null,
+  factor numeric(18, 8) not null,
+  previous_rent numeric(14, 2) not null,
+  new_rent numeric(14, 2) not null,
+  source_label text not null,
+  source_snapshot jsonb not null default '{}'::jsonb,
+  message_body text not null default '',
+  notification_status text not null default 'Pendiente' check (notification_status in ('Pendiente', 'Enviado', 'Fallido')),
+  notification_response jsonb not null default '{}'::jsonb,
+  notified_at timestamptz,
+  created_at timestamptz not null default timezone('utc'::text, now())
+);
+
+alter table public.agencies
+  add column if not exists messaging_instance text not null default 'agentcore';
+
 alter table public.profiles enable row level security;
 alter table public.agencies enable row level security;
 alter table public.properties enable row level security;
 alter table public.catalog_inquiries enable row level security;
 alter table public.marketplace_conversations enable row level security;
 alter table public.marketplace_messages enable row level security;
+alter table public.rental_contracts enable row level security;
+alter table public.rental_adjustments enable row level security;
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -121,6 +172,7 @@ drop trigger if exists profiles_set_updated_at on public.profiles;
 drop trigger if exists agencies_set_updated_at on public.agencies;
 drop trigger if exists properties_set_updated_at on public.properties;
 drop trigger if exists marketplace_conversations_set_updated_at on public.marketplace_conversations;
+drop trigger if exists rental_contracts_set_updated_at on public.rental_contracts;
 
 create trigger profiles_set_updated_at
   before update on public.profiles
@@ -138,6 +190,10 @@ create trigger marketplace_conversations_set_updated_at
   before update on public.marketplace_conversations
   for each row execute procedure public.touch_updated_at();
 
+create trigger rental_contracts_set_updated_at
+  before update on public.rental_contracts
+  for each row execute procedure public.touch_updated_at();
+
 drop policy if exists "Users can view their own profile" on public.profiles;
 drop policy if exists "Users can update their own profile" on public.profiles;
 drop policy if exists "Public can view agencies" on public.agencies;
@@ -147,6 +203,8 @@ drop policy if exists "Users can view their own conversations" on public.marketp
 drop policy if exists "Users can view their own marketplace messages" on public.marketplace_messages;
 drop policy if exists "Service role manages marketplace conversations" on public.marketplace_conversations;
 drop policy if exists "Service role manages marketplace messages" on public.marketplace_messages;
+drop policy if exists "Service role manages rental contracts" on public.rental_contracts;
+drop policy if exists "Service role manages rental adjustments" on public.rental_adjustments;
 
 create policy "Users can view their own profile"
 on public.profiles
@@ -199,6 +257,18 @@ with check (auth.role() = 'service_role');
 
 create policy "Service role manages marketplace messages"
 on public.marketplace_messages
+for all
+using (auth.role() = 'service_role')
+with check (auth.role() = 'service_role');
+
+create policy "Service role manages rental contracts"
+on public.rental_contracts
+for all
+using (auth.role() = 'service_role')
+with check (auth.role() = 'service_role');
+
+create policy "Service role manages rental adjustments"
+on public.rental_adjustments
 for all
 using (auth.role() = 'service_role')
 with check (auth.role() = 'service_role');

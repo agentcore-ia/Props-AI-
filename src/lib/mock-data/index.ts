@@ -1,3 +1,5 @@
+import type { RentalContractSummary } from "@/lib/rental-types";
+
 export type Metric = {
   label: string;
   value: string;
@@ -17,6 +19,7 @@ export type Agency = {
   status: "Activa" | "En onboarding";
   city: string;
   tagline: string;
+  messagingInstance?: string;
 };
 
 export type Property = {
@@ -30,6 +33,7 @@ export type Property = {
   description: string;
   image: string;
   images: string[];
+  rentalContract?: RentalContractSummary | null;
 };
 
 export type Lead = {

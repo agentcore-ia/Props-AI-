@@ -4,20 +4,29 @@ import { useMemo, useState } from "react";
 
 import type { Agency, Property } from "@/lib/mock-data";
 import type { CurrentUserContext } from "@/lib/auth/current-user";
+import type {
+  RentalAdjustmentSummary,
+  RentalDashboardSummary,
+} from "@/lib/rental-types";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { PropertyCard } from "@/components/props/property-card";
 import { PropertyFormDialog } from "@/components/props/property-form-dialog";
+import { RentAutomationPanel } from "@/components/props/rent-automation-panel";
 import { Button } from "@/components/ui/button";
 
 export function PropertiesWorkspace({
   agencies,
   properties,
   currentUser,
+  rentalSummary,
+  recentAdjustments,
 }: {
   agencies: Agency[];
   properties: Property[];
   currentUser: CurrentUserContext;
+  rentalSummary: RentalDashboardSummary;
+  recentAdjustments: RentalAdjustmentSummary[];
 }) {
   const [filter, setFilter] = useState<string>(
     currentUser.profile.role === "agency_admin"
@@ -42,6 +51,8 @@ export function PropertiesWorkspace({
         description="Inventario multi-tenant. Cada propiedad queda asociada a una inmobiliaria y se publica automaticamente en su catalogo."
         action={<PropertyFormDialog agencies={visibleAgencies} currentUser={currentUser} />}
       />
+
+      <RentAutomationPanel summary={rentalSummary} recentAdjustments={recentAdjustments} />
 
       <div className="flex flex-wrap gap-2">
         {currentUser.profile.role !== "agency_admin" ? (
