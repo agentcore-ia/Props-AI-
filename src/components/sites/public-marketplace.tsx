@@ -1,36 +1,73 @@
 "use client";
 
 import { useDeferredValue, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Building2, MapPin, Search } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeDollarSign,
+  Bath,
+  BedDouble,
+  Building2,
+  ChartColumnIncreasing,
+  Filter,
+  Heart,
+  Layers3,
+  LayoutGrid,
+  Map,
+  MapPin,
+  Radar,
+  Search,
+  Sparkles,
+  Star,
+} from "lucide-react";
 
 import type { Agency, Property } from "@/lib/mock-data";
+import {
+  buildPublicListings,
+  type MarketplaceSection,
+  type PublicListing,
+} from "@/lib/public-marketplace";
+import { cn, formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { formatCurrency } from "@/lib/utils";
+
+const navItems: Array<{ id: MarketplaceSection; label: string }> = [
+  { id: "explorar", label: "Explorar" },
+  { id: "mapa", label: "Mapa" },
+  { id: "favoritos", label: "Favoritos" },
+  { id: "inversiones", label: "Inversiones" },
+];
+
+const quickFilters = ["CABA", "Nordelta", "Venta", "Alquiler", "Balcon", "Inversion"];
 
 export function PublicMarketplace({
   agencies,
   properties,
+  initialSection = "explorar",
 }: {
   agencies: Agency[];
   properties: Property[];
+  initialSection?: MarketplaceSection;
 }) {
+  const [section, setSection] = useState<MarketplaceSection>(initialSection);
   const [query, setQuery] = useState("");
   const [operationFilter, setOperationFilter] = useState<"all" | Property["operation"]>("all");
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  const [comparisonIds, setComparisonIds] = useState<string[]>([]);
   const deferredQuery = useDeferredValue(query);
 
-  const agencyBySlug = useMemo(
-    () => new Map(agencies.map((agency) => [agency.slug, agency])),
-    [agencies]
+  const listings = useMemo(
+    () => buildPublicListings(properties, agencies),
+    [agencies, properties]
   );
 
-  const filteredProperties = useMemo(() => {
+  const filteredListings = useMemo(() => {
     const normalized = deferredQuery.trim().toLowerCase();
 
-    return properties.filter((property) => {
-      if (operationFilter !== "all" && property.operation !== operationFilter) {
+    return listings.filter((listing) => {
+      if (operationFilter !== "all" && listing.operation !== operationFilter) {
         return false;
       }
 
@@ -38,241 +75,927 @@ export function PublicMarketplace({
         return true;
       }
 
-      const agency = agencyBySlug.get(property.tenantSlug);
       const searchable = [
-        property.title,
-        property.location,
-        property.description,
-        property.operation,
-        property.status,
-        agency?.name,
-        agency?.city,
+        listing.title,
+        listing.location,
+        listing.description,
+        listing.operation,
+        listing.status,
+        listing.propertyType,
+        listing.agencyName,
+        listing.agencyCity,
+        listing.neighborhood,
+        ...listing.amenities,
       ]
-        .filter(Boolean)
         .join(" ")
         .toLowerCase();
 
       return searchable.includes(normalized);
     });
-  }, [agencyBySlug, deferredQuery, operationFilter, properties]);
+  }, [deferredQuery, listings, operationFilter]);
 
-  const stats = {
-    agencies: agencies.length,
-    properties: properties.length,
-    sale: properties.filter((property) => property.operation === "Venta").length,
-    rent: properties.filter((property) => property.operation === "Alquiler").length,
-  };
+  const favorites = useMemo(
+    () => listings.filter((listing) => favoriteIds.includes(listing.id)),
+    [favoriteIds, listings]
+  );
+
+  const comparison = useMemo(
+    () => listings.filter((listing) => comparisonIds.includes(listing.id)).slice(0, 3),
+    [comparisonIds, listings]
+  );
+
+  const investmentLeaders = useMemo(
+    () =>
+      [...filteredListings]
+        .sort(
+          (a, b) =>
+            b.investmentScore - a.investmentScore ||
+            b.appreciationPercent - a.appreciationPercent
+        )
+        .slice(0, 4),
+    [filteredListings]
+  );
+
+  const aggregated = useMemo(() => {
+    const total = filteredListings.length;
+    const avgPrice =
+      total > 0
+        ? Math.round(
+            filteredListings.reduce((acc, listing) => acc + listing.price, 0) / total
+          )
+        : 0;
+    const avgYield =
+      total > 0
+        ? (
+            filteredListings.reduce((acc, listing) => acc + listing.yieldPercent, 0) / total
+          ).toFixed(1)
+        : "0.0";
+    const avgPricePerMeter =
+      total > 0
+        ? Math.round(
+            filteredListings.reduce(
+              (acc, listing) => acc + listing.pricePerSquareMeter,
+              0
+            ) / total
+          )
+        : 0;
+
+    return { total, avgPrice, avgYield, avgPricePerMeter };
+  }, [filteredListings]);
+
+  function toggleFavorite(id: string) {
+    setFavoriteIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    );
+  }
+
+  function toggleComparison(id: string) {
+    setComparisonIds((current) => {
+      if (current.includes(id)) {
+        return current.filter((item) => item !== id);
+      }
+
+      if (current.length >= 3) {
+        return [...current.slice(1), id];
+      }
+
+      return [...current, id];
+    });
+  }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,rgba(239,246,255,0.95)_0%,rgba(248,250,252,1)_26%,rgba(255,255,255,1)_100%)]">
-      <header className="border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:py-8 xl:px-8">
-          <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-            <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_24px_80px_-48px_rgba(15,23,42,0.42)]">
-              <div className="grid gap-0 lg:grid-cols-[1.02fr_0.98fr]">
-                <div className="px-5 py-6 sm:px-7 sm:py-7">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">
-                    <Building2 className="size-3.5" />
-                    Props.com.ar
-                  </div>
+    <div className="min-h-screen bg-[linear-gradient(180deg,rgba(237,242,255,0.9)_0%,rgba(246,248,252,1)_24%,rgba(255,255,255,1)_100%)]">
+      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1480px] items-center justify-between gap-4 px-4 py-4 sm:px-6 xl:px-8">
+          <div className="flex items-center gap-8">
+            <Link href="/" className="text-2xl font-semibold tracking-tight text-slate-950">
+              Props
+            </Link>
 
-                  <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">
-                    Todas las propiedades publicadas en Props
-                  </h1>
-                  <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">
-                    Explora propiedades de distintas inmobiliarias en un solo lugar y luego continua la conversacion en el catalogo de cada cliente.
-                  </p>
-
-                  <div className="mt-8 rounded-[28px] border border-slate-200 bg-slate-50 p-3">
-                    <div className="relative">
-                      <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Buscar por barrio, inmobiliaria, operacion o tipologia..."
-                        className="h-12 rounded-2xl border-0 bg-white pl-11 shadow-none ring-1 ring-slate-200"
-                      />
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {[
-                        { value: "all", label: "Todo" },
-                        { value: "Venta", label: "Venta" },
-                        { value: "Alquiler", label: "Alquiler" },
-                      ].map((option) => (
-                        <Button
-                          key={option.value}
-                          variant={operationFilter === option.value ? "default" : "outline"}
-                          className="h-10 rounded-full px-5"
-                          onClick={() =>
-                            setOperationFilter(option.value as "all" | Property["operation"])
-                          }
-                        >
-                          {option.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-px bg-slate-200 lg:grid-cols-2">
-                  {[
-                    { label: "Inmobiliarias activas", value: stats.agencies },
-                    { label: "Propiedades publicadas", value: stats.properties },
-                    { label: "En venta", value: stats.sale },
-                    { label: "En alquiler", value: stats.rent },
-                  ].map((item) => (
-                    <div key={item.label} className="bg-white px-5 py-6 sm:px-6">
-                      <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                        {item.label}
-                      </p>
-                      <p className="mt-3 text-3xl font-semibold text-slate-950">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-[32px] border border-slate-200 bg-slate-950 p-6 text-white shadow-[0_24px_80px_-48px_rgba(15,23,42,0.55)]">
-              <p className="text-xs uppercase tracking-[0.24em] text-blue-100">
-                Acceso profesional
-              </p>
-              <h2 className="mt-4 text-3xl font-semibold">Panel para inmobiliarias</h2>
-              <p className="mt-4 text-sm leading-7 text-white/75">
-                Cada inmobiliaria opera desde su dashboard privado en `app.props.com.ar` y publica automaticamente en su propio subdominio.
-              </p>
-
-              <div className="mt-8 space-y-3">
-                <Link
-                  href="https://app.props.com.ar"
-                  className="flex items-center justify-between rounded-[24px] border border-white/10 bg-white/5 px-5 py-4 transition-colors hover:bg-white/10"
+            <nav className="hidden items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1 md:flex">
+              {navItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSection(item.id)}
+                  className={cn(
+                    "rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                    section === item.id
+                      ? "bg-white text-slate-950 shadow-sm"
+                      : "text-slate-500 hover:text-slate-950"
+                  )}
                 >
-                  <div>
-                    <p className="text-sm font-semibold text-white">Entrar al dashboard</p>
-                    <p className="mt-1 text-xs text-white/60">
-                      Gestion de propiedades, leads, mensajes e IA
-                    </p>
-                  </div>
-                  <ArrowRight className="size-4 text-white/70" />
-                </Link>
-              </div>
-            </section>
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="hidden rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-500 sm:block">
+              {favoriteIds.length} favoritos · {comparisonIds.length}/3 comparacion
+            </div>
+            <Link
+              href="https://app.props.com.ar"
+              className="inline-flex h-11 items-center rounded-2xl bg-slate-950 px-5 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+            >
+              Entrar al dashboard
+            </Link>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 xl:px-8">
-        <div className="mb-6">
-          <p className="text-sm font-medium text-slate-500">Marketplace publico</p>
-          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-            Propiedades listas para descubrir
-          </h2>
-        </div>
+      <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 xl:px-8">
+        <section className="overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-[0_28px_90px_-55px_rgba(15,23,42,0.32)]">
+          <div className="grid gap-0 xl:grid-cols-[1.08fr_0.92fr]">
+            <div className="px-5 py-7 sm:px-8 sm:py-10">
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">
+                <Building2 className="size-3.5" />
+                Marketplace multi inmobiliaria
+              </div>
+              <h1 className="mt-5 max-w-4xl text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl xl:text-6xl">
+                Explora, compara e invierte con todas las propiedades publicadas en Props
+              </h1>
+              <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600 sm:text-lg">
+                Una experiencia de marketplace con buscador, mapa, favoritos, comparacion y fichas comerciales detalladas para convertir mejor.
+              </p>
 
-        {filteredProperties.length > 0 ? (
-          <section className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
-            {filteredProperties.map((property) => {
-              const agency = agencyBySlug.get(property.tenantSlug);
-              const propertyUrl = `https://${property.tenantSlug}.props.com.ar/propiedad/${property.id}`;
-              const agencyUrl = `https://${property.tenantSlug}.props.com.ar`;
+              <div className="mt-8 rounded-[28px] border border-slate-200 bg-slate-50 p-3">
+                <div className="flex flex-col gap-3 lg:flex-row">
+                  <div className="relative flex-1">
+                    <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Buscar por ciudad, barrio, inmobiliaria, tipologia o amenity"
+                      className="h-12 rounded-2xl border-0 bg-white pl-11 shadow-none ring-1 ring-slate-200"
+                    />
+                  </div>
+                  <Button
+                    className="h-12 rounded-2xl px-6"
+                    onClick={() => setSection("explorar")}
+                  >
+                    Buscar
+                  </Button>
+                </div>
 
-              return (
-                <article
-                  key={property.id}
-                  className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_24px_70px_-44px_rgba(15,23,42,0.32)]"
-                >
-                  <Link href={propertyUrl} className="group block">
-                    <div className="relative h-64 overflow-hidden sm:h-72">
-                      <Image
-                        src={property.image}
-                        alt={property.title}
-                        fill
-                        className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/55 via-transparent to-transparent" />
-                      <div className="absolute left-4 top-4 flex flex-wrap items-center gap-2 sm:left-5 sm:top-5">
-                        <span className="rounded-full bg-white/92 px-3 py-1 text-xs font-semibold text-slate-900">
-                          {property.operation}
-                        </span>
-                        <span className="rounded-full bg-slate-900/75 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
-                          {property.status}
-                        </span>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {quickFilters.map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setQuery(item)}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:border-blue-200 hover:text-blue-700"
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                <StatCard label="Propiedades activas" value={String(aggregated.total)} />
+                <StatCard
+                  label="Precio promedio"
+                  value={aggregated.avgPrice ? formatCurrency(aggregated.avgPrice) : "-"}
+                />
+                <StatCard
+                  label="Rendimiento medio"
+                  value={`${aggregated.avgYield}% anual`}
+                />
+              </div>
+            </div>
+
+            <div className="relative min-h-[320px] overflow-hidden bg-slate-950">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(96,165,250,0.24),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.18),transparent_30%)]" />
+              <div className="absolute inset-0 opacity-70">
+                <Image
+                  src={filteredListings[0]?.image ?? listings[0]?.image ?? "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80"}
+                  alt="Marketplace Props"
+                  fill
+                  className="object-cover opacity-40"
+                />
+              </div>
+              <div className="relative flex h-full flex-col justify-between p-6 text-white sm:p-8">
+                <div className="flex flex-wrap gap-3">
+                  <InfoPill icon={<LayoutGrid className="size-4" />} text="Vista explorador" />
+                  <InfoPill icon={<Map className="size-4" />} text="Mapa interactivo" />
+                  <InfoPill icon={<Heart className="size-4" />} text="Favoritos y comparacion" />
+                </div>
+
+                <div className="space-y-4">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] backdrop-blur-md">
+                    <Sparkles className="size-3.5" />
+                    Arquitectura comercial completa
+                  </div>
+                  <h2 className="max-w-xl text-3xl font-semibold leading-tight sm:text-4xl">
+                    De la busqueda inicial al detalle de inversion en una sola experiencia
+                  </h2>
+                  <p className="max-w-lg text-sm leading-7 text-white/78 sm:text-base">
+                    Diseñado para que un lead descubra propiedades, compare opciones y llegue a la consulta con más contexto.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 flex flex-col gap-4 rounded-[30px] border border-slate-200 bg-white px-4 py-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.25)] lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setOperationFilter("all")}
+              className={pillClass(operationFilter === "all")}
+            >
+              Todo
+            </button>
+            <button
+              type="button"
+              onClick={() => setOperationFilter("Venta")}
+              className={pillClass(operationFilter === "Venta")}
+            >
+              Venta
+            </button>
+            <button
+              type="button"
+              onClick={() => setOperationFilter("Alquiler")}
+              className={pillClass(operationFilter === "Alquiler")}
+            >
+              Alquiler
+            </button>
+            <button type="button" className={pillClass(false)}>
+              <Filter className="mr-2 size-4" />
+              Filtros
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSection("explorar")}
+              className={iconToggleClass(section === "explorar")}
+            >
+              <LayoutGrid className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSection("mapa")}
+              className={iconToggleClass(section === "mapa")}
+            >
+              <Map className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSection("favoritos")}
+              className={iconToggleClass(section === "favoritos")}
+            >
+              <Heart className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSection("inversiones")}
+              className={iconToggleClass(section === "inversiones")}
+            >
+              <ChartColumnIncreasing className="size-4" />
+            </button>
+          </div>
+        </section>
+
+        {section === "explorar" ? (
+          <section className="mt-10 space-y-6">
+            <SectionHeading
+              eyebrow="Explorador"
+              title="Propiedades destacadas"
+              description={`${filteredListings.length} resultados para explorar, ordenar y abrir en detalle.`}
+            />
+            <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
+              {filteredListings.map((listing) => (
+                <MarketplacePropertyCard
+                  key={listing.id}
+                  listing={listing}
+                  isFavorite={favoriteIds.includes(listing.id)}
+                  isInComparison={comparisonIds.includes(listing.id)}
+                  onToggleFavorite={toggleFavorite}
+                  onToggleComparison={toggleComparison}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {section === "mapa" ? (
+          <section className="mt-10 grid gap-6 xl:grid-cols-[380px_1fr]">
+            <div className="space-y-4">
+              <SectionHeading
+                eyebrow="Vista mapa"
+                title={`${filteredListings.length} propiedades en contexto`}
+                description="Filtra a la izquierda y usa el mapa como guía de descubrimiento."
+              />
+              <div className="space-y-4">
+                {filteredListings.slice(0, 5).map((listing) => (
+                  <CompactMapListing
+                    key={listing.id}
+                    listing={listing}
+                    isFavorite={favoriteIds.includes(listing.id)}
+                    onToggleFavorite={toggleFavorite}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-[34px] border border-slate-200 bg-[linear-gradient(180deg,rgba(222,246,247,0.9)_0%,rgba(228,236,247,0.96)_100%)] p-5 shadow-[0_32px_90px_-60px_rgba(15,23,42,0.32)] sm:p-6">
+              <div className="relative h-[520px] overflow-hidden rounded-[28px] border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.78),transparent_30%),linear-gradient(135deg,rgba(236,244,255,0.85)_0%,rgba(221,236,240,0.88)_100%)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)]">
+                <div className="absolute inset-0 opacity-70 [background-image:linear-gradient(rgba(255,255,255,0.62)_2px,transparent_2px),linear-gradient(90deg,rgba(255,255,255,0.62)_2px,transparent_2px)] [background-size:84px_84px]" />
+                <div className="absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_20%_30%,rgba(14,165,233,0.18),transparent_12%),radial-gradient(circle_at_80%_76%,rgba(37,99,235,0.12),transparent_14%),radial-gradient(circle_at_63%_18%,rgba(99,102,241,0.14),transparent_10%)]" />
+
+                <div className="absolute left-4 right-4 top-4 rounded-[24px] border border-white/70 bg-white/90 p-3 shadow-lg backdrop-blur sm:left-6 sm:right-auto sm:w-[420px]">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Buscar por ciudad, barrio o ZIP..."
+                      className="h-12 rounded-2xl border-0 bg-slate-50 pl-11 shadow-none ring-1 ring-slate-200"
+                    />
+                  </div>
+                </div>
+
+                {filteredListings.slice(0, 8).map((listing) => (
+                  <button
+                    key={listing.id}
+                    type="button"
+                    onClick={() => setSection("explorar")}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-950 px-3 py-2 text-sm font-semibold text-white shadow-[0_18px_35px_-20px_rgba(15,23,42,0.65)] transition-transform hover:scale-[1.03]"
+                    style={{ left: `${listing.mapX}%`, top: `${listing.mapY}%` }}
+                  >
+                    {formatShortPrice(listing.price)}
+                  </button>
+                ))}
+
+                <div className="absolute bottom-4 right-4 flex flex-col gap-2">
+                  <MapControl>+</MapControl>
+                  <MapControl>-</MapControl>
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {section === "favoritos" ? (
+          <section className="mt-10 space-y-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <SectionHeading
+                eyebrow="Favoritos y comparacion"
+                title="Tus propiedades seleccionadas"
+                description="Guarda favoritas y compara hasta 3 opciones para tomar mejores decisiones."
+              />
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+                {comparisonIds.length}/3 seleccionadas para comparar
+              </div>
+            </div>
+
+            {favorites.length > 0 ? (
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {favorites.map((listing) => (
+                  <MarketplacePropertyCard
+                    key={listing.id}
+                    listing={listing}
+                    isFavorite
+                    isInComparison={comparisonIds.includes(listing.id)}
+                    onToggleFavorite={toggleFavorite}
+                    onToggleComparison={toggleComparison}
+                  />
+                ))}
+              </div>
+            ) : (
+              <EmptyPanel
+                title="Todavia no agregaste favoritos"
+                description="Desde Explorar o Mapa podes guardar propiedades y traerlas aca para compararlas."
+              />
+            )}
+
+            {comparison.length > 0 ? (
+              <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_28px_90px_-58px_rgba(15,23,42,0.28)]">
+                <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">Analisis comparativo</p>
+                    <h3 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
+                      Tabla comparativa
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setComparisonIds([])}
+                    className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-950"
+                  >
+                    Limpiar seleccion
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border-separate border-spacing-0">
+                    <thead>
+                      <tr className="bg-slate-50">
+                        <th className="w-44 px-5 py-4 text-left text-sm font-semibold text-slate-500 sm:px-6">
+                          Criterio
+                        </th>
+                        {comparison.map((listing) => (
+                          <th
+                            key={listing.id}
+                            className="min-w-[280px] px-5 py-4 text-left sm:px-6"
+                          >
+                            <div className="space-y-3">
+                              <div className="relative h-28 overflow-hidden rounded-[22px] border border-slate-200">
+                                <Image
+                                  src={listing.image}
+                                  alt={listing.title}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                              <div>
+                                <p className="text-lg font-semibold text-slate-950">
+                                  {listing.title}
+                                </p>
+                                <p className="text-sm text-slate-500">{listing.location}</p>
+                              </div>
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {comparisonRows(comparison).map((row) => (
+                        <tr key={row.label} className="border-t border-slate-200">
+                          <td className="px-5 py-4 text-sm font-medium text-slate-500 sm:px-6">
+                            {row.label}
+                          </td>
+                          {row.values.map((value, index) => (
+                            <td
+                              key={`${row.label}-${index}`}
+                              className="px-5 py-4 text-sm text-slate-800 sm:px-6"
+                            >
+                              {value}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            ) : null}
+          </section>
+        ) : null}
+
+        {section === "inversiones" ? (
+          <section className="mt-10 space-y-8">
+            <SectionHeading
+              eyebrow="Inversiones"
+              title="Oportunidades priorizadas por retorno"
+              description="Cruza precio por metro, rendimiento anual y apreciacion estimada para detectar las mejores jugadas."
+            />
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <InvestmentMetric
+                icon={<BadgeDollarSign className="size-5" />}
+                label="Precio medio por m²"
+                value={`US$ ${aggregated.avgPricePerMeter}`}
+                hint="benchmark publico del marketplace"
+              />
+              <InvestmentMetric
+                icon={<Radar className="size-5" />}
+                label="Yield promedio"
+                value={`${aggregated.avgYield}%`}
+                hint="retorno anual estimado"
+              />
+              <InvestmentMetric
+                icon={<ChartColumnIncreasing className="size-5" />}
+                label="Top score"
+                value={String(investmentLeaders[0]?.investmentScore ?? 0)}
+                hint="potencial compuesto"
+              />
+              <InvestmentMetric
+                icon={<Layers3 className="size-5" />}
+                label="Agencias participando"
+                value={String(agencies.length)}
+                hint="oferta diversificada"
+              />
+            </div>
+
+            <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
+              <section className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.28)] sm:p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">Ranking de oportunidades</p>
+                    <h3 className="mt-1 text-2xl font-semibold text-slate-950">
+                      Propiedades lideres
+                    </h3>
+                  </div>
+                </div>
+                <div className="mt-6 space-y-4">
+                  {investmentLeaders.map((listing, index) => (
+                    <div
+                      key={listing.id}
+                      className="grid gap-4 rounded-[26px] border border-slate-200 bg-slate-50 p-4 md:grid-cols-[120px_1fr_auto]"
+                    >
+                      <div className="relative h-24 overflow-hidden rounded-[18px]">
+                        <Image
+                          src={listing.image}
+                          alt={listing.title}
+                          fill
+                          className="object-cover"
+                        />
                       </div>
-                    </div>
-                  </Link>
-
-                  <div className="flex min-h-[270px] flex-col gap-4 p-5 sm:p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <h3 className="text-2xl font-semibold tracking-tight text-slate-950">
-                          {property.title}
-                        </h3>
-                        <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
-                          <MapPin className="size-4 shrink-0" />
-                          <span>{property.location}</span>
+                      <div>
+                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          <span>#{index + 1}</span>
+                          <span>{listing.agencyName}</span>
+                        </div>
+                        <p className="mt-2 text-xl font-semibold text-slate-950">
+                          {listing.title}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">{listing.location}</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <MetricBadge label={`${listing.yieldPercent}% yield`} />
+                          <MetricBadge label={`${listing.appreciationPercent}% apreciacion`} />
+                          <MetricBadge label={`US$ ${listing.pricePerSquareMeter}/m²`} />
                         </div>
                       </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Precio</p>
-                        <p className="mt-1 text-lg font-semibold text-slate-950 sm:text-xl">
-                          {formatCurrency(property.price)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <p className="line-clamp-3 text-sm leading-7 text-slate-600">
-                      {property.description}
-                    </p>
-
-                    <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        Inmobiliaria
-                      </p>
-                      <div className="mt-2 flex items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-slate-950">
-                            {agency?.name ?? property.tenantSlug}
-                          </p>
-                          <p className="text-sm text-slate-500">{agency?.city ?? "Catalogo Props"}</p>
+                      <div className="flex flex-col items-start gap-2 md:items-end">
+                        <div className="rounded-2xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white">
+                          Score {listing.investmentScore}
                         </div>
                         <Link
-                          href={agencyUrl}
+                          href={listing.routeHref}
                           className="text-sm font-semibold text-blue-700 transition-colors hover:text-blue-800"
                         >
-                          Ver catalogo
+                          Ver ficha
                         </Link>
                       </div>
                     </div>
+                  ))}
+                </div>
+              </section>
 
-                    <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-4">
-                      <span className="text-sm font-medium text-slate-500">Abrir detalle</span>
-                      <Link
-                        href={propertyUrl}
-                        className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700"
-                      >
-                        Explorar
-                        <ArrowRight className="size-4" />
-                      </Link>
+              <section className="rounded-[32px] border border-slate-200 bg-slate-950 p-5 text-white shadow-[0_28px_90px_-58px_rgba(15,23,42,0.36)] sm:p-6">
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-100">
+                  Lectura rapida del mercado
+                </p>
+                <h3 className="mt-2 text-3xl font-semibold tracking-tight">
+                  Donde hay mejores senales de captacion y conversión
+                </h3>
+                <div className="mt-6 space-y-4">
+                  {investmentLeaders.slice(0, 3).map((listing) => (
+                    <div
+                      key={listing.id}
+                      className="rounded-[24px] border border-white/10 bg-white/5 p-4"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-lg font-semibold">{listing.neighborhood}</p>
+                          <p className="mt-1 text-sm text-white/65">{listing.agencyName}</p>
+                        </div>
+                        <Star className="size-5 text-amber-300" />
+                      </div>
+                      <p className="mt-3 text-sm leading-7 text-white/80">{listing.summary}</p>
+                      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                        <MetricBadge dark label={`${listing.yieldPercent}% yield`} />
+                        <MetricBadge dark label={`Score ${listing.investmentScore}`} />
+                        <MetricBadge dark label={`${listing.yearBuilt}`} />
+                      </div>
                     </div>
-                  </div>
-                </article>
-              );
-            })}
+                  ))}
+                </div>
+              </section>
+            </div>
           </section>
-        ) : (
-          <div className="rounded-[34px] border border-dashed border-slate-200 bg-white px-6 py-16 text-center">
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-400">
-              Sin resultados
-            </p>
-            <h3 className="mt-3 text-2xl font-semibold text-slate-950">
-              No encontramos propiedades con esos filtros
-            </h3>
-            <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-slate-600">
-              Proba cambiar el tipo de operacion o usar una busqueda mas amplia.
-            </p>
-          </div>
-        )}
+        ) : null}
       </main>
     </div>
   );
+}
+
+function MarketplacePropertyCard({
+  listing,
+  isFavorite,
+  isInComparison,
+  onToggleFavorite,
+  onToggleComparison,
+}: {
+  listing: PublicListing;
+  isFavorite: boolean;
+  isInComparison: boolean;
+  onToggleFavorite: (id: string) => void;
+  onToggleComparison: (id: string) => void;
+}) {
+  return (
+    <article className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_28px_80px_-52px_rgba(15,23,42,0.28)] transition-transform duration-300 hover:-translate-y-1.5">
+      <div className="relative h-64 overflow-hidden sm:h-72">
+        <Link href={listing.routeHref} className="block h-full">
+          <Image
+            src={listing.image}
+            alt={listing.title}
+            fill
+            className="object-cover transition-transform duration-500 hover:scale-[1.03]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/55 via-transparent to-transparent" />
+        </Link>
+        <div className="absolute left-4 top-4 flex flex-wrap items-center gap-2">
+          {listing.featuredLabel ? (
+            <span className="rounded-full bg-emerald-600/92 px-3 py-1 text-xs font-semibold text-white">
+              {listing.featuredLabel}
+            </span>
+          ) : null}
+          <span className="rounded-full bg-white/92 px-3 py-1 text-xs font-semibold text-slate-900">
+            {listing.operation}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => onToggleFavorite(listing.id)}
+          className={cn(
+            "absolute right-4 top-4 flex size-11 items-center justify-center rounded-full border backdrop-blur-sm transition-colors",
+            isFavorite
+              ? "border-transparent bg-slate-950 text-white"
+              : "border-white/80 bg-white/88 text-slate-700"
+          )}
+        >
+          <Heart className={cn("size-4", isFavorite ? "fill-current" : "")} />
+        </button>
+      </div>
+
+      <div className="space-y-4 p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-3xl font-semibold tracking-tight text-slate-950">
+              {formatCurrency(listing.price)}
+            </p>
+            <h3 className="mt-2 text-xl font-semibold text-slate-900">{listing.title}</h3>
+            <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
+              <MapPin className="size-4 shrink-0" />
+              <span>{listing.location}</span>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-right">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">m²</p>
+            <p className="mt-1 text-sm font-semibold text-slate-950">{listing.area}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-4 border-y border-slate-100 py-3 text-sm text-slate-600">
+          <div className="inline-flex items-center gap-2">
+            <BedDouble className="size-4" />
+            {listing.bedrooms}
+          </div>
+          <div className="inline-flex items-center gap-2">
+            <Bath className="size-4" />
+            {listing.bathrooms}
+          </div>
+          <div className="inline-flex items-center gap-2">
+            <Layers3 className="size-4" />
+            {listing.propertyType}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Inmobiliaria</p>
+            <p className="mt-1 font-semibold text-slate-950">{listing.agencyName}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onToggleComparison(listing.id)}
+            className={cn(
+              "rounded-full border px-4 py-2 text-sm font-medium transition-colors",
+              isInComparison
+                ? "border-slate-950 bg-slate-950 text-white"
+                : "border-slate-200 bg-white text-slate-600 hover:text-slate-950"
+            )}
+          >
+            {isInComparison ? "Comparando" : "Comparar"}
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between pt-1">
+          <Link
+            href={listing.routeHref}
+            className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 transition-colors hover:text-blue-800"
+          >
+            Ver detalle
+            <ArrowRight className="size-4" />
+          </Link>
+          <Link
+            href={listing.catalogHref}
+            className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
+          >
+            Catalogo de la inmobiliaria
+          </Link>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function CompactMapListing({
+  listing,
+  isFavorite,
+  onToggleFavorite,
+}: {
+  listing: PublicListing;
+  isFavorite: boolean;
+  onToggleFavorite: (id: string) => void;
+}) {
+  return (
+    <article className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_20px_55px_-42px_rgba(15,23,42,0.22)]">
+      <div className="grid gap-4 sm:grid-cols-[120px_1fr]">
+        <div className="relative h-28 overflow-hidden rounded-[20px]">
+          <Image src={listing.image} alt={listing.title} fill className="object-cover" />
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xl font-semibold text-slate-950">
+                {formatCurrency(listing.price)}
+              </p>
+              <h3 className="mt-1 font-semibold text-slate-900">{listing.title}</h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => onToggleFavorite(listing.id)}
+              className={cn(
+                "flex size-10 items-center justify-center rounded-full border",
+                isFavorite
+                  ? "border-transparent bg-slate-950 text-white"
+                  : "border-slate-200 bg-white text-slate-600"
+              )}
+            >
+              <Heart className={cn("size-4", isFavorite ? "fill-current" : "")} />
+            </button>
+          </div>
+          <p className="mt-2 text-sm text-slate-500">{listing.location}</p>
+          <div className="mt-3 flex flex-wrap gap-3 text-sm text-slate-600">
+            <span>{listing.bedrooms} dorm.</span>
+            <span>{listing.bathrooms} baños</span>
+            <span>{listing.area} m²</span>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function SectionHeading({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div>
+      <p className="text-sm font-medium text-slate-500">{eyebrow}</p>
+      <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+        {title}
+      </h2>
+      <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4">
+      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
+      <p className="mt-2 text-lg font-semibold text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function InfoPill({ icon, text }: { icon: ReactNode; text: string }) {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md">
+      {icon}
+      {text}
+    </div>
+  );
+}
+
+function EmptyPanel({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="rounded-[34px] border border-dashed border-slate-200 bg-white px-6 py-16 text-center">
+      <h3 className="text-2xl font-semibold text-slate-950">{title}</h3>
+      <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-slate-600">{description}</p>
+    </div>
+  );
+}
+
+function InvestmentMetric({
+  icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  hint: string;
+}) {
+  return (
+    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_20px_55px_-42px_rgba(15,23,42,0.2)]">
+      <div className="flex size-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+        {icon}
+      </div>
+      <p className="mt-4 text-sm font-medium text-slate-500">{label}</p>
+      <p className="mt-2 text-2xl font-semibold text-slate-950">{value}</p>
+      <p className="mt-2 text-sm text-slate-500">{hint}</p>
+    </div>
+  );
+}
+
+function MetricBadge({ label, dark = false }: { label: string; dark?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "rounded-full px-3 py-1 text-xs font-medium",
+        dark ? "bg-white/10 text-white/88" : "bg-blue-50 text-blue-700"
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+function MapControl({ children }: { children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      className="flex size-11 items-center justify-center rounded-2xl border border-white/70 bg-white/90 text-lg font-semibold text-slate-900 shadow-lg backdrop-blur"
+    >
+      {children}
+    </button>
+  );
+}
+
+function comparisonRows(listings: PublicListing[]) {
+  return [
+    {
+      label: "Precio",
+      values: listings.map((listing) => formatCurrency(listing.price)),
+    },
+    {
+      label: "Precio / m²",
+      values: listings.map((listing) => `US$ ${listing.pricePerSquareMeter}`),
+    },
+    {
+      label: "Superficie total",
+      values: listings.map((listing) => `${listing.area} m²`),
+    },
+    {
+      label: "Dormitorios",
+      values: listings.map((listing) => String(listing.bedrooms)),
+    },
+    {
+      label: "Año de construccion",
+      values: listings.map((listing) => String(listing.yearBuilt)),
+    },
+    {
+      label: "Amenities principales",
+      values: listings.map((listing) => listing.amenities.slice(0, 3).join(" · ")),
+    },
+  ];
+}
+
+function pillClass(active: boolean) {
+  return cn(
+    "inline-flex h-11 items-center rounded-full border px-4 text-sm font-medium transition-colors",
+    active
+      ? "border-slate-950 bg-slate-950 text-white"
+      : "border-slate-200 bg-white text-slate-600 hover:text-slate-950"
+  );
+}
+
+function iconToggleClass(active: boolean) {
+  return cn(
+    "inline-flex size-11 items-center justify-center rounded-2xl border transition-colors",
+    active
+      ? "border-slate-950 bg-slate-950 text-white"
+      : "border-slate-200 bg-white text-slate-600 hover:text-slate-950"
+  );
+}
+
+function formatShortPrice(value: number) {
+  if (value >= 1_000_000) {
+    return `US$ ${(value / 1_000_000).toFixed(1)}M`;
+  }
+
+  if (value >= 1000) {
+    return `US$ ${Math.round(value / 1000)}K`;
+  }
+
+  return `US$ ${value}`;
 }
