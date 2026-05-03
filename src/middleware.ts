@@ -35,6 +35,7 @@ export async function middleware(request: NextRequest) {
     session = await updateSession(request);
 
     const isAuthRoute = pathname.startsWith("/auth");
+    const isLogoutRoute = pathname === "/auth/logout";
     const isProtectedRoute = !isAuthRoute;
 
     if (pathname === "/") {
@@ -54,7 +55,7 @@ export async function middleware(request: NextRequest) {
       return redirectResponse;
     }
 
-    if (isAuthRoute && session.user) {
+    if (isAuthRoute && session.user && !isLogoutRoute) {
       const redirectResponse = NextResponse.redirect(
         buildAbsoluteUrlFromNextRequest("/dashboard", request)
       );

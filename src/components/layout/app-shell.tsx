@@ -150,12 +150,14 @@ export function AppShell({
                   <p className="text-sm font-semibold">Agentcore Realty</p>
                   <p className="text-xs text-muted-foreground">{userEmail ?? "Sesion activa"}</p>
                 </div>
-                <a
-                  href="/auth/logout"
-                  className="hidden rounded-2xl border bg-background px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 sm:inline-flex"
-                >
-                  Salir
-                </a>
+                <form action="/auth/logout" method="post" className="hidden sm:block">
+                  <button
+                    type="submit"
+                    className="rounded-2xl border bg-background px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40"
+                  >
+                    Salir
+                  </button>
+                </form>
               </div>
             </div>
           </header>
