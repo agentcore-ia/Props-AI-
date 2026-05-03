@@ -10,7 +10,7 @@ export type CurrentUserContext = {
     id: string;
     email: string | null;
     full_name: string | null;
-    role: "superadmin" | "agency_admin" | "agent";
+    role: "superadmin" | "agency_admin" | "agent" | "customer";
     agency_slug: string | null;
   };
 };

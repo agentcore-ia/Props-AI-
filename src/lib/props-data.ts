@@ -40,6 +40,64 @@ export type AgencySummary = Agency & {
   propertyCount: number;
 };
 
+type MarketplaceConversationRow = {
+  id: string;
+  customer_id: string;
+  agency_id: string;
+  property_id: string | null;
+  title: string;
+  status: "Abierta" | "Cerrada";
+  created_at: string;
+  updated_at: string;
+  agencies: Pick<AgencyRow, "name" | "slug" | "city"> | null;
+  properties:
+    | Pick<PropertyRow, "id" | "title" | "location" | "image" | "operation" | "status">
+    | null;
+};
+
+type MarketplaceMessageRow = {
+  id: string;
+  conversation_id: string;
+  sender_role: "customer" | "assistant";
+  content: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+export type MarketplaceConversationSummary = {
+  id: string;
+  title: string;
+  status: "Abierta" | "Cerrada";
+  createdAt: string;
+  updatedAt: string;
+  agency: {
+    name: string;
+    slug: string;
+    city: string;
+  } | null;
+  property: {
+    id: string;
+    title: string;
+    location: string;
+    image: string;
+    operation: Property["operation"];
+    status: Property["status"];
+  } | null;
+  lastMessage: {
+    senderRole: "customer" | "assistant";
+    content: string;
+    createdAt: string;
+  } | null;
+};
+
+export type MarketplaceThreadMessage = {
+  id: string;
+  senderRole: "customer" | "assistant";
+  content: string;
+  createdAt: string;
+  metadata: Record<string, unknown>;
+};
+
 function mapAgency(row: AgencyRow): Agency {
   return {
     id: row.id,
@@ -175,4 +233,120 @@ export async function getPropertyBySlugAndId(slug: string, propertyId: string) {
   }
 
   return data ? mapProperty(data as unknown as PropertyRow) : null;
+}
+
+export async function listMarketplaceConversationSummaries(customerId: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("marketplace_conversations")
+    .select(
+      "id, customer_id, agency_id, property_id, title, status, created_at, updated_at, agencies(name, slug, city), properties(id, title, location, image, operation, status)"
+    )
+    .eq("customer_id", customerId)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  const conversations = (data ?? []) as unknown as MarketplaceConversationRow[];
+
+  const conversationIds = conversations.map((conversation) => conversation.id);
+  const lastMessageByConversation = new Map<string, MarketplaceConversationSummary["lastMessage"]>();
+
+  if (conversationIds.length > 0) {
+    const { data: messages, error: messagesError } = await admin
+      .from("marketplace_messages")
+      .select("id, conversation_id, sender_role, content, metadata, created_at")
+      .in("conversation_id", conversationIds)
+      .order("created_at", { ascending: false });
+
+    if (messagesError) {
+      throw messagesError;
+    }
+
+    for (const message of (messages ?? []) as MarketplaceMessageRow[]) {
+      if (!lastMessageByConversation.has(message.conversation_id)) {
+        lastMessageByConversation.set(message.conversation_id, {
+          senderRole: message.sender_role,
+          content: message.content,
+          createdAt: message.created_at,
+        });
+      }
+    }
+  }
+
+  return conversations.map((conversation) => ({
+    id: conversation.id,
+    title: conversation.title,
+    status: conversation.status,
+    createdAt: conversation.created_at,
+    updatedAt: conversation.updated_at,
+    agency: conversation.agencies
+      ? {
+          name: conversation.agencies.name,
+          slug: conversation.agencies.slug,
+          city: conversation.agencies.city,
+        }
+      : null,
+    property: conversation.properties
+      ? {
+          id: conversation.properties.id,
+          title: conversation.properties.title,
+          location: conversation.properties.location,
+          image: conversation.properties.image,
+          operation: conversation.properties.operation,
+          status: conversation.properties.status,
+        }
+      : null,
+    lastMessage: lastMessageByConversation.get(conversation.id) ?? null,
+  }));
+}
+
+export async function getMarketplaceConversationThread(
+  customerId: string,
+  conversationId: string
+) {
+  const admin = createAdminClient();
+  const { data: conversation, error: conversationError } = await admin
+    .from("marketplace_conversations")
+    .select(
+      "id, customer_id, agency_id, property_id, title, status, created_at, updated_at, agencies(name, slug, city), properties(id, title, location, image, operation, status)"
+    )
+    .eq("id", conversationId)
+    .eq("customer_id", customerId)
+    .maybeSingle();
+
+  if (conversationError) {
+    throw conversationError;
+  }
+
+  if (!conversation) {
+    return null;
+  }
+
+  const { data: messages, error: messagesError } = await admin
+    .from("marketplace_messages")
+    .select("id, conversation_id, sender_role, content, metadata, created_at")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true });
+
+  if (messagesError) {
+    throw messagesError;
+  }
+
+  const summary = (await listMarketplaceConversationSummaries(customerId)).find(
+    (item) => item.id === conversationId
+  );
+
+  return {
+    conversation: summary ?? null,
+    messages: ((messages ?? []) as MarketplaceMessageRow[]).map((message) => ({
+      id: message.id,
+      senderRole: message.sender_role,
+      content: message.content,
+      createdAt: message.created_at,
+      metadata: message.metadata ?? {},
+    })),
+  };
 }

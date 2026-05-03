@@ -15,6 +15,8 @@ import {
 
 import type { Agency, Property } from "@/lib/mock-data";
 import { CatalogInquiryForm } from "@/components/sites/catalog-inquiry-form";
+import { PublicCustomerChat } from "@/components/sites/public-customer-chat";
+import { PublicUserActions } from "@/components/sites/public-user-actions";
 import { buildPublicListings } from "@/lib/public-marketplace";
 import { formatCurrency } from "@/lib/utils";
 
@@ -23,11 +25,17 @@ export function MarketplacePropertyDetail({
   property,
   allAgencies,
   relatedProperties,
+  currentUser,
 }: {
   agency: Agency | null;
   property: Property | null;
   allAgencies: Agency[];
   relatedProperties: Property[];
+  currentUser: {
+    fullName: string | null;
+    email: string | null;
+    role: "superadmin" | "agency_admin" | "agent" | "customer";
+  } | null;
 }) {
   if (!agency || !property) {
     return (
@@ -90,12 +98,7 @@ export function MarketplacePropertyDetail({
             >
               Ver catalogo de {agency.name}
             </Link>
-            <Link
-              href="https://app.props.com.ar"
-              className="inline-flex h-11 items-center rounded-2xl bg-slate-950 px-5 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
-            >
-              Dashboard
-            </Link>
+            <PublicUserActions currentUser={currentUser} />
           </div>
         </div>
       </header>
@@ -168,7 +171,7 @@ export function MarketplacePropertyDetail({
               <SpecCard icon={<BedDouble className="size-4" />} label="Dormitorios" value={`${listing.bedrooms}`} hint={`${listing.suites} en suite`} />
               <SpecCard icon={<Bath className="size-4" />} label="Baños" value={`${listing.bathrooms}`} hint="terminaciones premium" />
               <SpecCard icon={<Ruler className="size-4" />} label="Construccion" value={`${listing.area} m²`} hint={`${listing.lotArea} m² totales`} />
-              <SpecCard icon={<CalendarRange className="size-4" />} label="Año" value={`${listing.yearBuilt}`} hint="ultimo refresh comercial" />
+              <SpecCard icon={<CalendarRange className="size-4" />} label="Año" value={`${listing.yearBuilt}`} hint="informacion actualizada" />
             </div>
           </div>
 
@@ -179,7 +182,7 @@ export function MarketplacePropertyDetail({
                   <Sparkles className="size-6" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-slate-500">Asesor responsable</p>
+              <p className="text-sm font-medium text-slate-500">Inmobiliaria responsable</p>
                   <h2 className="mt-1 text-2xl font-semibold text-slate-950">{agency.ownerName}</h2>
                   <p className="mt-2 text-sm text-slate-500">{agency.tagline}</p>
                 </div>
@@ -192,17 +195,24 @@ export function MarketplacePropertyDetail({
               </div>
 
               <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Lectura comercial</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Resumen de la oportunidad</p>
                 <p className="mt-2 text-sm leading-7 text-slate-600">{listing.summary}</p>
               </div>
             </section>
+
+            <PublicCustomerChat
+              tenantSlug={agency.slug}
+              propertyId={property.id}
+              propertyTitle={property.title}
+              currentUser={currentUser}
+            />
 
             <CatalogInquiryForm
               tenantSlug={agency.slug}
               propertyId={property.id}
               compact
               title="Solicitar mas informacion"
-              description="Deja tus datos para coordinar visita, resolver dudas comerciales o recibir propiedades similares."
+              description="Deja tus datos para coordinar visita, resolver dudas o recibir propiedades similares."
             />
           </div>
         </section>
@@ -218,7 +228,7 @@ export function MarketplacePropertyDetail({
                 <p>{listing.description}</p>
                 <p>{listing.summary}</p>
                 <p>
-                  La publicacion se integra al ecosistema de {agency.name} y queda disponible para consulta directa, seguimiento comercial y recorrido por propiedades relacionadas del mismo marketplace.
+                  La publicacion se integra al ecosistema de {agency.name} y queda disponible para consulta directa, seguimiento de conversaciones y recorrido por propiedades relacionadas del mismo marketplace.
                 </p>
               </div>
             </section>
@@ -257,7 +267,7 @@ export function MarketplacePropertyDetail({
               <div className="mt-5 rounded-[24px] border border-white/10 bg-white/5 p-4">
                 <p className="inline-flex items-center gap-2 text-sm font-medium text-white/88">
                   <ChartColumnIncreasing className="size-4" />
-                  Posicionamiento comercial
+                  Lectura de valor
                 </p>
                 <p className="mt-3 text-sm leading-7 text-white/75">
                   Esta propiedad combina {listing.propertyType.toLowerCase()}, ubicacion en {listing.neighborhood} y un precio por metro competitivo para el rango actual del marketplace.
@@ -280,7 +290,7 @@ export function MarketplacePropertyDetail({
                 </div>
               </div>
               <p className="mt-3 text-sm leading-7 text-slate-500">
-                {listing.location}. La ubicacion exacta se comparte durante el proceso de contacto para preservar privacidad y calificacion del lead.
+                {listing.location}. La ubicacion exacta se comparte durante el proceso de contacto para preservar privacidad y seguridad.
               </p>
             </section>
           </div>

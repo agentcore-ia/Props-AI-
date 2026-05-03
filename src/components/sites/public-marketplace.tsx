@@ -30,6 +30,7 @@ import {
   type PublicListing,
 } from "@/lib/public-marketplace";
 import { cn, formatCurrency } from "@/lib/utils";
+import { PublicUserActions } from "@/components/sites/public-user-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -46,10 +47,16 @@ export function PublicMarketplace({
   agencies,
   properties,
   initialSection = "explorar",
+  currentUser,
 }: {
   agencies: Agency[];
   properties: Property[];
   initialSection?: MarketplaceSection;
+  currentUser: {
+    fullName: string | null;
+    email: string | null;
+    role: "superadmin" | "agency_admin" | "agent" | "customer";
+  } | null;
 }) {
   const [section, setSection] = useState<MarketplaceSection>(initialSection);
   const [query, setQuery] = useState("");
@@ -195,12 +202,7 @@ export function PublicMarketplace({
             <div className="hidden rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-500 sm:block">
               {favoriteIds.length} favoritos · {comparisonIds.length}/3 comparacion
             </div>
-            <Link
-              href="https://app.props.com.ar"
-              className="inline-flex h-11 items-center rounded-2xl bg-slate-950 px-5 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
-            >
-              Entrar al dashboard
-            </Link>
+            <PublicUserActions currentUser={currentUser} />
           </div>
         </div>
       </header>
@@ -211,13 +213,13 @@ export function PublicMarketplace({
             <div className="px-5 py-7 sm:px-8 sm:py-10">
               <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">
                 <Building2 className="size-3.5" />
-                Marketplace multi inmobiliaria
+                Marketplace para comprar y alquilar
               </div>
               <h1 className="mt-5 max-w-4xl text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl xl:text-6xl">
-                Explora, compara e invierte con todas las propiedades publicadas en Props
+                Encuentra mejores propiedades y conversa con IA antes de contactar
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600 sm:text-lg">
-                Una experiencia de marketplace con buscador, mapa, favoritos, comparacion y fichas comerciales detalladas para convertir mejor.
+                Props reúne publicaciones de distintas inmobiliarias para ayudarte a descubrir, comparar y decidir con más contexto antes de enviar una consulta.
               </p>
 
               <div className="mt-8 rounded-[28px] border border-slate-200 bg-slate-50 p-3">
@@ -278,7 +280,7 @@ export function PublicMarketplace({
               </div>
               <div className="relative flex h-full flex-col justify-between p-6 text-white sm:p-8">
                 <div className="flex flex-wrap gap-3">
-                  <InfoPill icon={<LayoutGrid className="size-4" />} text="Vista explorador" />
+                  <InfoPill icon={<LayoutGrid className="size-4" />} text="Explorador" />
                   <InfoPill icon={<Map className="size-4" />} text="Mapa interactivo" />
                   <InfoPill icon={<Heart className="size-4" />} text="Favoritos y comparacion" />
                 </div>
@@ -286,13 +288,13 @@ export function PublicMarketplace({
                 <div className="space-y-4">
                   <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] backdrop-blur-md">
                     <Sparkles className="size-3.5" />
-                    Arquitectura comercial completa
+                    Experiencia guiada para compradores
                   </div>
                   <h2 className="max-w-xl text-3xl font-semibold leading-tight sm:text-4xl">
-                    De la busqueda inicial al detalle de inversion en una sola experiencia
+                    Busca, compara y pregunta con una experiencia pensada para decidir mejor
                   </h2>
                   <p className="max-w-lg text-sm leading-7 text-white/78 sm:text-base">
-                    Diseñado para que un lead descubra propiedades, compare opciones y llegue a la consulta con más contexto.
+                    Crea tu cuenta para guardar favoritos, retomar consultas y recibir respuestas iniciales con IA antes de hablar con cada inmobiliaria.
                   </p>
                 </div>
               </div>
@@ -619,7 +621,7 @@ export function PublicMarketplace({
                         <div className="mt-3 flex flex-wrap gap-2">
                           <MetricBadge label={`${listing.yieldPercent}% yield`} />
                           <MetricBadge label={`${listing.appreciationPercent}% apreciacion`} />
-                          <MetricBadge label={`US$ ${listing.pricePerSquareMeter}/m²`} />
+                          <MetricBadge label={`US$ ${listing.pricePerSquareMeter}/m2`} />
                         </div>
                       </div>
                       <div className="flex flex-col items-start gap-2 md:items-end">
@@ -643,7 +645,7 @@ export function PublicMarketplace({
                   Lectura rapida del mercado
                 </p>
                 <h3 className="mt-2 text-3xl font-semibold tracking-tight">
-                  Donde hay mejores senales de captacion y conversión
+                  Barrios y oportunidades para vivir o invertir con mejor contexto
                 </h3>
                 <div className="mt-6 space-y-4">
                   {investmentLeaders.slice(0, 3).map((listing) => (
@@ -738,7 +740,7 @@ function MarketplacePropertyCard({
             </div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-right">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">m²</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">m2</p>
             <p className="mt-1 text-sm font-semibold text-slate-950">{listing.area}</p>
           </div>
         </div>

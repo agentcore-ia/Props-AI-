@@ -10,9 +10,9 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const redirectTo = String(formData.get("redirectTo") ?? "/dashboard");
+  const redirectTo = String(formData.get("redirectTo") ?? "/cuenta");
 
-  const loginUrl = buildAbsoluteUrl("/auth/login", request.headers);
+  const loginUrl = buildAbsoluteUrl("/cuenta/login", request.headers);
   if (redirectTo) {
     loginUrl.searchParams.set("redirectTo", redirectTo);
   }
@@ -38,13 +38,7 @@ export async function POST(request: Request) {
     password,
   });
 
-  if (error) {
-    console.error("Supabase login failed", {
-      email,
-      message: error.message,
-      code: error.code,
-      status: error.status,
-    });
+  if (error || !data.user) {
     loginUrl.searchParams.set("error", "invalid_credentials");
     return NextResponse.redirect(loginUrl, { status: 303 });
   }
@@ -56,14 +50,14 @@ export async function POST(request: Request) {
     .eq("id", data.user.id)
     .maybeSingle();
 
-  const role =
-    (profile?.role as "superadmin" | "agency_admin" | "agent" | "customer") ?? "customer";
-  const targetPath = redirectTo && redirectTo.startsWith("/") ? redirectTo : undefined;
+  if (profile?.role && profile.role !== "customer") {
+    return NextResponse.redirect(buildAppUrl("/dashboard", request.headers), {
+      status: 303,
+    });
+  }
 
   return NextResponse.redirect(
-    role === "customer"
-      ? buildMarketplaceUrl(targetPath ?? "/cuenta", request.headers)
-      : buildAppUrl(targetPath ?? "/dashboard", request.headers),
+    buildMarketplaceUrl(redirectTo || "/cuenta", request.headers),
     {
       status: 303,
     }

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { buildAbsoluteUrlFromNextRequest } from "@/lib/request-url";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { buildAbsoluteUrlFromNextRequest, buildMarketplaceUrl } from "@/lib/request-url";
 import { updateSession } from "@/lib/supabase/middleware";
 import { resolveTenantFromHost } from "@/lib/tenant-routing";
 
@@ -33,15 +34,39 @@ export async function middleware(request: NextRequest) {
 
   if (resolved.kind === "app") {
     session = await updateSession(request);
+    let role: "superadmin" | "agency_admin" | "agent" | "customer" | null = null;
+
+    if (session.user) {
+      const admin = createAdminClient();
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .maybeSingle();
+
+      role =
+        (profile?.role as "superadmin" | "agency_admin" | "agent" | "customer" | null) ??
+        null;
+    }
 
     const isAuthRoute = pathname.startsWith("/auth");
     const isLogoutRoute = pathname === "/auth/logout";
     const isProtectedRoute = !isAuthRoute;
 
     if (pathname === "/") {
-      const target = session.user ? "/dashboard" : "/auth/login";
+      const target = session.user
+        ? role === "customer"
+          ? buildMarketplaceUrl("/cuenta", request.headers)
+          : buildAbsoluteUrlFromNextRequest("/dashboard", request)
+        : buildAbsoluteUrlFromNextRequest("/auth/login", request);
+      const redirectResponse = NextResponse.redirect(target);
+      session.copyCookies(redirectResponse);
+      return redirectResponse;
+    }
+
+    if (isProtectedRoute && session.user && role === "customer") {
       const redirectResponse = NextResponse.redirect(
-        buildAbsoluteUrlFromNextRequest(target, request)
+        buildMarketplaceUrl("/cuenta", request.headers)
       );
       session.copyCookies(redirectResponse);
       return redirectResponse;
@@ -57,7 +82,9 @@ export async function middleware(request: NextRequest) {
 
     if (isAuthRoute && session.user && !isLogoutRoute) {
       const redirectResponse = NextResponse.redirect(
-        buildAbsoluteUrlFromNextRequest("/dashboard", request)
+        role === "customer"
+          ? buildMarketplaceUrl("/cuenta", request.headers)
+          : buildAbsoluteUrlFromNextRequest("/dashboard", request)
       );
       session.copyCookies(redirectResponse);
       return redirectResponse;

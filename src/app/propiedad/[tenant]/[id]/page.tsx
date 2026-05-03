@@ -1,4 +1,5 @@
 import { MarketplacePropertyDetail } from "@/components/sites/marketplace-property-detail";
+import { getCurrentUserContext } from "@/lib/auth/current-user";
 import {
   getAgencyBySlug,
   getPropertyBySlugAndId,
@@ -13,11 +14,12 @@ export default async function MarketplacePropertyPage({
 }: {
   params: { tenant: string; id: string };
 }) {
-  const [agency, property, allAgencies, sameAgencyProperties] = await Promise.all([
+  const [agency, property, allAgencies, sameAgencyProperties, current] = await Promise.all([
     getAgencyBySlug(params.tenant),
     getPropertyBySlugAndId(params.tenant, params.id),
     listAgencies(),
     listProperties({ tenantSlug: params.tenant }),
+    getCurrentUserContext(),
   ]);
 
   const relatedProperties = sameAgencyProperties
@@ -30,6 +32,15 @@ export default async function MarketplacePropertyPage({
       property={property}
       allAgencies={allAgencies}
       relatedProperties={relatedProperties}
+      currentUser={
+        current
+          ? {
+              fullName: current.profile.full_name,
+              email: current.user.email,
+              role: current.profile.role,
+            }
+          : null
+      }
     />
   );
 }
