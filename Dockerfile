@@ -15,4 +15,4 @@ ENV NODE_ENV=production
 ENV PORT=3000
 COPY --from=builder /app ./
 EXPOSE 3000
-CMD ["npm", "run", "start"]
+CMD ["sh", "-c", "npm run start -- -H 0.0.0.0 -p ${PORT:-3000}"]
