@@ -43,9 +43,25 @@ create table if not exists public.properties (
   updated_at timestamptz not null default timezone('utc'::text, now())
 );
 
+create table if not exists public.catalog_inquiries (
+  id uuid primary key default gen_random_uuid(),
+  agency_id uuid not null references public.agencies (id) on delete cascade,
+  property_id uuid references public.properties (id) on delete set null,
+  name text not null,
+  email text not null,
+  phone text not null,
+  message text not null,
+  budget text,
+  operation text,
+  status text not null default 'Nuevo' check (status in ('Nuevo', 'Contactado', 'Visitando', 'Cerrado')),
+  source text not null default 'catalog',
+  created_at timestamptz not null default timezone('utc'::text, now())
+);
+
 alter table public.profiles enable row level security;
 alter table public.agencies enable row level security;
 alter table public.properties enable row level security;
+alter table public.catalog_inquiries enable row level security;
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -97,6 +113,7 @@ drop policy if exists "Users can view their own profile" on public.profiles;
 drop policy if exists "Users can update their own profile" on public.profiles;
 drop policy if exists "Public can view agencies" on public.agencies;
 drop policy if exists "Public can view properties" on public.properties;
+drop policy if exists "Service role manages inquiries" on public.catalog_inquiries;
 
 create policy "Users can view their own profile"
 on public.profiles
@@ -117,3 +134,9 @@ create policy "Public can view properties"
 on public.properties
 for select
 using (true);
+
+create policy "Service role manages inquiries"
+on public.catalog_inquiries
+for all
+using (auth.role() = 'service_role')
+with check (auth.role() = 'service_role');

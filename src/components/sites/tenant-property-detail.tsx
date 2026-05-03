@@ -1,17 +1,33 @@
 import Image from "next/image";
 import Link from "next/link";
-import { MapPin } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  CheckCircle2,
+  MapPin,
+  MessageSquareMore,
+  Phone,
+} from "lucide-react";
 
 import type { Agency, Property } from "@/lib/mock-data";
-import { Button } from "@/components/ui/button";
+import { CatalogInquiryForm } from "@/components/sites/catalog-inquiry-form";
+import { TenantPropertyCard } from "@/components/sites/tenant-property-card";
 import { formatCurrency } from "@/lib/utils";
+
+const highlights = [
+  "Acompanamiento comercial personalizado",
+  "Visitas coordinadas con respuesta agil",
+  "Analisis de opcion segun necesidad y presupuesto",
+];
 
 export function TenantPropertyDetail({
   agency,
   property,
+  relatedProperties,
 }: {
   agency: Agency | null;
   property: Property | null;
+  relatedProperties: Property[];
 }) {
   if (!agency || !property) {
     return (
@@ -27,59 +43,133 @@ export function TenantPropertyDetail({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6">
-          <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-blue-600">{agency.name}</p>
-            <h1 className="mt-2 text-3xl font-semibold">{property.title}</h1>
-          </div>
-          <Link href="/">
-            <Button variant="outline" className="rounded-2xl">
-              Volver al catalogo
-            </Button>
+    <div className="min-h-screen bg-[linear-gradient(180deg,rgba(241,245,249,0.95)_0%,rgba(255,255,255,1)_28%,rgba(255,255,255,1)_100%)]">
+      <header className="border-b border-slate-200 bg-white/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-5 sm:px-6 xl:px-8">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
+          >
+            <ArrowLeft className="size-4" />
+            Volver al catalogo
           </Link>
+
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">
+                <Building2 className="size-3.5" />
+                {agency.name}
+              </div>
+              <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-950">
+                {property.title}
+              </h1>
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                <span className="rounded-full bg-white px-3 py-1 font-semibold text-slate-700 ring-1 ring-slate-200">
+                  {property.operation}
+                </span>
+                <span className="rounded-full bg-slate-900 px-3 py-1 font-semibold text-white">
+                  {property.status}
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <MapPin className="size-4" />
+                  {property.location}
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-slate-200 bg-white px-5 py-4 shadow-[0_18px_45px_-32px_rgba(15,23,42,0.25)]">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Valor publicado</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950">
+                {formatCurrency(property.price)}
+              </p>
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <section className="space-y-4">
-          <div className="relative h-[460px] overflow-hidden rounded-[32px] border bg-white">
-            <Image src={property.images[0]} alt={property.title} fill className="object-cover" />
+      <main className="mx-auto max-w-[1440px] space-y-10 px-4 py-8 sm:px-6 xl:px-8">
+        <section className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
+          <div className="space-y-4">
+            <div className="relative h-[340px] overflow-hidden rounded-[30px] border border-slate-200 bg-white sm:h-[440px] xl:h-[560px]">
+              <Image src={property.images[0]} alt={property.title} fill className="object-cover" />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              {property.images.slice(1, 4).map((image) => (
+                <div
+                  key={image}
+                  className="relative h-28 overflow-hidden rounded-[24px] border border-slate-200 bg-white sm:h-36"
+                >
+                  <Image src={image} alt={property.title} fill className="object-cover" />
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            {property.images.slice(1).map((image) => (
-              <div key={image} className="relative h-36 overflow-hidden rounded-[24px] border bg-white">
-                <Image src={image} alt={property.title} fill className="object-cover" />
+
+          <div className="space-y-6">
+            <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.3)]">
+              <h2 className="text-2xl font-semibold text-slate-950">Resumen comercial</h2>
+              <p className="mt-4 text-sm leading-7 text-slate-600">{property.description}</p>
+
+              <div className="mt-6 grid gap-3">
+                {highlights.map((highlight) => (
+                  <div key={highlight} className="flex items-start gap-3">
+                    <CheckCircle2 className="mt-0.5 size-4 text-emerald-600" />
+                    <p className="text-sm text-slate-600">{highlight}</p>
+                  </div>
+                ))}
               </div>
-            ))}
+            </section>
+
+            <section className="rounded-[30px] border border-slate-200 bg-slate-950 p-6 text-white shadow-[0_24px_80px_-48px_rgba(15,23,42,0.55)]">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.24em] text-blue-100">
+                    Asesor asignado
+                  </p>
+                  <h3 className="mt-3 text-2xl font-semibold">{agency.ownerName}</h3>
+                </div>
+                <div className="flex size-11 items-center justify-center rounded-2xl bg-white/10">
+                  <MessageSquareMore className="size-5" />
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-3 text-sm text-white/80">
+                <p>{agency.email}</p>
+                <p className="inline-flex items-center gap-2">
+                  <Phone className="size-4" />
+                  {agency.phone}
+                </p>
+                <p>{agency.city}</p>
+              </div>
+            </section>
+
+            <CatalogInquiryForm
+              tenantSlug={agency.slug}
+              propertyId={property.id}
+              compact
+              title="Solicitar mas informacion"
+              description="Consulta disponibilidad, coordinacion de visita o condiciones comerciales de esta propiedad."
+            />
           </div>
         </section>
 
-        <aside className="rounded-[32px] border bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-              {property.operation}
-            </span>
-            <span className="text-3xl font-semibold">{formatCurrency(property.price)}</span>
-          </div>
+        {relatedProperties.length > 0 ? (
+          <section className="space-y-6">
+            <div>
+              <p className="text-sm font-medium text-slate-500">Mas opciones del catalogo</p>
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
+                Propiedades relacionadas
+              </h2>
+            </div>
 
-          <div className="mt-6 flex items-center gap-2 text-sm text-slate-600">
-            <MapPin className="size-4" />
-            <span>{property.location}</span>
-          </div>
-
-          <p className="mt-6 text-sm leading-7 text-slate-600">{property.description}</p>
-
-          <div className="mt-8 rounded-[24px] border bg-slate-50 p-5">
-            <p className="font-semibold">Contacto</p>
-            <p className="mt-2 text-sm text-slate-600">{agency.ownerName}</p>
-            <p className="mt-1 text-sm text-slate-600">{agency.phone}</p>
-            <p className="mt-1 text-sm text-slate-600">{agency.email}</p>
-          </div>
-
-          <Button className="mt-8 w-full rounded-2xl">Contactar por esta propiedad</Button>
-        </aside>
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {relatedProperties.map((item) => (
+                <TenantPropertyCard key={item.id} property={item} />
+              ))}
+            </div>
+          </section>
+        ) : null}
       </main>
     </div>
   );

@@ -74,6 +74,8 @@ Variables requeridas:
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SECRET_KEY=
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5.4
 ```
 
 Checklist del proyecto Supabase:
@@ -88,6 +90,27 @@ Checklist del proyecto Supabase:
 4. En `SQL Editor`, ejecutar [supabase/setup.sql](./supabase/setup.sql).
 5. Copiar la `secret key` del proyecto en `Settings > API Keys` y cargarla como `SUPABASE_SECRET_KEY` en el deploy.
 6. Crear el primer usuario desde `Authentication > Users` o usar el bootstrap admin ya provisionado.
+
+## Catalogo publico + IA
+
+El catalogo publico ahora incluye:
+
+- buscador responsive
+- filtros de venta / alquiler
+- formulario real de consultas
+- asistente IA conectado por `Responses API`
+
+Para habilitar OpenAI real en produccion, cargar:
+
+```bash
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5.4
+```
+
+Referencia oficial usada para la integracion:
+
+- [Responses API](https://platform.openai.com/docs/api-reference/responses/compact?api-mode=responses)
+- [Quickstart JavaScript](https://platform.openai.com/docs/quickstart?api-mode=chat&lang=curl)
 
 El middleware protege el dashboard y redirige a `/auth/login` cuando no hay sesión.
 
