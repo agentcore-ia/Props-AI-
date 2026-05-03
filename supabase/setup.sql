@@ -46,10 +46,14 @@ create trigger profiles_set_updated_at
   before update on public.profiles
   for each row execute procedure public.touch_updated_at();
 
+drop policy if exists "Users can view their own profile" on public.profiles;
+
 create policy "Users can view their own profile"
 on public.profiles
 for select
 using (auth.uid() = id);
+
+drop policy if exists "Users can update their own profile" on public.profiles;
 
 create policy "Users can update their own profile"
 on public.profiles
