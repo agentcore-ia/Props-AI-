@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: { redirectTo?: string };
+  searchParams: { redirectTo?: string; error?: string };
 }) {
   const supabase = createClient();
   const {
@@ -22,6 +22,12 @@ export default async function LoginPage({
   }
 
   const redirectTo = searchParams.redirectTo ?? "/dashboard";
+  const error =
+    searchParams.error === "invalid_credentials"
+      ? "Email o password incorrectos."
+      : searchParams.error === "unexpected"
+        ? "Ocurrió un error inesperado al iniciar sesión."
+        : undefined;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.14),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(15,23,42,0.08),transparent_24%),#f8fafc] px-4 py-10">
@@ -40,7 +46,7 @@ export default async function LoginPage({
             </div>
           </div>
 
-          <LoginForm redirectTo={redirectTo} />
+          <LoginForm redirectTo={redirectTo} error={error} />
         </CardContent>
       </Card>
     </div>
