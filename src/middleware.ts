@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { buildAbsoluteUrlFromNextRequest } from "@/lib/request-url";
 import { updateSession } from "@/lib/supabase/middleware";
 import { resolveTenantFromHost } from "@/lib/tenant-routing";
 
@@ -38,13 +39,15 @@ export async function middleware(request: NextRequest) {
 
     if (pathname === "/") {
       const target = session.user ? "/dashboard" : "/auth/login";
-      const redirectResponse = NextResponse.redirect(new URL(target, request.url));
+      const redirectResponse = NextResponse.redirect(
+        buildAbsoluteUrlFromNextRequest(target, request)
+      );
       session.copyCookies(redirectResponse);
       return redirectResponse;
     }
 
     if (isProtectedRoute && !session.user) {
-      const loginUrl = new URL("/auth/login", request.url);
+      const loginUrl = buildAbsoluteUrlFromNextRequest("/auth/login", request);
       loginUrl.searchParams.set("redirectTo", pathname);
       const redirectResponse = NextResponse.redirect(loginUrl);
       session.copyCookies(redirectResponse);
@@ -52,7 +55,9 @@ export async function middleware(request: NextRequest) {
     }
 
     if (isAuthRoute && session.user) {
-      const redirectResponse = NextResponse.redirect(new URL("/dashboard", request.url));
+      const redirectResponse = NextResponse.redirect(
+        buildAbsoluteUrlFromNextRequest("/dashboard", request)
+      );
       session.copyCookies(redirectResponse);
       return redirectResponse;
     }

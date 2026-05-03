@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
 import { getSupabaseEnv } from "@/lib/supabase/env";
+import { buildAbsoluteUrl } from "@/lib/request-url";
 
 export async function POST(request: Request) {
   const formData = await request.formData();
@@ -10,7 +11,7 @@ export async function POST(request: Request) {
   const password = String(formData.get("password") ?? "");
   const redirectTo = String(formData.get("redirectTo") ?? "/dashboard");
 
-  const loginUrl = new URL("/auth/login", request.url);
+  const loginUrl = buildAbsoluteUrl("/auth/login", request.headers);
   if (redirectTo) {
     loginUrl.searchParams.set("redirectTo", redirectTo);
   }
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
     return NextResponse.redirect(loginUrl, { status: 303 });
   }
 
-  return NextResponse.redirect(new URL(redirectTo || "/dashboard", request.url), {
+  return NextResponse.redirect(buildAbsoluteUrl(redirectTo || "/dashboard", request.headers), {
     status: 303,
   });
 }
