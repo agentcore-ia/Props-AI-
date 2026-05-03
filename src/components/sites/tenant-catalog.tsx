@@ -1,18 +1,18 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import { MapPin } from "lucide-react";
 
+import type { Agency, Property } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
-import { usePropsStore } from "@/lib/store/use-props-store";
 import { formatCurrency } from "@/lib/utils";
 
-export function TenantCatalog({ tenantSlug }: { tenantSlug: string }) {
-  const { agencies, properties } = usePropsStore();
-  const agency = agencies.find((item) => item.slug === tenantSlug);
-  const tenantProperties = properties.filter((property) => property.tenantSlug === tenantSlug);
-
+export function TenantCatalog({
+  agency,
+  properties,
+}: {
+  agency: Agency | null;
+  properties: Property[];
+}) {
   if (!agency) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
@@ -47,7 +47,7 @@ export function TenantCatalog({ tenantSlug }: { tenantSlug: string }) {
           </div>
           <div className="rounded-[28px] border bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">Propiedades publicadas</p>
-            <p className="mt-3 text-2xl font-semibold">{tenantProperties.length}</p>
+            <p className="mt-3 text-2xl font-semibold">{properties.length}</p>
           </div>
           <div className="rounded-[28px] border bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">Contacto</p>
@@ -56,7 +56,7 @@ export function TenantCatalog({ tenantSlug }: { tenantSlug: string }) {
         </section>
 
         <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {tenantProperties.map((property) => (
+          {properties.map((property) => (
             <Link
               key={property.id}
               href={`/propiedad/${property.id}`}

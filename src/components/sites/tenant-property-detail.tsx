@@ -1,26 +1,18 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import { MapPin } from "lucide-react";
 
+import type { Agency, Property } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
-import { usePropsStore } from "@/lib/store/use-props-store";
 import { formatCurrency } from "@/lib/utils";
 
 export function TenantPropertyDetail({
-  tenantSlug,
-  propertyId,
+  agency,
+  property,
 }: {
-  tenantSlug: string;
-  propertyId: string;
+  agency: Agency | null;
+  property: Property | null;
 }) {
-  const { agencies, properties } = usePropsStore();
-  const agency = agencies.find((item) => item.slug === tenantSlug);
-  const property = properties.find(
-    (item) => item.tenantSlug === tenantSlug && item.id === propertyId
-  );
-
   if (!agency || !property) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">

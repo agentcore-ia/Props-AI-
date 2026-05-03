@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { ImagePlus, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ImagePlus, Loader2, Plus } from "lucide-react";
 
-import type { Agency, Property } from "@/lib/mock-data";
+import type { Agency } from "@/lib/mock-data";
+import type { CurrentUserContext } from "@/lib/auth/current-user";
+import type { Property } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,7 +19,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { usePropsStore } from "@/lib/store/use-props-store";
 
 const initialState = {
   tenantSlug: "",
@@ -29,16 +31,73 @@ const initialState = {
   image: "",
 };
 
-export function PropertyFormDialog({ agencies }: { agencies: Agency[] }) {
-  const { createProperty } = usePropsStore();
+export function PropertyFormDialog({
+  agencies,
+  currentUser,
+}: {
+  agencies: Agency[];
+  currentUser: CurrentUserContext;
+}) {
+  const router = useRouter();
+  const defaultSlug =
+    currentUser.profile.role === "agency_admin"
+      ? currentUser.profile.agency_slug ?? agencies[0]?.slug ?? ""
+      : agencies[0]?.slug ?? "";
+
   const [open, setOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     ...initialState,
-    tenantSlug: agencies[0]?.slug ?? "",
+    tenantSlug: defaultSlug,
   });
 
+  async function handleCreateProperty() {
+    setSubmitting(true);
+    setError(null);
+
+    const response = await fetch("/api/admin/properties", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        ...form,
+        price: Number(form.price) || 0,
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      setSubmitting(false);
+      setError(payload?.error ?? "No se pudo guardar la propiedad.");
+      return;
+    }
+
+    setForm({
+      ...initialState,
+      tenantSlug: defaultSlug,
+    });
+    setSubmitting(false);
+    setOpen(false);
+    router.refresh();
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
+          setError(null);
+          setForm({
+            ...initialState,
+            tenantSlug: defaultSlug,
+          });
+        }
+      }}
+    >
       <DialogTrigger render={<Button className="rounded-2xl" />}>
         <Plus className="size-4" />
         Nueva propiedad
@@ -58,6 +117,7 @@ export function PropertyFormDialog({ agencies }: { agencies: Agency[] }) {
               <select
                 className="flex h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none"
                 value={form.tenantSlug}
+                disabled={currentUser.profile.role === "agency_admin"}
                 onChange={(event) => setForm((prev) => ({ ...prev, tenantSlug: event.target.value }))}
               >
                 {agencies.map((agency) => (
@@ -158,31 +218,20 @@ export function PropertyFormDialog({ agencies }: { agencies: Agency[] }) {
               </div>
             </div>
           </div>
+
+          {error ? (
+            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancelar
           </Button>
-          <Button
-            onClick={() => {
-              createProperty({
-                tenantSlug: form.tenantSlug,
-                title: form.title,
-                price: Number(form.price) || 0,
-                description: form.description,
-                status: form.status,
-                operation: form.operation,
-                location: form.location,
-                image: form.image,
-              });
-              setForm({
-                ...initialState,
-                tenantSlug: agencies[0]?.slug ?? "",
-              });
-              setOpen(false);
-            }}
-          >
+          <Button onClick={handleCreateProperty} disabled={submitting}>
+            {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
             Guardar y publicar
           </Button>
         </DialogFooter>

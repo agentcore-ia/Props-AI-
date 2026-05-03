@@ -73,6 +73,7 @@ Variables requeridas:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SECRET_KEY=
 ```
 
 Checklist del proyecto Supabase:
@@ -85,7 +86,8 @@ Checklist del proyecto Supabase:
      - `https://app.props.com.ar/auth/login`
      - `http://localhost:3000/auth/login`
 4. En `SQL Editor`, ejecutar [supabase/setup.sql](./supabase/setup.sql).
-5. Crear el primer usuario desde `Authentication > Users`.
+5. Copiar la `secret key` del proyecto en `Settings > API Keys` y cargarla como `SUPABASE_SECRET_KEY` en el deploy.
+6. Crear el primer usuario desde `Authentication > Users` o usar el bootstrap admin ya provisionado.
 
 El middleware protege el dashboard y redirige a `/auth/login` cuando no hay sesión.
 

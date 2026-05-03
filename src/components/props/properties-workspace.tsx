@@ -2,16 +2,33 @@
 
 import { useMemo, useState } from "react";
 
+import type { Agency, Property } from "@/lib/mock-data";
+import type { CurrentUserContext } from "@/lib/auth/current-user";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { PropertyCard } from "@/components/props/property-card";
 import { PropertyFormDialog } from "@/components/props/property-form-dialog";
 import { Button } from "@/components/ui/button";
-import { usePropsStore } from "@/lib/store/use-props-store";
 
-export function PropertiesWorkspace() {
-  const { agencies, properties } = usePropsStore();
-  const [filter, setFilter] = useState<string>("all");
+export function PropertiesWorkspace({
+  agencies,
+  properties,
+  currentUser,
+}: {
+  agencies: Agency[];
+  properties: Property[];
+  currentUser: CurrentUserContext;
+}) {
+  const [filter, setFilter] = useState<string>(
+    currentUser.profile.role === "agency_admin"
+      ? currentUser.profile.agency_slug ?? "all"
+      : "all"
+  );
+
+  const visibleAgencies =
+    currentUser.profile.role === "agency_admin"
+      ? agencies.filter((agency) => agency.slug === currentUser.profile.agency_slug)
+      : agencies;
 
   const filteredProperties = useMemo(() => {
     if (filter === "all") return properties;
@@ -23,18 +40,20 @@ export function PropertiesWorkspace() {
       <PageHeader
         title="Propiedades"
         description="Inventario multi-tenant. Cada propiedad queda asociada a una inmobiliaria y se publica automaticamente en su catalogo."
-        action={<PropertyFormDialog agencies={agencies} />}
+        action={<PropertyFormDialog agencies={visibleAgencies} currentUser={currentUser} />}
       />
 
       <div className="flex flex-wrap gap-2">
-        <Button
-          variant={filter === "all" ? "default" : "outline"}
-          className="rounded-2xl"
-          onClick={() => setFilter("all")}
-        >
-          Todas
-        </Button>
-        {agencies.map((agency) => (
+        {currentUser.profile.role !== "agency_admin" ? (
+          <Button
+            variant={filter === "all" ? "default" : "outline"}
+            className="rounded-2xl"
+            onClick={() => setFilter("all")}
+          >
+            Todas
+          </Button>
+        ) : null}
+        {visibleAgencies.map((agency) => (
           <Button
             key={agency.id}
             variant={filter === agency.slug ? "default" : "outline"}

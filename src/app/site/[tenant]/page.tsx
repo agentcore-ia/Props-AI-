@@ -1,9 +1,17 @@
 import { TenantCatalog } from "@/components/sites/tenant-catalog";
+import { getAgencyBySlug, listProperties } from "@/lib/props-data";
 
-export default function TenantCatalogPage({
+export const dynamic = "force-dynamic";
+
+export default async function TenantCatalogPage({
   params,
 }: {
   params: { tenant: string };
 }) {
-  return <TenantCatalog tenantSlug={params.tenant} />;
+  const [agency, properties] = await Promise.all([
+    getAgencyBySlug(params.tenant),
+    listProperties({ tenantSlug: params.tenant }),
+  ]);
+
+  return <TenantCatalog agency={agency} properties={properties} />;
 }
