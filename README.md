@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Props AI
 
-## Getting Started
+Base escalable para un CRM inmobiliario SaaS llamado `Props`, pensado para evolucionar desde mock data hacia backend real, IA y canales conversacionales.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Next.js 14 con App Router
+- Tailwind CSS
+- shadcn/ui
+- TypeScript
+- Recharts
+
+## Módulos incluidos
+
+- Dashboard con métricas, actividad reciente y gráfico
+- Propiedades con cards y modal de alta
+- Leads con vista tabla y kanban
+- Mensajes con inbox estilo chat
+- IA con interfaz tipo copiloto
+- Llamadas con timeline operativo
+- Configuración de la inmobiliaria
+
+## Estructura
+
+```text
+src/
+  app/
+    (crm)/
+      dashboard/
+      propiedades/
+      leads/
+      mensajes/
+      ia/
+      llamadas/
+      configuracion/
+  components/
+    ui/
+    layout/
+    dashboard/
+    props/
+    leads/
+    messages/
+    ia/
+  lib/
+    mock-data/
+    utils.ts
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Desarrollo
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Validación
 
-## Learn More
+```bash
+npm run lint
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Próximos pasos sugeridos
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Conectar autenticación y roles.
+2. Sustituir mocks por servicios/API.
+3. Persistir estado de mensajes, leads y propiedades.
+4. Integrar WhatsApp, automatizaciones e IA real.

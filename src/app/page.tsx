@@ -1,101 +1,85 @@
-import Image from "next/image";
+import Link from "next/link";
+import { ArrowRight, Building2, Globe2, ShieldCheck } from "lucide-react";
 
-export default function Home() {
+import { Button } from "@/components/ui/button";
+
+export default function HomePage() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.14),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(15,23,42,0.08),transparent_24%),#f8fafc]">
+      <header className="border-b bg-white/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex size-11 items-center justify-center rounded-2xl bg-blue-600 text-white">
+              <Building2 className="size-5" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold">Props</p>
+              <p className="text-sm text-slate-500">CRM inmobiliario multi-tenant</p>
+            </div>
+          </div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          <Link href="/dashboard">
+            <Button className="rounded-2xl">
+              Ir al dashboard
+              <ArrowRight className="size-4" />
+            </Button>
+          </Link>
         </div>
+      </header>
+
+      <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+        <section className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-[0.28em] text-blue-600">props.com.ar</p>
+            <h1 className="mt-5 max-w-4xl text-5xl font-semibold tracking-tight text-slate-950">
+              Vende tu CRM inmobiliario y entrega un sitio automatico por cliente.
+            </h1>
+            <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
+              Landing para vender el sistema, dashboard para operar y un catalogo publico por subdominio para cada inmobiliaria.
+            </p>
+
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link href="/dashboard">
+                <Button size="lg" className="rounded-2xl">
+                  app.props.com.ar
+                </Button>
+              </Link>
+              <a
+                href="http://gentile.localhost:3002"
+                className="inline-flex items-center rounded-2xl border bg-white px-5 py-3 text-sm font-medium"
+              >
+                gentile.props.com.ar
+              </a>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            {[
+              {
+                icon: ShieldCheck,
+                title: "Admin multi-tenant",
+                text: "Crea usuarios, inmobiliarias y controla sus planes desde un panel central.",
+              },
+              {
+                icon: Globe2,
+                title: "Web automatica por cliente",
+                text: "Cada inmobiliaria obtiene su subdominio y publica solo sus propiedades.",
+              },
+              {
+                icon: Building2,
+                title: "Operacion unificada",
+                text: "Propiedades, leads, mensajes e IA trabajan sobre una misma base de producto.",
+              },
+            ].map((item) => (
+              <div key={item.title} className="rounded-[30px] border bg-white p-6 shadow-sm">
+                <item.icon className="size-6 text-blue-600" />
+                <h2 className="mt-4 text-xl font-semibold">{item.title}</h2>
+                <p className="mt-2 text-sm leading-7 text-slate-600">{item.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
