@@ -5,7 +5,25 @@ function normalizePath(path: string) {
   return path.startsWith("/") ? path : `/${path}`;
 }
 
+function normalizeOrigin(origin: string | null) {
+  if (!origin) return null;
+
+  try {
+    return new URL(origin).origin;
+  } catch {
+    return null;
+  }
+}
+
 export function buildRequestOrigin(headers: Headers) {
+  const directOrigin =
+    normalizeOrigin(headers.get("origin")) ??
+    normalizeOrigin(headers.get("referer"));
+
+  if (directOrigin) {
+    return directOrigin;
+  }
+
   const protocol =
     headers.get("x-forwarded-proto") ??
     headers.get("x-forwarded-protocol") ??
