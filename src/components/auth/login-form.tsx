@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LockKeyhole, Mail } from "lucide-react";
 
@@ -14,10 +14,12 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setError(null);
     setIsSubmitting(true);
 
+    const formData = new FormData(event.currentTarget);
     const email = String(formData.get("email") ?? "").trim().toLowerCase();
     const password = String(formData.get("password") ?? "");
 
@@ -43,12 +45,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
   }
 
   return (
-    <form
-      className="space-y-5"
-      action={async (formData) => {
-        await handleSubmit(formData);
-      }}
-    >
+    <form className="space-y-5" onSubmit={handleSubmit}>
       <input type="hidden" name="redirectTo" value={redirectTo} />
 
       <div className="space-y-2">
