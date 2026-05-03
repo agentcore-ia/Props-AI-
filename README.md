@@ -64,6 +64,31 @@ NODE_ENV=production
 PORT=3000
 ```
 
+## Supabase Auth
+
+La app ya viene preparada para login con Supabase en el dashboard (`app.props.com.ar`).
+
+Variables requeridas:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+```
+
+Checklist del proyecto Supabase:
+
+1. Crear un proyecto nuevo.
+2. En `Authentication > Sign In / Providers`, dejar activo `Email`.
+3. En `Authentication > URL Configuration`:
+   - Site URL: `https://app.props.com.ar`
+   - Redirect URLs:
+     - `https://app.props.com.ar/auth/login`
+     - `http://localhost:3000/auth/login`
+4. En `SQL Editor`, ejecutar [supabase/setup.sql](./supabase/setup.sql).
+5. Crear el primer usuario desde `Authentication > Users`.
+
+El middleware protege el dashboard y redirige a `/auth/login` cuando no hay sesión.
+
 ## Validación
 
 ```bash

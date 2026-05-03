@@ -1,7 +1,15 @@
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { createClient } from "@/lib/supabase/server";
 
-export default function CrmLayout({ children }: { children: ReactNode }) {
-  return <AppShell>{children}</AppShell>;
+export const dynamic = "force-dynamic";
+
+export default async function CrmLayout({ children }: { children: ReactNode }) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  return <AppShell userEmail={user?.email ?? null}>{children}</AppShell>;
 }

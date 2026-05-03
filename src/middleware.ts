@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { updateSession } from "@/lib/supabase/middleware";
 import { resolveTenantFromHost } from "@/lib/tenant-routing";
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
@@ -16,10 +17,6 @@ export function middleware(request: NextRequest) {
 
   const resolved = resolveTenantFromHost(request.headers.get("host"));
 
-  if (resolved.kind === "app" && pathname === "/") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
   if (resolved.kind === "tenant" && resolved.tenantSlug) {
     const rewriteUrl = request.nextUrl.clone();
     rewriteUrl.pathname =
@@ -29,7 +26,39 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(rewriteUrl);
   }
 
-  return NextResponse.next();
+  let session:
+    | Awaited<ReturnType<typeof updateSession>>
+    | null = null;
+
+  if (resolved.kind === "app") {
+    session = await updateSession(request);
+
+    const isAuthRoute = pathname.startsWith("/auth");
+    const isProtectedRoute = !isAuthRoute;
+
+    if (pathname === "/") {
+      const target = session.user ? "/dashboard" : "/auth/login";
+      const redirectResponse = NextResponse.redirect(new URL(target, request.url));
+      session.copyCookies(redirectResponse);
+      return redirectResponse;
+    }
+
+    if (isProtectedRoute && !session.user) {
+      const loginUrl = new URL("/auth/login", request.url);
+      loginUrl.searchParams.set("redirectTo", pathname);
+      const redirectResponse = NextResponse.redirect(loginUrl);
+      session.copyCookies(redirectResponse);
+      return redirectResponse;
+    }
+
+    if (isAuthRoute && session.user) {
+      const redirectResponse = NextResponse.redirect(new URL("/dashboard", request.url));
+      session.copyCookies(redirectResponse);
+      return redirectResponse;
+    }
+  }
+
+  return session?.response ?? NextResponse.next();
 }
 
 export const config = {

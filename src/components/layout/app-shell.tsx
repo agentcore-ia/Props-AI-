@@ -94,7 +94,13 @@ function SidebarContent() {
   );
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  userEmail,
+}: {
+  children: ReactNode;
+  userEmail?: null | string;
+}) {
   return (
     <div className="min-h-screen">
       <div className="flex min-h-screen w-full">
@@ -142,8 +148,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </Avatar>
                 <div className="hidden sm:block">
                   <p className="text-sm font-semibold">Agentcore Realty</p>
-                  <p className="text-xs text-muted-foreground">Plan Growth</p>
+                  <p className="text-xs text-muted-foreground">{userEmail ?? "Sesion activa"}</p>
                 </div>
+                <a
+                  href="/auth/logout"
+                  className="hidden rounded-2xl border bg-background px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 sm:inline-flex"
+                >
+                  Salir
+                </a>
               </div>
             </div>
           </header>
