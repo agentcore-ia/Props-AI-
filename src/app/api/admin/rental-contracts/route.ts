@@ -9,6 +9,12 @@ import type { UploadedRentalContractFile } from "@/lib/rental-contract-files";
 import { uploadRentalContractFile } from "@/lib/rental-contract-files";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+function normalizeOptionalString(value: string | null | undefined) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
 export async function POST(request: Request) {
   const current = await getCurrentUserContext();
 
@@ -131,7 +137,7 @@ export async function POST(request: Request) {
   const resolvedTenantName =
     tenantName || analyzedContract?.tenantName || existingContract?.tenant_name || "";
   const resolvedTenantPhone = tenantPhone || existingContract?.tenant_phone || "";
-  const resolvedTenantEmail = tenantEmail || existingContract?.tenant_email || null;
+  const resolvedTenantEmail = normalizeOptionalString(tenantEmail) ?? existingContract?.tenant_email ?? null;
   const resolvedCurrentRent =
     analyzedContract?.currentRent ??
     existingContract?.current_rent ??
@@ -151,12 +157,12 @@ export async function POST(request: Request) {
     6;
   const resolvedContractStartDate =
     analyzedContract?.contractStartDate ??
-    contractStartDateRaw ??
+    normalizeOptionalString(contractStartDateRaw) ??
     existingContract?.contract_start_date ??
     null;
   const resolvedNextAdjustmentDate =
     analyzedContract?.nextAdjustmentDate ??
-    nextAdjustmentDateRaw ??
+    normalizeOptionalString(nextAdjustmentDateRaw) ??
     existingContract?.next_adjustment_date ??
     null;
   const schedule = buildFallbackContractSchedule({
@@ -225,6 +231,23 @@ export async function POST(request: Request) {
   });
 
   if (error) {
+    console.error("[rental-contract] upsert failed", {
+      propertyId: property.id,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+      payload: {
+        tenant_name: upsertPayload.tenant_name,
+        current_rent: upsertPayload.current_rent,
+        index_type: upsertPayload.index_type,
+        adjustment_frequency_months: upsertPayload.adjustment_frequency_months,
+        contract_start_date: upsertPayload.contract_start_date,
+        rent_reference_date: upsertPayload.rent_reference_date,
+        next_adjustment_date: upsertPayload.next_adjustment_date,
+        status: upsertPayload.status,
+      },
+    });
     return NextResponse.json(
       { error: "No se pudo guardar el contrato." },
       { status: 400 }

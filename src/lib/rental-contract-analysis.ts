@@ -52,6 +52,12 @@ function addMonthsIsoDate(isoDate: string, months: number) {
   return date.toISOString().slice(0, 10);
 }
 
+function normalizeOptionalDate(value: string | null | undefined) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
 export function buildFallbackContractSchedule({
   contractStartDate,
   nextAdjustmentDate,
@@ -62,9 +68,10 @@ export function buildFallbackContractSchedule({
   adjustmentFrequencyMonths: number;
 }) {
   const today = new Date().toISOString().slice(0, 10);
-  const safeStartDate = contractStartDate ?? today;
+  const safeStartDate = normalizeOptionalDate(contractStartDate) ?? today;
   const safeNextAdjustmentDate =
-    nextAdjustmentDate ?? addMonthsIsoDate(safeStartDate, adjustmentFrequencyMonths || 6);
+    normalizeOptionalDate(nextAdjustmentDate) ??
+    addMonthsIsoDate(safeStartDate, adjustmentFrequencyMonths || 6);
 
   return {
     contractStartDate: safeStartDate,
