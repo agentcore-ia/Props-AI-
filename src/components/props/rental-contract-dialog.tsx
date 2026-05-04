@@ -33,14 +33,27 @@ function getInitialForm(property: Property) {
     tenantName: property.rentalContract?.tenantName ?? "",
     tenantPhone: property.rentalContract?.tenantPhone ?? "",
     tenantEmail: property.rentalContract?.tenantEmail ?? "",
+    currentRent: property.rentalContract?.currentRent
+      ? String(property.rentalContract.currentRent)
+      : String(property.price),
     indexType: property.rentalContract?.indexType ?? "IPC",
     adjustmentFrequencyMonths: property.rentalContract?.adjustmentFrequencyMonths
       ? String(property.rentalContract.adjustmentFrequencyMonths)
       : "6",
+    contractStartDate: property.rentalContract?.contractStartDate ?? "",
+    nextAdjustmentDate: property.rentalContract?.nextAdjustmentDate ?? "",
     notes: property.rentalContract?.notes ?? "",
     autoNotify: property.rentalContract?.autoNotify ?? true,
     status: property.rentalContract?.status ?? "Activo",
   };
+}
+
+function getReviewReasons(notes: string) {
+  return notes
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("[Revision requerida]"))
+    .map((line) => line.replace("[Revision requerida]", "").trim());
 }
 
 function SectionTitle({
@@ -66,8 +79,15 @@ export function RentalContractDialog({ property }: { property: Property }) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [form, setForm] = useState(() => getInitialForm(property));
   const [contractFile, setContractFile] = useState<File | null>(null);
+  const reviewReasons = useMemo(
+    () => getReviewReasons(property.rentalContract?.notes ?? ""),
+    [property.rentalContract?.notes]
+  );
+  const requiresReview =
+    property.rentalContract?.status === "Pausado" && reviewReasons.length > 0;
 
   const acceptedFormats = useMemo(
     () =>
@@ -93,8 +113,11 @@ export function RentalContractDialog({ property }: { property: Property }) {
     body.set("tenantName", form.tenantName);
     body.set("tenantPhone", form.tenantPhone);
     body.set("tenantEmail", form.tenantEmail);
+    body.set("currentRent", form.currentRent);
     body.set("indexType", form.indexType);
     body.set("adjustmentFrequencyMonths", form.adjustmentFrequencyMonths);
+    body.set("contractStartDate", form.contractStartDate);
+    body.set("nextAdjustmentDate", form.nextAdjustmentDate);
     body.set("notes", form.notes);
     body.set("autoNotify", String(form.autoNotify));
     body.set("status", form.status);
@@ -116,9 +139,51 @@ export function RentalContractDialog({ property }: { property: Property }) {
       return;
     }
 
+    setWarning(payload?.warning ?? null);
+
     setSubmitting(false);
     setOpen(false);
     setContractFile(null);
+    router.refresh();
+  }
+
+  async function handleConfirmAutomation() {
+    if (!property.rentalContract) return;
+
+    setSubmitting(true);
+    setError(null);
+    setWarning(null);
+
+    const response = await fetch("/api/admin/rental-contracts", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        contractId: property.rentalContract.id,
+        tenantName: form.tenantName,
+        tenantPhone: form.tenantPhone,
+        tenantEmail: form.tenantEmail || null,
+        currentRent: Number(form.currentRent),
+        indexType: form.indexType,
+        adjustmentFrequencyMonths: Number(form.adjustmentFrequencyMonths),
+        contractStartDate: form.contractStartDate,
+        nextAdjustmentDate: form.nextAdjustmentDate,
+        autoNotify: form.autoNotify,
+        notes: form.notes,
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      setSubmitting(false);
+      setError(payload?.error ?? "No se pudo confirmar el contrato.");
+      return;
+    }
+
+    setSubmitting(false);
+    setOpen(false);
     router.refresh();
   }
 
@@ -129,13 +194,18 @@ export function RentalContractDialog({ property }: { property: Property }) {
         setOpen(nextOpen);
         if (!nextOpen) {
           setError(null);
+          setWarning(null);
           setContractFile(null);
           setForm(getInitialForm(property));
         }
       }}
     >
       <DialogTrigger render={<Button variant="outline" className="rounded-2xl" />}>
-        {property.rentalContract ? "Editar contrato" : "Configurar alquiler"}
+        {requiresReview
+          ? "Revisar contrato"
+          : property.rentalContract
+          ? "Editar contrato"
+          : "Configurar alquiler"}
       </DialogTrigger>
       <DialogContent className="h-[min(92vh,940px)] w-[min(96vw,1280px)] max-w-[min(96vw,1280px)] overflow-x-hidden overflow-y-auto rounded-[32px] p-0 sm:max-w-[min(96vw,1280px)]">
         <div className="p-6 lg:p-8">
@@ -183,6 +253,15 @@ export function RentalContractDialog({ property }: { property: Property }) {
                   </div>
 
                   <div className="space-y-2 xl:col-span-3">
+                    <label className="text-sm font-medium">Alquiler actual (ARS)</label>
+                    <Input
+                      placeholder="800000"
+                      value={form.currentRent}
+                      onChange={(event) => setForm((prev) => ({ ...prev, currentRent: event.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-3">
                     <label className="text-sm font-medium">Índice preferido</label>
                     <select
                       className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
@@ -206,6 +285,28 @@ export function RentalContractDialog({ property }: { property: Property }) {
                     <p className="text-xs text-muted-foreground">
                       Si el contrato dice otra cosa, Props prioriza el documento.
                     </p>
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-3">
+                    <label className="text-sm font-medium">Inicio del contrato</label>
+                    <Input
+                      type="date"
+                      value={form.contractStartDate}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, contractStartDate: event.target.value }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-3">
+                    <label className="text-sm font-medium">Próximo aumento</label>
+                    <Input
+                      type="date"
+                      value={form.nextAdjustmentDate}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, nextAdjustmentDate: event.target.value }))
+                      }
+                    />
                   </div>
 
                   <div className="space-y-2 xl:col-span-3">
@@ -258,6 +359,20 @@ export function RentalContractDialog({ property }: { property: Property }) {
                 />
 
                 <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {requiresReview ? (
+                    <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 md:col-span-2 xl:col-span-3">
+                      <p className="font-semibold">Revisión requerida antes de automatizar</p>
+                      <ul className="mt-2 space-y-1">
+                        {reviewReasons.map((reason) => (
+                          <li key={reason}>- {reason}</li>
+                        ))}
+                      </ul>
+                      <p className="mt-3 text-amber-700">
+                        Confirma estos datos y activa recién cuando estén correctos.
+                      </p>
+                    </div>
+                  ) : null}
+
                   <div className="rounded-[24px] border bg-muted/20 p-4">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <CircleDollarSign className="size-4 text-primary" />
@@ -380,12 +495,24 @@ export function RentalContractDialog({ property }: { property: Property }) {
               {error}
             </div>
           ) : null}
+
+          {warning ? (
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {warning}
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancelar
           </Button>
+          {requiresReview ? (
+            <Button onClick={handleConfirmAutomation} disabled={submitting}>
+              {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+              Confirmar y activar automatización
+            </Button>
+          ) : null}
           <Button onClick={handleSave} disabled={submitting}>
             {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
             Guardar contrato

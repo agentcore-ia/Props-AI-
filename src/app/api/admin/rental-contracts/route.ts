@@ -28,8 +28,11 @@ export async function POST(request: Request) {
   const tenantName = String(formData.get("tenantName") ?? "").trim();
   const tenantPhone = String(formData.get("tenantPhone") ?? "").trim();
   const tenantEmail = String(formData.get("tenantEmail") ?? "").trim();
+  const currentRentRaw = String(formData.get("currentRent") ?? "").trim();
   const indexType = String(formData.get("indexType") ?? "").trim();
   const adjustmentFrequencyMonths = Number(formData.get("adjustmentFrequencyMonths") ?? 0);
+  const contractStartDateRaw = String(formData.get("contractStartDate") ?? "").trim();
+  const nextAdjustmentDateRaw = String(formData.get("nextAdjustmentDate") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
   const autoNotify = String(formData.get("autoNotify") ?? "true") === "true";
   const status = String(formData.get("status") ?? "Activo").trim();
@@ -132,6 +135,7 @@ export async function POST(request: Request) {
   const resolvedCurrentRent =
     analyzedContract?.currentRent ??
     existingContract?.current_rent ??
+    (currentRentRaw ? Number(currentRentRaw) : null) ??
     fallbackRent;
   const resolvedIndexType =
     (indexType === "IPC" || indexType === "ICL" ? indexType : null) ??
@@ -146,9 +150,15 @@ export async function POST(request: Request) {
     existingContract?.adjustment_frequency_months ??
     6;
   const resolvedContractStartDate =
-    analyzedContract?.contractStartDate ?? existingContract?.contract_start_date ?? null;
+    analyzedContract?.contractStartDate ??
+    contractStartDateRaw ??
+    existingContract?.contract_start_date ??
+    null;
   const resolvedNextAdjustmentDate =
-    analyzedContract?.nextAdjustmentDate ?? existingContract?.next_adjustment_date ?? null;
+    analyzedContract?.nextAdjustmentDate ??
+    nextAdjustmentDateRaw ??
+    existingContract?.next_adjustment_date ??
+    null;
   const schedule = buildFallbackContractSchedule({
     contractStartDate: resolvedContractStartDate,
     nextAdjustmentDate: resolvedNextAdjustmentDate,
@@ -229,4 +239,123 @@ export async function POST(request: Request) {
     requiresReview,
     reviewReasons,
   });
+}
+
+export async function PATCH(request: Request) {
+  const current = await getCurrentUserContext();
+
+  if (!current) {
+    return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+  }
+
+  if (!["superadmin", "agency_admin"].includes(current.profile.role)) {
+    return NextResponse.json(
+      { error: "No tienes permisos para confirmar contratos." },
+      { status: 403 }
+    );
+  }
+
+  const body = (await request.json().catch(() => null)) as
+    | {
+        contractId?: string;
+        tenantName?: string;
+        tenantPhone?: string;
+        tenantEmail?: string | null;
+        currentRent?: number;
+        indexType?: "IPC" | "ICL";
+        adjustmentFrequencyMonths?: number;
+        contractStartDate?: string;
+        nextAdjustmentDate?: string;
+        autoNotify?: boolean;
+        notes?: string;
+      }
+    | null;
+
+  const contractId = String(body?.contractId ?? "").trim();
+  if (!contractId) {
+    return NextResponse.json({ error: "Falta el contrato a confirmar." }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+  const { data: contract, error } = await admin
+    .from("rental_contracts")
+    .select("id, agency_id, tenant_name, tenant_phone, tenant_email, current_rent, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, auto_notify, notes, agencies!inner(slug)")
+    .eq("id", contractId)
+    .maybeSingle();
+
+  if (error || !contract) {
+    return NextResponse.json({ error: "No encontramos el contrato." }, { status: 404 });
+  }
+
+  const contractAgencySlug = Array.isArray(contract.agencies)
+    ? contract.agencies[0]?.slug ?? null
+    : ((contract.agencies as { slug?: string } | null)?.slug ?? null);
+
+  if (
+    current.profile.role === "agency_admin" &&
+    current.profile.agency_slug !== contractAgencySlug
+  ) {
+    return NextResponse.json(
+      { error: "Solo puedes confirmar contratos de tu inmobiliaria." },
+      { status: 403 }
+    );
+  }
+
+  const tenantName = String(body?.tenantName ?? contract.tenant_name).trim();
+  const tenantPhone = String(body?.tenantPhone ?? contract.tenant_phone).trim();
+  const tenantEmail = body?.tenantEmail?.trim?.() || null;
+  const currentRent = Number(body?.currentRent ?? contract.current_rent);
+  const indexType = body?.indexType ?? contract.index_type;
+  const adjustmentFrequencyMonths = Number(
+    body?.adjustmentFrequencyMonths ?? contract.adjustment_frequency_months
+  );
+  const contractStartDate = String(body?.contractStartDate ?? contract.contract_start_date).trim();
+  const nextAdjustmentDate = String(body?.nextAdjustmentDate ?? contract.next_adjustment_date).trim();
+  const autoNotify = Boolean(body?.autoNotify ?? contract.auto_notify);
+  const notes = String(body?.notes ?? contract.notes ?? "")
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("[Revision requerida]"))
+    .join("\n")
+    .trim();
+
+  if (
+    !tenantName ||
+    !tenantPhone ||
+    !Number.isFinite(currentRent) ||
+    currentRent <= 0 ||
+    !["IPC", "ICL"].includes(indexType) ||
+    !Number.isFinite(adjustmentFrequencyMonths) ||
+    adjustmentFrequencyMonths <= 0 ||
+    !contractStartDate ||
+    !nextAdjustmentDate
+  ) {
+    return NextResponse.json(
+      { error: "Completa los datos críticos del contrato antes de activarlo." },
+      { status: 400 }
+    );
+  }
+
+  const { error: updateError } = await admin
+    .from("rental_contracts")
+    .update({
+      tenant_name: tenantName,
+      tenant_phone: tenantPhone,
+      tenant_email: tenantEmail,
+      current_rent: currentRent,
+      index_type: indexType,
+      adjustment_frequency_months: adjustmentFrequencyMonths,
+      contract_start_date: contractStartDate,
+      rent_reference_date: contractStartDate,
+      next_adjustment_date: nextAdjustmentDate,
+      auto_notify: autoNotify,
+      status: "Activo",
+      notes,
+    })
+    .eq("id", contractId);
+
+  if (updateError) {
+    return NextResponse.json({ error: "No se pudo confirmar el contrato." }, { status: 400 });
+  }
+
+  return NextResponse.json({ ok: true });
 }

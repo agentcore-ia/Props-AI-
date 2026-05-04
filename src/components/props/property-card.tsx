@@ -18,6 +18,13 @@ const statusStyles: Record<Property["status"], string> = {
 
 export function PropertyCard({ property }: { property: Property }) {
   const isRental = property.operation === "Alquiler";
+  const reviewReasons = (property.rentalContract?.notes ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("[Revision requerida]"))
+    .map((line) => line.replace("[Revision requerida]", "").trim());
+  const requiresReview =
+    property.rentalContract?.status === "Pausado" && reviewReasons.length > 0;
 
   return (
     <Card className="overflow-hidden rounded-[30px] border-0 bg-card shadow-sm">
@@ -70,15 +77,39 @@ export function PropertyCard({ property }: { property: Property }) {
             <div className="mt-4 rounded-[20px] bg-background p-4">
               {property.rentalContract ? (
                 <div className="space-y-3">
+                  {requiresReview ? (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                      <p className="font-medium">Revisión requerida antes de automatizar</p>
+                      <ul className="mt-2 space-y-1">
+                        {reviewReasons.map((reason) => (
+                          <li key={reason}>- {reason}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="font-medium">{property.rentalContract.tenantName}</p>
                       <p className="text-sm text-muted-foreground">{property.rentalContract.tenantPhone}</p>
                     </div>
-                    <Badge variant="outline" className="rounded-full">
-                      {property.rentalContract.indexType} cada{" "}
-                      {property.rentalContract.adjustmentFrequencyMonths} meses
-                    </Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="rounded-full">
+                        {property.rentalContract.indexType} cada{" "}
+                        {property.rentalContract.adjustmentFrequencyMonths} meses
+                      </Badge>
+                      <Badge
+                        className={cn(
+                          "rounded-full border-0",
+                          property.rentalContract.status === "Activo"
+                            ? "bg-emerald-500/10 text-emerald-700"
+                            : property.rentalContract.status === "Pausado"
+                            ? "bg-amber-500/10 text-amber-700"
+                            : "bg-slate-900/10 text-slate-700"
+                        )}
+                      >
+                        {property.rentalContract.status}
+                      </Badge>
+                    </div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="rounded-2xl border px-3 py-3">
