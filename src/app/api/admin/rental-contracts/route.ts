@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
-import { analyzeRentalContractText } from "@/lib/rental-contract-analysis";
+import {
+  analyzeRentalContractText,
+  buildFallbackContractSchedule,
+} from "@/lib/rental-contract-analysis";
 import type { UploadedRentalContractFile } from "@/lib/rental-contract-files";
 import { uploadRentalContractFile } from "@/lib/rental-contract-files";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -144,6 +147,11 @@ export async function POST(request: Request) {
     analyzedContract?.contractStartDate ?? existingContract?.contract_start_date ?? null;
   const resolvedNextAdjustmentDate =
     analyzedContract?.nextAdjustmentDate ?? existingContract?.next_adjustment_date ?? null;
+  const schedule = buildFallbackContractSchedule({
+    contractStartDate: resolvedContractStartDate,
+    nextAdjustmentDate: resolvedNextAdjustmentDate,
+    adjustmentFrequencyMonths: resolvedAdjustmentFrequencyMonths,
+  });
 
   if (!resolvedTenantName || !resolvedTenantPhone) {
     return NextResponse.json(
@@ -162,13 +170,13 @@ export async function POST(request: Request) {
     currency: "ARS",
     index_type: resolvedIndexType,
     adjustment_frequency_months: resolvedAdjustmentFrequencyMonths,
-    contract_start_date: resolvedContractStartDate,
+    contract_start_date: schedule.contractStartDate,
     rent_reference_date:
       existingContract?.rent_reference_date ??
-      resolvedContractStartDate ??
+      schedule.contractStartDate ??
       existingContract?.contract_start_date ??
       null,
-    next_adjustment_date: resolvedNextAdjustmentDate,
+    next_adjustment_date: schedule.nextAdjustmentDate,
     last_adjustment_date: existingContract?.last_adjustment_date ?? null,
     auto_notify: autoNotify,
     notification_channel: "whatsapp",
@@ -203,7 +211,7 @@ export async function POST(request: Request) {
     warning:
       uploadedContract?.extractionWarning ??
       (!resolvedContractStartDate || !resolvedNextAdjustmentDate
-        ? "Guardamos el contrato, pero todavia no pudimos detectar todas las fechas automaticamente."
+        ? "Guardamos el contrato, pero algunas fechas quedaron estimadas hasta que Props pueda interpretarlo mejor."
         : null),
   });
 }

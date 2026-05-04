@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
 import { uploadPropertyImages } from "@/lib/property-images";
-import { analyzeRentalContractText } from "@/lib/rental-contract-analysis";
+import {
+  analyzeRentalContractText,
+  buildFallbackContractSchedule,
+} from "@/lib/rental-contract-analysis";
 import { uploadRentalContractFile } from "@/lib/rental-contract-files";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -244,6 +247,11 @@ export async function POST(request: Request) {
       analyzedContract?.contractStartDate ?? rentalContract.contractStartDate ?? null;
     const resolvedNextAdjustmentDate =
       analyzedContract?.nextAdjustmentDate ?? rentalContract.nextAdjustmentDate ?? null;
+    const schedule = buildFallbackContractSchedule({
+      contractStartDate: resolvedContractStartDate,
+      nextAdjustmentDate: resolvedNextAdjustmentDate,
+      adjustmentFrequencyMonths: resolvedAdjustmentFrequencyMonths,
+    });
 
     const { error: contractError } = await admin.from("rental_contracts").insert({
       property_id: property.id,
@@ -255,9 +263,9 @@ export async function POST(request: Request) {
       currency: "ARS",
       index_type: resolvedIndexType,
       adjustment_frequency_months: resolvedAdjustmentFrequencyMonths,
-      contract_start_date: resolvedContractStartDate,
-      rent_reference_date: resolvedContractStartDate,
-      next_adjustment_date: resolvedNextAdjustmentDate,
+      contract_start_date: schedule.contractStartDate,
+      rent_reference_date: schedule.contractStartDate,
+      next_adjustment_date: schedule.nextAdjustmentDate,
       auto_notify: rentalContract.autoNotify,
       notification_channel: "whatsapp",
       status: "Activo",
