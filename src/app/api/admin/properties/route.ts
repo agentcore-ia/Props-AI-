@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
 import { uploadPropertyImages } from "@/lib/property-images";
+import { analyzeRentalContractText } from "@/lib/rental-contract-analysis";
 import { uploadRentalContractFile } from "@/lib/rental-contract-files";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -176,21 +177,11 @@ export async function POST(request: Request) {
   }
 
   if (operation === "Alquiler" && rentalContract?.enabled) {
-    const currentRent = Number(rentalContract.currentRent ?? 0);
-    const adjustmentFrequencyMonths = Number(rentalContract.adjustmentFrequencyMonths ?? 0);
-
-    if (
-      !rentalContract.tenantName?.trim() ||
-      !rentalContract.tenantPhone?.trim() ||
-      !rentalContract.contractStartDate ||
-      !rentalContract.nextAdjustmentDate ||
-      !currentRent ||
-      !adjustmentFrequencyMonths
-    ) {
+    if (!rentalContract.tenantName?.trim() || !rentalContract.tenantPhone?.trim()) {
       await admin.from("properties").delete().eq("id", property.id);
 
       return NextResponse.json(
-        { error: "Completa los datos del contrato de alquiler." },
+        { error: "Completa al menos el nombre y WhatsApp del inquilino." },
         { status: 400 }
       );
     }
@@ -227,19 +218,58 @@ export async function POST(request: Request) {
       }
     }
 
+    const analyzedContract =
+      uploadedContract?.extractedText?.trim()
+        ? await analyzeRentalContractText({
+            text: uploadedContract.extractedText,
+            fallbackRent: price,
+          })
+        : null;
+
+    const draftCurrentRent = Number(rentalContract.currentRent ?? 0);
+    const draftFrequency = Number(rentalContract.adjustmentFrequencyMonths ?? 0);
+    const resolvedCurrentRent =
+      analyzedContract?.currentRent ??
+      (draftCurrentRent > 0 ? draftCurrentRent : null) ??
+      price;
+    const resolvedIndexType =
+      analyzedContract?.indexType ??
+      rentalContract.indexType ??
+      "IPC";
+    const resolvedAdjustmentFrequencyMonths =
+      analyzedContract?.adjustmentFrequencyMonths ??
+      (draftFrequency > 0 ? draftFrequency : null) ??
+      6;
+    const resolvedContractStartDate =
+      analyzedContract?.contractStartDate ?? rentalContract.contractStartDate ?? "";
+    const resolvedNextAdjustmentDate =
+      analyzedContract?.nextAdjustmentDate ?? rentalContract.nextAdjustmentDate ?? "";
+
+    if (!resolvedContractStartDate || !resolvedNextAdjustmentDate) {
+      await admin.from("properties").delete().eq("id", property.id);
+
+      return NextResponse.json(
+        {
+          error:
+            "Adjunta el contrato para que Props detecte inicio y proximo aumento automaticamente.",
+        },
+        { status: 400 }
+      );
+    }
+
     const { error: contractError } = await admin.from("rental_contracts").insert({
       property_id: property.id,
       agency_id: agency.id,
       tenant_name: rentalContract.tenantName.trim(),
       tenant_phone: rentalContract.tenantPhone.trim(),
       tenant_email: rentalContract.tenantEmail.trim() || null,
-      current_rent: currentRent,
+      current_rent: resolvedCurrentRent,
       currency: "ARS",
-      index_type: rentalContract.indexType,
-      adjustment_frequency_months: adjustmentFrequencyMonths,
-      contract_start_date: rentalContract.contractStartDate,
-      rent_reference_date: rentalContract.contractStartDate,
-      next_adjustment_date: rentalContract.nextAdjustmentDate,
+      index_type: resolvedIndexType,
+      adjustment_frequency_months: resolvedAdjustmentFrequencyMonths,
+      contract_start_date: resolvedContractStartDate,
+      rent_reference_date: resolvedContractStartDate,
+      next_adjustment_date: resolvedNextAdjustmentDate,
       auto_notify: rentalContract.autoNotify,
       notification_channel: "whatsapp",
       status: "Activo",

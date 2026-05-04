@@ -7,7 +7,7 @@ import { RentalContractDialog } from "@/components/props/rental-contract-dialog"
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { cn, formatArsCurrency, formatCurrency, formatShortDate } from "@/lib/utils";
+import { cn, formatArsCurrency, formatMoney, formatShortDate } from "@/lib/utils";
 
 const statusStyles: Record<Property["status"], string> = {
   Disponible: "bg-emerald-500/10 text-emerald-700",
@@ -53,9 +53,7 @@ export function PropertyCard({ property }: { property: Property }) {
               <p className="text-sm text-muted-foreground">
                 {isRental ? "Precio publicado" : "Valor de publicación"}
               </p>
-              <p className="text-xl font-semibold">
-                {isRental ? formatArsCurrency(property.price) : formatCurrency(property.price)}
-              </p>
+              <p className="text-xl font-semibold">{formatMoney(property.price, property.currency)}</p>
             </div>
 
             {isRental ? (
@@ -122,7 +120,8 @@ export function PropertyCard({ property }: { property: Property }) {
                 <div className="flex items-start gap-3 text-sm text-muted-foreground">
                   <MessageCircleWarning className="mt-0.5 size-4 text-primary" />
                   <p>
-                    Esta propiedad todavía no tiene contrato activo. Configuralo para automatizar IPC/ICL y avisos al inquilino.
+                    Esta propiedad todavía no tiene contrato activo. Adjunta el contrato para que Props detecte
+                    fechas, monto y automatice IPC/ICL con avisos al inquilino.
                   </p>
                 </div>
               )}

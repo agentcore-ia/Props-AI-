@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { analyzeRentalContractText } from "@/lib/rental-contract-analysis";
 import { uploadRentalContractFile } from "@/lib/rental-contract-files";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -23,11 +24,8 @@ export async function POST(request: Request) {
   const tenantName = String(formData.get("tenantName") ?? "").trim();
   const tenantPhone = String(formData.get("tenantPhone") ?? "").trim();
   const tenantEmail = String(formData.get("tenantEmail") ?? "").trim();
-  const currentRent = Number(formData.get("currentRent") ?? 0);
   const indexType = String(formData.get("indexType") ?? "").trim();
   const adjustmentFrequencyMonths = Number(formData.get("adjustmentFrequencyMonths") ?? 0);
-  const contractStartDate = String(formData.get("contractStartDate") ?? "").trim();
-  const nextAdjustmentDate = String(formData.get("nextAdjustmentDate") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
   const autoNotify = String(formData.get("autoNotify") ?? "true") === "true";
   const status = String(formData.get("status") ?? "Activo").trim();
@@ -35,17 +33,9 @@ export async function POST(request: Request) {
   const contractFile =
     contractFileEntry instanceof File && contractFileEntry.size > 0 ? contractFileEntry : null;
 
-  if (
-    !propertyId ||
-    !tenantName ||
-    !tenantPhone ||
-    !currentRent ||
-    !adjustmentFrequencyMonths ||
-    !contractStartDate ||
-    !nextAdjustmentDate
-  ) {
+  if (!propertyId) {
     return NextResponse.json(
-      { error: "Completa todos los campos del contrato." },
+      { error: "Falta la propiedad a configurar." },
       { status: 400 }
     );
   }
@@ -53,7 +43,7 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   const { data: property, error: propertyError } = await admin
     .from("properties")
-    .select("id, agency_id, operation, agencies!inner(slug)")
+    .select("id, agency_id, title, price, currency, operation, agencies!inner(slug)")
     .eq("id", propertyId)
     .maybeSingle();
 
@@ -87,7 +77,7 @@ export async function POST(request: Request) {
 
   const { data: existingContract, error: existingContractError } = await admin
     .from("rental_contracts")
-    .select("id, rent_reference_date, last_adjustment_date, contract_file_name, contract_file_path, contract_file_mime_type, contract_file_size_bytes, contract_text")
+    .select("id, tenant_name, tenant_phone, tenant_email, current_rent, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, rent_reference_date, last_adjustment_date, contract_file_name, contract_file_path, contract_file_mime_type, contract_file_size_bytes, contract_text")
     .eq("property_id", property.id)
     .maybeSingle();
 
@@ -128,19 +118,70 @@ export async function POST(request: Request) {
     }
   }
 
+  const fallbackRent = Number(property.price ?? 0);
+  const analyzedContract =
+    uploadedContract?.extractedText?.trim()
+      ? await analyzeRentalContractText({
+          text: uploadedContract.extractedText,
+          fallbackRent,
+        })
+      : null;
+
+  const resolvedTenantName =
+    tenantName || analyzedContract?.tenantName || existingContract?.tenant_name || "";
+  const resolvedTenantPhone = tenantPhone || existingContract?.tenant_phone || "";
+  const resolvedTenantEmail = tenantEmail || existingContract?.tenant_email || null;
+  const resolvedCurrentRent =
+    analyzedContract?.currentRent ??
+    existingContract?.current_rent ??
+    fallbackRent;
+  const resolvedIndexType =
+    (indexType === "IPC" || indexType === "ICL" ? indexType : null) ??
+    analyzedContract?.indexType ??
+    existingContract?.index_type ??
+    "IPC";
+  const resolvedAdjustmentFrequencyMonths =
+    (Number.isFinite(adjustmentFrequencyMonths) && adjustmentFrequencyMonths > 0
+      ? adjustmentFrequencyMonths
+      : null) ??
+    analyzedContract?.adjustmentFrequencyMonths ??
+    existingContract?.adjustment_frequency_months ??
+    6;
+  const resolvedContractStartDate =
+    analyzedContract?.contractStartDate ?? existingContract?.contract_start_date ?? null;
+  const resolvedNextAdjustmentDate =
+    analyzedContract?.nextAdjustmentDate ?? existingContract?.next_adjustment_date ?? null;
+
+  if (!resolvedTenantName || !resolvedTenantPhone) {
+    return NextResponse.json(
+      { error: "Completa al menos el nombre y WhatsApp del inquilino." },
+      { status: 400 }
+    );
+  }
+
+  if (!resolvedContractStartDate || !resolvedNextAdjustmentDate) {
+    return NextResponse.json(
+      {
+        error:
+          "Adjunta el contrato para que Props analice inicio y proximo aumento automaticamente.",
+      },
+      { status: 400 }
+    );
+  }
+
   const upsertPayload = {
     property_id: property.id,
     agency_id: property.agency_id,
-    tenant_name: tenantName,
-    tenant_phone: tenantPhone,
-    tenant_email: tenantEmail || null,
-    current_rent: currentRent,
+    tenant_name: resolvedTenantName,
+    tenant_phone: resolvedTenantPhone,
+    tenant_email: resolvedTenantEmail,
+    current_rent: resolvedCurrentRent,
     currency: "ARS",
-    index_type: indexType,
-    adjustment_frequency_months: adjustmentFrequencyMonths,
-    contract_start_date: contractStartDate,
-    rent_reference_date: existingContract?.rent_reference_date ?? contractStartDate,
-    next_adjustment_date: nextAdjustmentDate,
+    index_type: resolvedIndexType,
+    adjustment_frequency_months: resolvedAdjustmentFrequencyMonths,
+    contract_start_date: resolvedContractStartDate,
+    rent_reference_date: existingContract?.rent_reference_date ?? resolvedContractStartDate,
+    next_adjustment_date: resolvedNextAdjustmentDate,
     last_adjustment_date: existingContract?.last_adjustment_date ?? null,
     auto_notify: autoNotify,
     notification_channel: "whatsapp",
@@ -152,7 +193,10 @@ export async function POST(request: Request) {
       uploadedContract?.mimeType ?? existingContract?.contract_file_mime_type ?? null,
     contract_file_size_bytes:
       uploadedContract?.sizeBytes ?? existingContract?.contract_file_size_bytes ?? null,
-    contract_text: uploadedContract?.extractedText ?? existingContract?.contract_text ?? "",
+    contract_text:
+      uploadedContract?.extractedText ??
+      existingContract?.contract_text ??
+      "",
     created_by: current.user.id,
   };
 

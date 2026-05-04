@@ -9,9 +9,22 @@ const BUCKET = "rental-contracts";
 const MAX_FILE_SIZE = 12 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = [
   "application/pdf",
+  "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "text/plain",
 ];
+
+function getMimeTypeFromFilename(fileName: string) {
+  const normalized = fileName.toLowerCase();
+
+  if (normalized.endsWith(".pdf")) return "application/pdf";
+  if (normalized.endsWith(".doc")) return "application/msword";
+  if (normalized.endsWith(".docx")) {
+    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  }
+  if (normalized.endsWith(".txt")) return "text/plain";
+  return null;
+}
 
 function sanitizeFilename(name: string) {
   return name
@@ -40,6 +53,16 @@ async function ensureBucket() {
     if (createError && !String(createError.message).includes("already exists")) {
       throw createError;
     }
+  } else {
+    const { error: updateError } = await admin.storage.updateBucket(BUCKET, {
+      public: false,
+      fileSizeLimit: MAX_FILE_SIZE,
+      allowedMimeTypes: ALLOWED_MIME_TYPES,
+    });
+
+    if (updateError) {
+      throw updateError;
+    }
   }
 }
 
@@ -48,6 +71,19 @@ async function extractText(buffer: Buffer, mimeType: string) {
     const parser = new PDFParse({ data: buffer });
     const parsed = await parser.getText();
     return parsed.text.trim();
+  }
+
+  if (mimeType === "application/msword") {
+    const wordExtractorModule = (await import("word-extractor")) as {
+      default?: new () => { extract(input: Buffer): Promise<{ getBody(): string }> };
+    };
+    const WordExtractor = wordExtractorModule.default;
+    if (!WordExtractor) {
+      throw new Error("No se pudo leer el formato DOC.");
+    }
+    const extractor = new WordExtractor();
+    const parsed = await extractor.extract(buffer);
+    return parsed.getBody().trim();
   }
 
   if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
@@ -79,7 +115,11 @@ export async function uploadRentalContractFile({
     throw new Error("Archivo de contrato invalido.");
   }
 
-  if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+  const normalizedMimeType =
+    (file.type && ALLOWED_MIME_TYPES.includes(file.type) ? file.type : null) ??
+    getMimeTypeFromFilename(file.name);
+
+  if (!normalizedMimeType || !ALLOWED_MIME_TYPES.includes(normalizedMimeType)) {
     throw new Error("Formato de contrato no soportado.");
   }
 
@@ -95,7 +135,7 @@ export async function uploadRentalContractFile({
   const filePath = `${tenantSlug}/${propertyId}/${Date.now()}-${crypto.randomUUID()}-${filename}`;
 
   const { error } = await admin.storage.from(BUCKET).upload(filePath, buffer, {
-    contentType: file.type,
+    contentType: normalizedMimeType,
     upsert: true,
   });
 
@@ -103,12 +143,12 @@ export async function uploadRentalContractFile({
     throw error;
   }
 
-  const extractedText = await extractText(buffer, file.type);
+  const extractedText = await extractText(buffer, normalizedMimeType);
 
   return {
     fileName: filename,
     filePath,
-    mimeType: file.type,
+    mimeType: normalizedMimeType,
     sizeBytes: file.size,
     extractedText,
   };
