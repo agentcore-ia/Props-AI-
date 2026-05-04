@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
 import { uploadPropertyImages } from "@/lib/property-images";
+import { uploadRentalContractFile } from "@/lib/rental-contract-files";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const fallbackImage =
@@ -92,6 +93,9 @@ export async function POST(request: Request) {
   const imageFiles = formData
     .getAll("images")
     .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+  const contractFileEntry = formData.get("contractFile");
+  const contractFile =
+    contractFileEntry instanceof File && contractFileEntry.size > 0 ? contractFileEntry : null;
 
   let uploadedImages: string[] = [];
 
@@ -157,6 +161,38 @@ export async function POST(request: Request) {
       );
     }
 
+    let uploadedContract:
+      | {
+          fileName: string;
+          filePath: string;
+          mimeType: string;
+          sizeBytes: number;
+          extractedText: string;
+        }
+      | null = null;
+
+    if (contractFile) {
+      try {
+        uploadedContract = await uploadRentalContractFile({
+          tenantSlug,
+          propertyId: property.id,
+          file: contractFile,
+        });
+      } catch (uploadError) {
+        await admin.from("properties").delete().eq("id", property.id);
+
+        return NextResponse.json(
+          {
+            error:
+              uploadError instanceof Error
+                ? uploadError.message
+                : "No se pudo subir el contrato de alquiler.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     const { error: contractError } = await admin.from("rental_contracts").insert({
       property_id: property.id,
       agency_id: agency.id,
@@ -174,6 +210,11 @@ export async function POST(request: Request) {
       notification_channel: "whatsapp",
       status: "Activo",
       notes: rentalContract.notes?.trim() ?? "",
+      contract_file_name: uploadedContract?.fileName ?? null,
+      contract_file_path: uploadedContract?.filePath ?? null,
+      contract_file_mime_type: uploadedContract?.mimeType ?? null,
+      contract_file_size_bytes: uploadedContract?.sizeBytes ?? null,
+      contract_text: uploadedContract?.extractedText ?? "",
       created_by: current.user.id,
     });
 

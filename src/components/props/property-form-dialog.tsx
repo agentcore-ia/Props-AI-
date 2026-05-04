@@ -3,7 +3,16 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, FileImage, ImagePlus, Loader2, Plus, UploadCloud } from "lucide-react";
+import {
+  CalendarDays,
+  FileImage,
+  FileText,
+  ImagePlus,
+  Loader2,
+  Plus,
+  Sparkles,
+  UploadCloud,
+} from "lucide-react";
 
 import type { Agency, Property } from "@/lib/mock-data";
 import type { CurrentUserContext } from "@/lib/auth/current-user";
@@ -42,6 +51,24 @@ const initialState = {
   autoNotify: true,
 };
 
+function SectionTitle({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/70">{eyebrow}</p>
+      <p className="mt-1 text-base font-semibold">{title}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
 export function PropertyFormDialog({
   agencies,
   currentUser,
@@ -63,6 +90,7 @@ export function PropertyFormDialog({
     tenantSlug: defaultSlug,
   });
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [contractFile, setContractFile] = useState<File | null>(null);
 
   const previews = useMemo(
     () => imageFiles.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })),
@@ -113,6 +141,10 @@ export function PropertyFormDialog({
       body.append("images", file);
     }
 
+    if (contractFile) {
+      body.set("contractFile", contractFile);
+    }
+
     const response = await fetch("/api/admin/properties", {
       method: "POST",
       body,
@@ -131,6 +163,7 @@ export function PropertyFormDialog({
       tenantSlug: defaultSlug,
     });
     setImageFiles([]);
+    setContractFile(null);
     setSubmitting(false);
     setOpen(false);
     router.refresh();
@@ -144,6 +177,7 @@ export function PropertyFormDialog({
         if (!nextOpen) {
           setError(null);
           setImageFiles([]);
+          setContractFile(null);
           setForm({
             ...initialState,
             tenantSlug: defaultSlug,
@@ -155,286 +189,358 @@ export function PropertyFormDialog({
         <Plus className="size-4" />
         Nueva propiedad
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto rounded-[28px] p-0">
-        <div className="p-6">
+      <DialogContent className="max-h-[92vh] max-w-7xl overflow-y-auto rounded-[32px] p-0">
+        <div className="p-6 lg:p-8">
           <DialogHeader>
             <DialogTitle>Nueva propiedad</DialogTitle>
             <DialogDescription>
-              Carga una propiedad con fotos reales, y si es alquiler podés dejar listo el contrato y su automatización de aumentos.
+              Carga la publicación en un flujo más ágil: datos clave, imágenes reales y, si es alquiler, contrato listo para automatización e IA.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium">Inmobiliaria</label>
-              <select
-                className="flex h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none"
-                value={form.tenantSlug}
-                disabled={currentUser.profile.role === "agency_admin"}
-                onChange={(event) => setForm((prev) => ({ ...prev, tenantSlug: event.target.value }))}
-              >
-                {agencies.map((agency) => (
-                  <option key={agency.id} value={agency.slug}>
-                    {agency.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="mt-6 grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+            <div className="space-y-6">
+              <section className="rounded-[28px] border bg-card p-5">
+                <SectionTitle
+                  eyebrow="Base"
+                  title="Datos comerciales"
+                  description="Lo mínimo importante para publicar y encontrar rápido la propiedad dentro del CRM."
+                />
 
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium">Titulo</label>
-              <Input
-                placeholder="Torre Libertad 4B"
-                value={form.title}
-                onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
-              />
-            </div>
+                <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-12">
+                  <div className="space-y-2 xl:col-span-5">
+                    <label className="text-sm font-medium">Inmobiliaria</label>
+                    <select
+                      className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
+                      value={form.tenantSlug}
+                      disabled={currentUser.profile.role === "agency_admin"}
+                      onChange={(event) => setForm((prev) => ({ ...prev, tenantSlug: event.target.value }))}
+                    >
+                      {agencies.map((agency) => (
+                        <option key={agency.id} value={agency.slug}>
+                          {agency.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Precio publicado</label>
-              <Input
-                placeholder="250000"
-                value={form.price}
-                onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
-              />
-            </div>
+                  <div className="space-y-2 xl:col-span-7">
+                    <label className="text-sm font-medium">Título</label>
+                    <Input
+                      placeholder="Torre Libertad 4B"
+                      value={form.title}
+                      onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
+                    />
+                  </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Operacion</label>
-              <select
-                className="flex h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none"
-                value={form.operation}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, operation: event.target.value as Property["operation"] }))
-                }
-              >
-                <option value="Venta">Venta</option>
-                <option value="Alquiler">Alquiler</option>
-              </select>
-            </div>
+                  <div className="space-y-2 xl:col-span-4">
+                    <label className="text-sm font-medium">Precio publicado</label>
+                    <Input
+                      placeholder="250000"
+                      value={form.price}
+                      onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
+                    />
+                  </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Estado</label>
-              <select
-                className="flex h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none"
-                value={form.status}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, status: event.target.value as Property["status"] }))
-                }
-              >
-                <option value="Disponible">Disponible</option>
-                <option value="Reservada">Reservada</option>
-                <option value="Vendida">Vendida</option>
-                <option value="Alquilada">Alquilada</option>
-              </select>
-            </div>
+                  <div className="space-y-2 xl:col-span-4">
+                    <label className="text-sm font-medium">Operación</label>
+                    <select
+                      className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
+                      value={form.operation}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, operation: event.target.value as Property["operation"] }))
+                      }
+                    >
+                      <option value="Venta">Venta</option>
+                      <option value="Alquiler">Alquiler</option>
+                    </select>
+                  </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium">Ubicacion</label>
-              <Input
-                placeholder="Belgrano, CABA"
-                value={form.location}
-                onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value }))}
-              />
-            </div>
+                  <div className="space-y-2 xl:col-span-4">
+                    <label className="text-sm font-medium">Estado</label>
+                    <select
+                      className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
+                      value={form.status}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, status: event.target.value as Property["status"] }))
+                      }
+                    >
+                      <option value="Disponible">Disponible</option>
+                      <option value="Reservada">Reservada</option>
+                      <option value="Vendida">Vendida</option>
+                      <option value="Alquilada">Alquilada</option>
+                    </select>
+                  </div>
 
-            <div className="space-y-3 md:col-span-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Imagenes de la propiedad</label>
-                <span className="text-xs text-muted-foreground">Hasta 10 MB por imagen</span>
-              </div>
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed bg-muted/30 px-6 py-8 text-center transition hover:bg-muted/50">
-                <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <UploadCloud className="size-5" />
+                  <div className="space-y-2 xl:col-span-12">
+                    <label className="text-sm font-medium">Ubicación</label>
+                    <Input
+                      placeholder="Belgrano, CABA"
+                      value={form.location}
+                      onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-12">
+                    <label className="text-sm font-medium">Descripción</label>
+                    <Textarea
+                      placeholder="Detalles destacados, amenities, target de cliente y contexto comercial..."
+                      rows={5}
+                      value={form.description}
+                      onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
+                    />
+                  </div>
                 </div>
-                <p className="font-medium">Arrastrá o elegí imágenes reales</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Se suben a tu storage y quedan listas para el marketplace y el subdominio de la inmobiliaria.
-                </p>
-                <input
-                  className="hidden"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/avif"
-                  multiple
-                  onChange={(event) =>
-                    setImageFiles(Array.from(event.target.files ?? []))
-                  }
-                />
-              </label>
+              </section>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">O URL externa opcional</label>
-                <Input
-                  placeholder="https://..."
-                  value={form.manualImageUrl}
-                  onChange={(event) => setForm((prev) => ({ ...prev, manualImageUrl: event.target.value }))}
-                />
-              </div>
+              {isRental ? (
+                <section className="rounded-[28px] border bg-card p-5">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <SectionTitle
+                      eyebrow="Alquiler"
+                      title="Contrato y aumentos"
+                      description="Deja listo el contrato, la frecuencia de ajuste y el documento que luego interpreta Props AI."
+                    />
+                    <label className="flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-medium">
+                      <input
+                        type="checkbox"
+                        checked={form.rentEnabled}
+                        onChange={(event) =>
+                          setForm((prev) => ({ ...prev, rentEnabled: event.target.checked }))
+                        }
+                      />
+                      Tiene contrato activo
+                    </label>
+                  </div>
 
-              {previews.length > 0 ? (
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  {previews.map((preview, index) => (
-                    <div key={`${preview.name}-${index}`} className="overflow-hidden rounded-[22px] border bg-card">
-                      <div className="relative h-36">
-                        <Image src={preview.url} alt={preview.name} fill className="object-cover" unoptimized />
+                  {form.rentEnabled ? (
+                    <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_0.95fr]">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Nombre del inquilino</label>
+                          <Input
+                            placeholder="Juan Perez"
+                            value={form.tenantName}
+                            onChange={(event) => setForm((prev) => ({ ...prev, tenantName: event.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">WhatsApp del inquilino</label>
+                          <Input
+                            placeholder="+54 11 5555 1234"
+                            value={form.tenantPhone}
+                            onChange={(event) => setForm((prev) => ({ ...prev, tenantPhone: event.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Email del inquilino</label>
+                          <Input
+                            placeholder="juan@email.com"
+                            value={form.tenantEmail}
+                            onChange={(event) => setForm((prev) => ({ ...prev, tenantEmail: event.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Alquiler actual (ARS)</label>
+                          <Input
+                            placeholder="850000"
+                            value={form.currentRent}
+                            onChange={(event) => setForm((prev) => ({ ...prev, currentRent: event.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Índice</label>
+                          <select
+                            className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
+                            value={form.indexType}
+                            onChange={(event) =>
+                              setForm((prev) => ({ ...prev, indexType: event.target.value as "IPC" | "ICL" }))
+                            }
+                          >
+                            <option value="IPC">IPC</option>
+                            <option value="ICL">ICL</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Cada cuántos meses aumenta</label>
+                          <Input
+                            placeholder="6"
+                            value={form.adjustmentFrequencyMonths}
+                            onChange={(event) =>
+                              setForm((prev) => ({
+                                ...prev,
+                                adjustmentFrequencyMonths: event.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Inicio del contrato</label>
+                          <Input
+                            type="date"
+                            value={form.contractStartDate}
+                            onChange={(event) =>
+                              setForm((prev) => ({ ...prev, contractStartDate: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Próximo aumento</label>
+                          <Input
+                            type="date"
+                            value={form.nextAdjustmentDate}
+                            onChange={(event) =>
+                              setForm((prev) => ({ ...prev, nextAdjustmentDate: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <label className="text-sm font-medium">Notas internas</label>
+                          <Textarea
+                            rows={4}
+                            placeholder="Cláusulas, observaciones del alquiler o recordatorios del equipo..."
+                            value={form.notes}
+                            onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
+                          />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-                        <FileImage className="size-3.5" />
-                        <span className="truncate">{preview.name}</span>
-                      </div>
+
+                      <aside className="space-y-4 rounded-[24px] border bg-muted/25 p-4">
+                        <div className="rounded-[20px] border bg-background p-4">
+                          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                            <CalendarDays className="size-4 text-primary" />
+                            Aviso automático al inquilino
+                          </div>
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            Cuando llegue la fecha, Props calculará el aumento por {form.indexType} y enviará el nuevo valor por WhatsApp usando n8n.
+                          </p>
+                        </div>
+
+                        <label className="flex cursor-pointer flex-col gap-3 rounded-[22px] border border-dashed bg-background px-4 py-5 text-sm transition hover:bg-muted/40">
+                          <div className="flex items-center gap-2 font-medium">
+                            <FileText className="size-4 text-primary" />
+                            Adjuntar contrato
+                          </div>
+                          <p className="text-muted-foreground">
+                            Guarda el PDF, DOCX o TXT con las cláusulas y deja el texto listo para Props AI.
+                          </p>
+                          <input
+                            className="hidden"
+                            type="file"
+                            accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                            onChange={(event) => setContractFile(event.target.files?.[0] ?? null)}
+                          />
+                          <span className="rounded-2xl border px-3 py-2 text-center font-medium">
+                            {contractFile ? contractFile.name : "Elegir contrato"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Hasta 12 MB. La IA podrá usar el texto extraído del archivo.
+                          </span>
+                        </label>
+
+                        <div className="rounded-[22px] border bg-background p-4 text-sm">
+                          <div className="flex items-center gap-2 font-medium">
+                            <Sparkles className="size-4 text-primary" />
+                            Contexto inteligente
+                          </div>
+                          <p className="mt-2 text-muted-foreground">
+                            Una vez guardado, el copiloto interno puede resumir el contrato, detectar fechas de ajuste y ayudarte a redactar mensajes al inquilino.
+                          </p>
+                        </div>
+                      </aside>
                     </div>
-                  ))}
-                </div>
+                  ) : null}
+                </section>
               ) : null}
             </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium">Descripcion</label>
-              <Textarea
-                placeholder="Detalles destacados, amenities y contexto comercial..."
-                rows={5}
-                value={form.description}
-                onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-              />
-            </div>
+            <aside className="space-y-6">
+              <section className="rounded-[28px] border bg-card p-5">
+                <SectionTitle
+                  eyebrow="Visual"
+                  title="Galería de publicación"
+                  description="Sube fotos reales con preview para web, marketplace y subdominio de la inmobiliaria."
+                />
 
-            {isRental ? (
-              <div className="md:col-span-2 rounded-[28px] border bg-muted/30 p-5">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-semibold">Contrato de alquiler</p>
-                    <p className="text-sm text-muted-foreground">
-                      Si ya hay inquilino, dejá configurado el contrato y los aumentos automáticos.
+                <div className="mt-5 space-y-4">
+                  <label className="flex cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed bg-muted/30 px-6 py-8 text-center transition hover:bg-muted/50">
+                    <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <UploadCloud className="size-5" />
+                    </div>
+                    <p className="font-medium">Arrastra o elige imágenes reales</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Hasta 10 MB por imagen. Se suben a storage y quedan listas para el marketplace.
                     </p>
-                  </div>
-                  <label className="flex items-center gap-2 text-sm font-medium">
                     <input
-                      type="checkbox"
-                      checked={form.rentEnabled}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, rentEnabled: event.target.checked }))
-                      }
+                      className="hidden"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/avif"
+                      multiple
+                      onChange={(event) => setImageFiles(Array.from(event.target.files ?? []))}
                     />
-                    Tiene contrato activo
                   </label>
-                </div>
 
-                {form.rentEnabled ? (
-                  <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Nombre del inquilino</label>
-                      <Input
-                        placeholder="Juan Perez"
-                        value={form.tenantName}
-                        onChange={(event) => setForm((prev) => ({ ...prev, tenantName: event.target.value }))}
-                      />
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">O URL externa opcional</label>
+                    <Input
+                      placeholder="https://..."
+                      value={form.manualImageUrl}
+                      onChange={(event) => setForm((prev) => ({ ...prev, manualImageUrl: event.target.value }))}
+                    />
+                  </div>
+
+                  {previews.length > 0 ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {previews.map((preview, index) => (
+                        <div key={`${preview.name}-${index}`} className="overflow-hidden rounded-[22px] border bg-card">
+                          <div className="relative h-36">
+                            <Image src={preview.url} alt={preview.name} fill className="object-cover" unoptimized />
+                          </div>
+                          <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+                            <FileImage className="size-3.5" />
+                            <span className="truncate">{preview.name}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">WhatsApp del inquilino</label>
-                      <Input
-                        placeholder="+54 11 5555 1234"
-                        value={form.tenantPhone}
-                        onChange={(event) => setForm((prev) => ({ ...prev, tenantPhone: event.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Email del inquilino</label>
-                      <Input
-                        placeholder="juan@email.com"
-                        value={form.tenantEmail}
-                        onChange={(event) => setForm((prev) => ({ ...prev, tenantEmail: event.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Alquiler actual (ARS)</label>
-                      <Input
-                        placeholder="850000"
-                        value={form.currentRent}
-                        onChange={(event) => setForm((prev) => ({ ...prev, currentRent: event.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Indice</label>
-                      <select
-                        className="flex h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none"
-                        value={form.indexType}
-                        onChange={(event) =>
-                          setForm((prev) => ({ ...prev, indexType: event.target.value as "IPC" | "ICL" }))
-                        }
-                      >
-                        <option value="IPC">IPC</option>
-                        <option value="ICL">ICL</option>
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Cada cuantos meses aumenta</label>
-                      <Input
-                        placeholder="6"
-                        value={form.adjustmentFrequencyMonths}
-                        onChange={(event) =>
-                          setForm((prev) => ({
-                            ...prev,
-                            adjustmentFrequencyMonths: event.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Inicio del contrato</label>
-                      <Input
-                        type="date"
-                        value={form.contractStartDate}
-                        onChange={(event) =>
-                          setForm((prev) => ({ ...prev, contractStartDate: event.target.value }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Proximo aumento</label>
-                      <Input
-                        type="date"
-                        value={form.nextAdjustmentDate}
-                        onChange={(event) =>
-                          setForm((prev) => ({ ...prev, nextAdjustmentDate: event.target.value }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <label className="text-sm font-medium">Notas internas</label>
-                      <Textarea
-                        rows={3}
-                        placeholder="Observaciones del contrato, cláusulas o recordatorios..."
-                        value={form.notes}
-                        onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
-                      />
-                    </div>
-                    <div className="md:col-span-2 rounded-[22px] border bg-background px-4 py-3 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2 font-medium text-foreground">
-                        <CalendarDays className="size-4" />
-                        Aviso automático al inquilino
+                  ) : (
+                    <div className="flex min-h-44 items-center justify-center rounded-[24px] border border-dashed bg-muted/25">
+                      <div className="text-center">
+                        <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                          <ImagePlus className="size-5" />
+                        </div>
+                        <p className="font-medium">Todavía no cargaste imágenes</p>
+                        <p className="text-sm text-muted-foreground">
+                          La primera foto será la portada en el CRM y el marketplace.
+                        </p>
                       </div>
-                      <p className="mt-1">
-                        Cuando llegue la fecha, Props va a calcular el aumento por {form.indexType} y le enviará el nuevo valor por WhatsApp usando n8n.
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <section className="rounded-[28px] border bg-card p-5">
+                <SectionTitle
+                  eyebrow="Publicación"
+                  title="Salida automática"
+                  description="Al guardar, la propiedad se vincula al CRM, al marketplace general y al subdominio de la inmobiliaria."
+                />
+
+                <div className="mt-5 rounded-[24px] border border-dashed bg-muted/30 p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-2xl bg-primary/10 p-3 text-primary">
+                      <ImagePlus className="size-5" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Publicación enlazada automáticamente</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Cuando guardes esta propiedad y la vincules a una inmobiliaria, aparecerá en el CRM, en {form.tenantSlug || "el subdominio del cliente"} y en el marketplace público.
                       </p>
                     </div>
                   </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            <div className="md:col-span-2">
-              <div className="flex min-h-28 items-center justify-center rounded-[24px] border border-dashed bg-muted/40">
-                <div className="text-center">
-                  <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <ImagePlus className="size-5" />
-                  </div>
-                  <p className="font-medium">Publicacion enlazada automaticamente</p>
-                  <p className="text-sm text-muted-foreground">
-                    Al guardar, la propiedad quedará visible en {form.tenantSlug || "el subdominio del cliente"} y en el marketplace general.
-                  </p>
                 </div>
-              </div>
-            </div>
+              </section>
+            </aside>
           </div>
 
           {error ? (

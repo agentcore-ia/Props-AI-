@@ -100,6 +100,11 @@ create table if not exists public.rental_contracts (
   notification_channel text not null default 'whatsapp' check (notification_channel in ('whatsapp')),
   status text not null default 'Activo' check (status in ('Activo', 'Pausado', 'Finalizado')),
   notes text not null default '',
+  contract_file_name text,
+  contract_file_path text,
+  contract_file_mime_type text,
+  contract_file_size_bytes integer,
+  contract_text text not null default '',
   created_by uuid references auth.users (id) on delete set null,
   created_at timestamptz not null default timezone('utc'::text, now()),
   updated_at timestamptz not null default timezone('utc'::text, now())
@@ -128,6 +133,13 @@ create table if not exists public.rental_adjustments (
 
 alter table public.agencies
   add column if not exists messaging_instance text not null default 'agentcore';
+
+alter table public.rental_contracts
+  add column if not exists contract_file_name text,
+  add column if not exists contract_file_path text,
+  add column if not exists contract_file_mime_type text,
+  add column if not exists contract_file_size_bytes integer,
+  add column if not exists contract_text text not null default '';
 
 alter table public.profiles enable row level security;
 alter table public.agencies enable row level security;

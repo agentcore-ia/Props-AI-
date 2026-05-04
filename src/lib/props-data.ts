@@ -60,6 +60,11 @@ type RentalContractRow = {
   notification_channel: "whatsapp";
   status: "Activo" | "Pausado" | "Finalizado";
   notes: string;
+  contract_file_name: string | null;
+  contract_file_path: string | null;
+  contract_file_mime_type: string | null;
+  contract_file_size_bytes: number | null;
+  contract_text: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -184,6 +189,11 @@ function mapRentalContract(row: RentalContractRow, agencyMessagingInstance = "ag
     status: row.status,
     notes: row.notes,
     agencyMessagingInstance,
+    contractFileName: row.contract_file_name,
+    contractFilePath: row.contract_file_path,
+    contractFileMimeType: row.contract_file_mime_type,
+    contractFileSizeBytes: row.contract_file_size_bytes,
+    contractText: row.contract_text ?? "",
   };
 }
 

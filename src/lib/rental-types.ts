@@ -26,6 +26,11 @@ export type RentalContractSummary = {
   status: RentalContractStatus;
   notes: string;
   agencyMessagingInstance: string;
+  contractFileName: string | null;
+  contractFilePath: string | null;
+  contractFileMimeType: string | null;
+  contractFileSizeBytes: number | null;
+  contractText: string;
 };
 
 export type RentalAdjustmentSummary = {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, WandSparkles } from "lucide-react";
+import { Loader2, Sparkles, WandSparkles } from "lucide-react";
 
 import { AIMessage, aiMessages } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,44 @@ import { cn } from "@/lib/utils";
 export function AIChat() {
   const [messages, setMessages] = useState<AIMessage[]>(aiMessages);
   const [prompt, setPrompt] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit() {
+    if (!prompt.trim() || submitting) {
+      return;
+    }
+
+    const currentPrompt = prompt.trim();
+    setSubmitting(true);
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", content: currentPrompt }]);
+    setPrompt("");
+
+    try {
+      const response = await fetch("/api/admin/assistant", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ prompt: currentPrompt }),
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content:
+            response.ok
+              ? payload?.reply ?? "No pude responder esta vez."
+              : payload?.error ?? "No se pudo completar la consulta a la IA.",
+        },
+      ]);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <div className="overflow-hidden rounded-[32px] border bg-card shadow-sm">
@@ -23,7 +61,7 @@ export function AIChat() {
           <div>
             <h3 className="text-lg font-semibold">Asistente de operaciones</h3>
             <p className="text-sm text-muted-foreground">
-              Usá prompts para ventas, mensajes, resúmenes y automatizaciones.
+              Usa prompts para ventas, mensajes, resúmenes y lectura de contratos.
             </p>
           </div>
         </div>
@@ -53,28 +91,17 @@ export function AIChat() {
           <Input
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
-            placeholder="Ej. redactá un seguimiento cálido para un lead que visitó ayer..."
+            placeholder="Ej. resumí el contrato del alquiler de Torre Libertad y marcame próximos hitos..."
             className="border-0 shadow-none focus-visible:ring-0"
-          />
-          <Button
-            className="rounded-2xl"
-            onClick={() => {
-              if (!prompt.trim()) return;
-
-              setMessages((prev) => [
-                ...prev,
-                { id: crypto.randomUUID(), role: "user", content: prompt },
-                {
-                  id: crypto.randomUUID(),
-                  role: "assistant",
-                  content:
-                    "Respuesta simulada: puedo convertir este prompt en un flujo reusable, sugerir una respuesta comercial y registrar la acción en el CRM.",
-                },
-              ]);
-              setPrompt("");
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                void handleSubmit();
+              }
             }}
-          >
-            <WandSparkles className="size-4" />
+          />
+          <Button className="rounded-2xl" disabled={submitting || !prompt.trim()} onClick={handleSubmit}>
+            {submitting ? <Loader2 className="size-4 animate-spin" /> : <WandSparkles className="size-4" />}
             Generar
           </Button>
         </div>

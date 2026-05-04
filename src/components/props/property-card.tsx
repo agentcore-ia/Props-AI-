@@ -1,10 +1,11 @@
 import Image from "next/image";
+import Link from "next/link";
 import { CalendarDays, HousePlus, MapPin, MessageCircleWarning } from "lucide-react";
 
 import type { Property } from "@/lib/mock-data";
 import { RentalContractDialog } from "@/components/props/rental-contract-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn, formatArsCurrency, formatCurrency, formatShortDate } from "@/lib/utils";
 
@@ -96,6 +97,26 @@ export function PropertyCard({ property }: { property: Property }) {
                       </p>
                     </div>
                   </div>
+                  {property.rentalContract.contractFileName ? (
+                    <div className="rounded-2xl border px-3 py-3">
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Contrato adjunto</p>
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{property.rentalContract.contractFileName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            IA lista para leer cláusulas, fechas y aumentos.
+                          </p>
+                        </div>
+                        <Link
+                          href={`/api/admin/rental-contracts/${property.rentalContract.id}/document`}
+                          target="_blank"
+                          className={buttonVariants({ size: "sm", variant: "outline", className: "rounded-2xl" })}
+                        >
+                          Ver
+                        </Link>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="flex items-start gap-3 text-sm text-muted-foreground">
