@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
 import { analyzeRentalContractText } from "@/lib/rental-contract-analysis";
+import type { UploadedRentalContractFile } from "@/lib/rental-contract-files";
 import { uploadRentalContractFile } from "@/lib/rental-contract-files";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -88,15 +89,7 @@ export async function POST(request: Request) {
     );
   }
 
-  let uploadedContract:
-    | {
-        fileName: string;
-        filePath: string;
-        mimeType: string;
-        sizeBytes: number;
-        extractedText: string;
-      }
-    | null = null;
+  let uploadedContract: UploadedRentalContractFile | null = null;
 
   if (contractFile) {
     try {
@@ -159,16 +152,6 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!resolvedContractStartDate || !resolvedNextAdjustmentDate) {
-    return NextResponse.json(
-      {
-        error:
-          "Adjunta el contrato para que Props analice inicio y proximo aumento automaticamente.",
-      },
-      { status: 400 }
-    );
-  }
-
   const upsertPayload = {
     property_id: property.id,
     agency_id: property.agency_id,
@@ -180,7 +163,11 @@ export async function POST(request: Request) {
     index_type: resolvedIndexType,
     adjustment_frequency_months: resolvedAdjustmentFrequencyMonths,
     contract_start_date: resolvedContractStartDate,
-    rent_reference_date: existingContract?.rent_reference_date ?? resolvedContractStartDate,
+    rent_reference_date:
+      existingContract?.rent_reference_date ??
+      resolvedContractStartDate ??
+      existingContract?.contract_start_date ??
+      null,
     next_adjustment_date: resolvedNextAdjustmentDate,
     last_adjustment_date: existingContract?.last_adjustment_date ?? null,
     auto_notify: autoNotify,
@@ -211,5 +198,12 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    warning:
+      uploadedContract?.extractionWarning ??
+      (!resolvedContractStartDate || !resolvedNextAdjustmentDate
+        ? "Guardamos el contrato, pero todavia no pudimos detectar todas las fechas automaticamente."
+        : null),
+  });
 }

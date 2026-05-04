@@ -72,6 +72,8 @@ async function ensureBucket() {
 async function extractText(buffer: Buffer, mimeType: string) {
   if (mimeType === "application/pdf") {
     const { PDFParse } = require("pdf-parse") as typeof import("pdf-parse");
+    const workerPath = require.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs");
+    PDFParse.setWorker(workerPath);
     const parser = new PDFParse({ data: buffer });
     const parsed = await parser.getText();
     await parser.destroy();
@@ -105,6 +107,7 @@ export type UploadedRentalContractFile = {
   mimeType: string;
   sizeBytes: number;
   extractedText: string;
+  extractionWarning?: string | null;
 };
 
 export async function uploadRentalContractFile({
@@ -148,7 +151,22 @@ export async function uploadRentalContractFile({
     throw error;
   }
 
-  const extractedText = await extractText(buffer, normalizedMimeType);
+  let extractedText = "";
+  let extractionWarning: string | null = null;
+
+  try {
+    extractedText = await extractText(buffer, normalizedMimeType);
+  } catch (error) {
+    extractionWarning =
+      error instanceof Error
+        ? error.message
+        : "No se pudo extraer el texto del contrato.";
+    console.warn("[rental-contract] text extraction failed", {
+      filePath,
+      mimeType: normalizedMimeType,
+      extractionWarning,
+    });
+  }
 
   return {
     fileName: filename,
@@ -156,6 +174,7 @@ export async function uploadRentalContractFile({
     mimeType: normalizedMimeType,
     sizeBytes: file.size,
     extractedText,
+    extractionWarning,
   };
 }
 

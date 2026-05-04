@@ -241,21 +241,9 @@ export async function POST(request: Request) {
       (draftFrequency > 0 ? draftFrequency : null) ??
       6;
     const resolvedContractStartDate =
-      analyzedContract?.contractStartDate ?? rentalContract.contractStartDate ?? "";
+      analyzedContract?.contractStartDate ?? rentalContract.contractStartDate ?? null;
     const resolvedNextAdjustmentDate =
-      analyzedContract?.nextAdjustmentDate ?? rentalContract.nextAdjustmentDate ?? "";
-
-    if (!resolvedContractStartDate || !resolvedNextAdjustmentDate) {
-      await admin.from("properties").delete().eq("id", property.id);
-
-      return NextResponse.json(
-        {
-          error:
-            "Adjunta el contrato para que Props detecte inicio y proximo aumento automaticamente.",
-        },
-        { status: 400 }
-      );
-    }
+      analyzedContract?.nextAdjustmentDate ?? rentalContract.nextAdjustmentDate ?? null;
 
     const { error: contractError } = await admin.from("rental_contracts").insert({
       property_id: property.id,
