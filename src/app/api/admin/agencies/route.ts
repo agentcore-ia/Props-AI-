@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { buildSuggestedMessagingInstance } from "@/lib/agency-access";
 import { getCurrentUserContext } from "@/lib/auth/current-user";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -107,6 +108,7 @@ export async function POST(request: Request) {
       owner_email: ownerEmail,
       city,
       tagline: `Catalogo digital de ${name}.`,
+      messaging_instance: buildSuggestedMessagingInstance(slug),
       plan: "Starter",
       status: "Activa",
     })
