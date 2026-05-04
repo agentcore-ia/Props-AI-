@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 
 const DEFAULT_INTEGRATION = "WHATSAPP-BAILEYS";
 const EVOLUTION_API_URL_FALLBACK = "https://agentcore-evolution-api.8zp1cp.easypanel.host";
-const EVOLUTION_API_KEY_FALLBACK = "465E65D048F8-42B4-B162-4CF3107E70D8";
+const EVOLUTION_API_KEY_FALLBACK = "429683C4C977415CAAFCCE10F7D57E11";
 const DEFAULT_WEBHOOK_EVENTS = [
   "QRCODE_UPDATED",
   "CONNECTION_UPDATE",
@@ -19,6 +19,16 @@ type EvolutionFetchOptions = {
 };
 
 type EvolutionInstanceRecord = {
+  id?: string;
+  name?: string;
+  connectionStatus?: string;
+  ownerJid?: string | null;
+  profileName?: string | null;
+  profilePicUrl?: string | null;
+  integration?: string;
+  token?: string | null;
+  Websocket?: Record<string, unknown> | null;
+  Setting?: Record<string, unknown> | null;
   instance?: {
     instanceName?: string;
     instanceId?: string;
@@ -72,6 +82,16 @@ async function evolutionFetch<T>(path: string, options?: EvolutionFetchOptions):
   return payload as T;
 }
 
+function findInstanceByName(instances: EvolutionInstanceRecord[], instanceName: string) {
+  return instances.find(
+    (item) => item.name === instanceName || item.instance?.instanceName === instanceName
+  );
+}
+
+function getInstanceToken(instance: EvolutionInstanceRecord | null | undefined) {
+  return instance?.token ?? instance?.instance?.integration?.token ?? null;
+}
+
 export async function fetchEvolutionInstances() {
   return evolutionFetch<EvolutionInstanceRecord[]>("/instance/fetchInstances");
 }
@@ -79,7 +99,7 @@ export async function fetchEvolutionInstances() {
 export async function ensureEvolutionInstance(instanceName: string) {
   const { integration, webhookUrl, webhookEvents } = getEvolutionEnv();
   const instances = await fetchEvolutionInstances();
-  const existing = instances.find((item) => item.instance?.instanceName === instanceName);
+  const existing = findInstanceByName(instances, instanceName);
 
   if (existing) {
     if (webhookUrl) {
@@ -115,7 +135,8 @@ export async function ensureEvolutionInstance(instanceName: string) {
     await setEvolutionWebhook(instanceName, webhookUrl, webhookEvents);
   }
 
-  return { instance: created.instance };
+  const refreshedInstances = await fetchEvolutionInstances();
+  return findInstanceByName(refreshedInstances, instanceName) ?? { instance: created.instance };
 }
 
 export async function getEvolutionConnectionState(instanceName: string) {
@@ -129,7 +150,31 @@ export async function getEvolutionConnectionState(instanceName: string) {
 }
 
 export async function getEvolutionQr(instanceName: string) {
-  return evolutionFetch<{
+  const instances = await fetchEvolutionInstances();
+  const instance = findInstanceByName(instances, instanceName);
+  const token = getInstanceToken(instance);
+
+  if (!token) {
+    throw new Error("La instancia existe pero no devolvio token para generar el QR.");
+  }
+
+  const { apiUrl } = getEvolutionEnv();
+  const response = await fetch(`${apiUrl}/instance/connect/${instanceName}`, {
+    method: "GET",
+    headers: {
+      apikey: token,
+    },
+    cache: "no-store",
+  });
+
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    throw new Error(payload?.message ?? payload?.error ?? "No se pudo obtener el QR de Evolution.");
+  }
+
+  return payload as {
     pairingCode?: string;
     code?: string;
     base64?: string;
@@ -138,13 +183,11 @@ export async function getEvolutionQr(instanceName: string) {
       state?: string;
     };
     status?: string;
-  }>(`/instance/connect/${instanceName}`);
+  };
 }
 
 export async function restartEvolutionInstance(instanceName: string) {
-  return evolutionFetch<Record<string, unknown>>(`/instance/restart/${instanceName}`, {
-    method: "PUT",
-  });
+  return getEvolutionQr(instanceName);
 }
 
 export async function setEvolutionWebhook(instanceName: string, url: string, events: string[]) {
