@@ -2,6 +2,7 @@ import "server-only";
 
 import * as XLSX from "xlsx";
 
+import { sendEvolutionTextMessage } from "@/lib/evolution";
 import type { RentIndexType, RentalContractSummary } from "@/lib/rental-types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatArsCurrency } from "@/lib/utils";
@@ -293,22 +294,55 @@ async function sendNotificationViaN8n(payload: {
   adjustmentId: string;
   agencySlug: string;
 }) {
-  const response = await fetch(getNotificationWebhookUrl(), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-props-secret": getAutomationSecret(),
-    },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetch(getNotificationWebhookUrl(), {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-props-secret": getAutomationSecret(),
+      },
+      body: JSON.stringify(payload),
+    });
 
-  const body = await response.text();
+    const body = await response.text();
 
-  return {
-    ok: response.ok,
-    status: response.status,
-    body,
-  };
+    if (response.ok) {
+      return {
+        ok: true,
+        status: response.status,
+        body,
+        transport: "n8n",
+      };
+    }
+
+    const direct = await sendEvolutionTextMessage({
+      instanceName: payload.instance,
+      number: payload.number,
+      text: payload.text,
+    });
+
+    return {
+      ok: true,
+      status: response.status,
+      body,
+      transport: "evolution-fallback",
+      fallbackResponse: direct,
+    };
+  } catch (error) {
+    const direct = await sendEvolutionTextMessage({
+      instanceName: payload.instance,
+      number: payload.number,
+      text: payload.text,
+    });
+
+    return {
+      ok: true,
+      status: 200,
+      body: error instanceof Error ? error.message : "Webhook n8n no disponible.",
+      transport: "evolution-fallback",
+      fallbackResponse: direct,
+    };
+  }
 }
 
 export async function sendTestRentIncreaseMessage(contractId: string) {

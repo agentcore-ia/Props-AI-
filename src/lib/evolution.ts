@@ -203,3 +203,30 @@ export async function setEvolutionWebhook(instanceName: string, url: string, eve
     },
   });
 }
+
+export async function sendEvolutionTextMessage(payload: {
+  instanceName: string;
+  number: string;
+  text: string;
+}) {
+  const number = String(payload.number).replace(/[^\d]/g, "");
+  const text = String(payload.text ?? "").trim();
+
+  if (!number || !text) {
+    throw new Error("Faltan numero o mensaje para enviar por WhatsApp.");
+  }
+
+  return evolutionFetch<Record<string, unknown>>(
+    `/message/sendText/${encodeURIComponent(payload.instanceName)}`,
+    {
+      method: "POST",
+      body: {
+        number,
+        text,
+        options: {
+          delay: 800,
+        },
+      },
+    }
+  );
+}
