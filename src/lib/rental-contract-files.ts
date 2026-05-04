@@ -1,9 +1,12 @@
 import "server-only";
 
+import { createRequire } from "node:module";
+
 import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+
+const require = createRequire(import.meta.url);
 
 const BUCKET = "rental-contracts";
 const MAX_FILE_SIZE = 12 * 1024 * 1024;
@@ -68,8 +71,10 @@ async function ensureBucket() {
 
 async function extractText(buffer: Buffer, mimeType: string) {
   if (mimeType === "application/pdf") {
+    const { PDFParse } = require("pdf-parse") as typeof import("pdf-parse");
     const parser = new PDFParse({ data: buffer });
     const parsed = await parser.getText();
+    await parser.destroy();
     return parsed.text.trim();
   }
 
