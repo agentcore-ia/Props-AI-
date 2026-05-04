@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { formatMoney, formatShortDate } from "@/lib/utils";
+import { formatArsCurrency, formatMoney, formatShortDate } from "@/lib/utils";
 
 function getInitialForm(property: Property) {
   return {
@@ -409,6 +409,67 @@ export function RentalContractDialog({ property }: { property: Property }) {
                     </p>
                   </div>
                 </div>
+
+                {property.rentalContract ? (
+                  <div className="mt-5 rounded-[24px] border bg-background p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/70">
+                      Datos detectados / confirmados
+                    </p>
+                    <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Alquiler actual</p>
+                        <p className="mt-1 font-semibold">
+                          {formatArsCurrency(property.rentalContract.currentRent)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Índice</p>
+                        <p className="mt-1 font-semibold">{property.rentalContract.indexType}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Frecuencia</p>
+                        <p className="mt-1 font-semibold">
+                          Cada {property.rentalContract.adjustmentFrequencyMonths} meses
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Próximo aumento</p>
+                        <p className="mt-1 font-semibold">
+                          {formatShortDate(property.rentalContract.nextAdjustmentDate)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Inicio del contrato</p>
+                        <p className="mt-1 font-semibold">
+                          {formatShortDate(property.rentalContract.contractStartDate)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Fecha base del cálculo</p>
+                        <p className="mt-1 font-semibold">
+                          {formatShortDate(property.rentalContract.rentReferenceDate)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Estado</p>
+                        <p className="mt-1 font-semibold">{property.rentalContract.status}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Notificación automática</p>
+                        <p className="mt-1 font-semibold">
+                          {property.rentalContract.autoNotify ? "Activa" : "Pausada"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {property.rentalContract.contractText ? (
+                      <div className="mt-4 rounded-[20px] border bg-muted/20 p-4 text-sm leading-6 text-muted-foreground">
+                        <p className="mb-2 font-medium text-foreground">Texto leído del contrato</p>
+                        <p>{property.rentalContract.contractText.slice(0, 520)}...</p>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </section>
             </div>
 

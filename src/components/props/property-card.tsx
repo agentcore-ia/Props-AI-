@@ -126,6 +126,41 @@ export function PropertyCard({ property }: { property: Property }) {
                       </p>
                     </div>
                   </div>
+                  <div className="rounded-2xl border bg-muted/20 px-3 py-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                      Datos detectados / confirmados
+                    </p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Índice</p>
+                        <p className="font-medium">{property.rentalContract.indexType}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Frecuencia</p>
+                        <p className="font-medium">
+                          Cada {property.rentalContract.adjustmentFrequencyMonths} meses
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Inicio del contrato</p>
+                        <p className="font-medium">
+                          {formatShortDate(property.rentalContract.contractStartDate)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Fecha base del cálculo</p>
+                        <p className="font-medium">
+                          {formatShortDate(property.rentalContract.rentReferenceDate)}
+                        </p>
+                      </div>
+                    </div>
+                    {property.rentalContract.contractText ? (
+                      <div className="mt-3 rounded-2xl border bg-background px-3 py-3 text-xs leading-6 text-muted-foreground">
+                        <p className="mb-1 font-medium text-foreground">Extracto leído del contrato</p>
+                        <p>{property.rentalContract.contractText.slice(0, 260)}...</p>
+                      </div>
+                    ) : null}
+                  </div>
                   {property.rentalContract.contractFileName ? (
                     <div className="rounded-2xl border px-3 py-3">
                       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Contrato adjunto</p>
