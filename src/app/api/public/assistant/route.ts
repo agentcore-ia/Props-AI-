@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     .slice(0, 12)
     .map(
       (property) =>
-        `- ${property.title} | ${property.operation} | ${property.status} | ${property.location} | ${property.price} | ${property.description}`
+        `- ${property.title} | ${property.operation} | ${property.status} | ${property.location} | direccion: ${property.exactAddress} | precio: ${property.price} ${property.currency} | tipo: ${property.propertyType} | dormitorios: ${property.bedrooms} | banos: ${property.bathrooms} | m2: ${property.area} | expensas: ${property.expenses ?? "n/d"} ${property.expensesCurrency ?? ""} | mascotas: ${property.petsPolicy || "consultar"} | requisitos: ${property.requirements || "sin requisitos cargados"} | amenities: ${property.amenities.join(", ") || "sin amenities"} | descripcion: ${property.description}`
     )
     .join("\n");
 
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
             {
               type: "input_text",
               text:
-                "Sos un asesor inmobiliario digital de Props. Responde en espanol claro, breve y comercial. Solo podes recomendar propiedades del catalogo provisto. Si faltan datos, pedi presupuesto, zona y cantidad de ambientes. No inventes propiedades ni disponibilidad.",
+                "Sos un asesor inmobiliario digital de Props. Responde en espanol claro, breve y comercial. Solo podes recomendar propiedades del catalogo provisto. Usa direccion, moneda, requisitos, politica de mascotas, expensas, disponibilidad y amenities cuando existan. Si faltan datos, pedi presupuesto, zona y cantidad de ambientes. No inventes propiedades ni disponibilidad.",
             },
           ],
         },

@@ -19,9 +19,8 @@ export type PublicListing = Property & {
   lotArea: number;
   yearBuilt: number;
   pricePerSquareMeter: number;
-  propertyType: "Departamento" | "Casa" | "PH" | "Loft" | "Townhouse";
+  propertyType: Property["propertyType"];
   featuredLabel: string | null;
-  amenities: string[];
   mapX: number;
   mapY: number;
   investmentScore: number;
@@ -90,15 +89,15 @@ export function buildPublicListings(
   return properties.map((property, index) => {
     const agency = agencyBySlug.get(property.tenantSlug);
     const mapAnchor = mapAnchors[index % mapAnchors.length];
-    const bedrooms = 2 + (index % 4);
-    const bathrooms = 1.5 + ((index + 1) % 4) * 0.5;
+    const bedrooms = property.bedrooms || 2 + (index % 4);
+    const bathrooms = property.bathrooms || 1.5 + ((index + 1) % 4) * 0.5;
     const suites = 1 + (index % 3);
-    const area = 85 + index * 28;
+    const area = property.area || 85 + index * 28;
     const lotArea = area + 40 + (index % 4) * 35;
     const yearBuilt = 2019 + (index % 6);
     const propertyType = resolvePropertyType(property, index);
     const featuredLabel = featuredLabels[index % featuredLabels.length];
-    const amenities = amenitySets[index % amenitySets.length];
+    const amenities = property.amenities.length > 0 ? property.amenities : amenitySets[index % amenitySets.length];
     const neighborhood = property.location.split(",")[0]?.trim() ?? property.location;
     const pricePerSquareMeter = Math.max(900, Math.round(property.price / area));
     const yieldPercent = Number((4.2 + (index % 5) * 0.45).toFixed(1));
@@ -140,6 +139,10 @@ function resolvePropertyType(
   property: Property,
   index: number
 ): PublicListing["propertyType"] {
+  if (property.propertyType) {
+    return property.propertyType;
+  }
+
   const title = `${property.title} ${property.description}`.toLowerCase();
 
   if (title.includes("casa")) return "Casa";
@@ -155,5 +158,8 @@ function resolvePropertyType(
 
 function buildSummary(property: Property, agencyName?: string) {
   const owner = agencyName ? `Publicado por ${agencyName}.` : "";
-  return `${property.description} ${owner} Ideal para quienes priorizan ${property.operation.toLowerCase()} con una experiencia cuidada en ${property.location}.`;
+  const requirements = property.requirements
+    ? ` Requisitos y observaciones: ${property.requirements}`
+    : "";
+  return `${property.description} ${owner} Ideal para quienes priorizan ${property.operation.toLowerCase()} con una experiencia cuidada en ${property.location}.${requirements}`;
 }

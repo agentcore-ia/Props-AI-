@@ -1,18 +1,26 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   ArrowLeft,
   Building2,
+  CalendarDays,
+  CarFront,
   CheckCircle2,
   MapPin,
   MessageSquareMore,
+  PawPrint,
   Phone,
 } from "lucide-react";
 
 import type { Agency, Property } from "@/lib/mock-data";
 import { CatalogInquiryForm } from "@/components/sites/catalog-inquiry-form";
 import { TenantPropertyCard } from "@/components/sites/tenant-property-card";
-import { formatCurrency } from "@/lib/utils";
+import {
+  buildGoogleMapsEmbedUrl,
+  buildGoogleMapsExternalUrl,
+  formatMoney,
+} from "@/lib/utils";
 
 const highlights = [
   "Acompanamiento comercial personalizado",
@@ -41,6 +49,8 @@ export function TenantPropertyDetail({
       </div>
     );
   }
+
+  const address = property.exactAddress || property.location;
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,rgba(241,245,249,0.95)_0%,rgba(255,255,255,1)_28%,rgba(255,255,255,1)_100%)]">
@@ -80,7 +90,7 @@ export function TenantPropertyDetail({
             <div className="rounded-[28px] border border-slate-200 bg-white px-5 py-4 shadow-[0_18px_45px_-32px_rgba(15,23,42,0.25)]">
               <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Valor publicado</p>
               <p className="mt-2 text-3xl font-semibold text-slate-950">
-                {formatCurrency(property.price)}
+                {formatMoney(property.price, property.currency)}
               </p>
             </div>
           </div>
@@ -119,6 +129,32 @@ export function TenantPropertyDetail({
                   </div>
                 ))}
               </div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <InfoTile label="Mascotas" value={property.petsPolicy || "Consultar"} icon={<PawPrint className="size-4" />} />
+                <InfoTile label="Cocheras" value={String(property.parkingSpots)} icon={<CarFront className="size-4" />} />
+                <InfoTile
+                  label="Expensas"
+                  value={
+                    property.expenses && property.expensesCurrency
+                      ? formatMoney(property.expenses, property.expensesCurrency)
+                      : "No informadas"
+                  }
+                  icon={<CalendarDays className="size-4" />}
+                />
+                <InfoTile
+                  label="Disponible desde"
+                  value={property.availableFrom || "Inmediata"}
+                  icon={<CalendarDays className="size-4" />}
+                />
+              </div>
+
+              <div className="mt-5 rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Requisitos</p>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  {property.requirements || "Sin requisitos especiales cargados por la inmobiliaria."}
+                </p>
+              </div>
             </section>
 
             <section className="rounded-[30px] border border-slate-200 bg-slate-950 p-6 text-white shadow-[0_24px_80px_-48px_rgba(15,23,42,0.55)]">
@@ -154,6 +190,31 @@ export function TenantPropertyDetail({
           </div>
         </section>
 
+        <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.22)]">
+          <p className="text-sm font-medium text-slate-500">Ubicacion</p>
+          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
+            Direccion cargada para llegar mejor a la visita
+          </h2>
+          <div className="mt-6 overflow-hidden rounded-[28px] border border-slate-200 bg-white">
+            <iframe
+              title={`Mapa de ${property.title}`}
+              src={buildGoogleMapsEmbedUrl(address)}
+              className="h-[360px] w-full border-0"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+          </div>
+          <p className="mt-3 text-sm leading-7 text-slate-500">{address}</p>
+          <a
+            href={buildGoogleMapsExternalUrl(address)}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-4 inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            Abrir en Google Maps
+          </a>
+        </section>
+
         {relatedProperties.length > 0 ? (
           <section className="space-y-6">
             <div>
@@ -171,6 +232,26 @@ export function TenantPropertyDetail({
           </section>
         ) : null}
       </main>
+    </div>
+  );
+}
+
+function InfoTile({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon: ReactNode;
+}) {
+  return (
+    <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
+      <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-500">
+        {icon}
+        {label}
+      </div>
+      <p className="mt-2 text-base font-semibold text-slate-950">{value}</p>
     </div>
   );
 }

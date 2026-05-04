@@ -33,8 +33,22 @@ const initialState = {
   tenantSlug: "",
   title: "",
   price: "",
+  currency: "USD",
   location: "",
+  exactAddress: "",
   description: "",
+  propertyType: "Departamento",
+  bedrooms: "",
+  bathrooms: "",
+  area: "",
+  parkingSpots: "",
+  furnished: false,
+  expenses: "",
+  expensesCurrency: "ARS",
+  availableFrom: "",
+  petsPolicy: "",
+  requirements: "",
+  amenities: "",
   status: "Disponible" as Property["status"],
   operation: "Venta" as Property["operation"],
   manualImageUrl: "",
@@ -115,8 +129,22 @@ export function PropertyFormDialog({
     body.set("tenantSlug", form.tenantSlug);
     body.set("title", form.title);
     body.set("price", form.price);
+    body.set("currency", form.currency);
     body.set("location", form.location);
+    body.set("exactAddress", form.exactAddress);
     body.set("description", form.description);
+    body.set("propertyType", form.propertyType);
+    body.set("bedrooms", form.bedrooms);
+    body.set("bathrooms", form.bathrooms);
+    body.set("area", form.area);
+    body.set("parkingSpots", form.parkingSpots);
+    body.set("furnished", String(form.furnished));
+    body.set("expenses", form.expenses);
+    body.set("expensesCurrency", form.expensesCurrency);
+    body.set("availableFrom", form.availableFrom);
+    body.set("petsPolicy", form.petsPolicy);
+    body.set("requirements", form.requirements);
+    body.set("amenities", form.amenities);
     body.set("status", form.status);
     body.set("operation", form.operation);
     body.set("manualImageUrl", form.manualImageUrl);
@@ -194,17 +222,17 @@ export function PropertyFormDialog({
           <DialogHeader>
             <DialogTitle>Nueva propiedad</DialogTitle>
             <DialogDescription>
-              Carga la publicación en un flujo más ágil: datos clave, imágenes reales y, si es alquiler, contrato listo para automatización e IA.
+              Carga la publicación en un flujo más ágil: datos clave, imágenes reales, información útil para respuestas con IA y, si es alquiler, contrato listo para automatización.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="mt-6 grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+          <div className="mt-6 grid gap-6 xl:grid-cols-[1.45fr_0.95fr]">
             <div className="space-y-6">
               <section className="rounded-[28px] border bg-card p-5">
                 <SectionTitle
                   eyebrow="Base"
-                  title="Datos comerciales"
-                  description="Lo mínimo importante para publicar y encontrar rápido la propiedad dentro del CRM."
+                  title="Datos comerciales y operativos"
+                  description="Carga la información que va a leer el equipo, el marketplace y la IA de Props."
                 />
 
                 <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-12">
@@ -233,7 +261,7 @@ export function PropertyFormDialog({
                     />
                   </div>
 
-                  <div className="space-y-2 xl:col-span-4">
+                  <div className="space-y-2 xl:col-span-3">
                     <label className="text-sm font-medium">Precio publicado</label>
                     <Input
                       placeholder="250000"
@@ -242,7 +270,19 @@ export function PropertyFormDialog({
                     />
                   </div>
 
-                  <div className="space-y-2 xl:col-span-4">
+                  <div className="space-y-2 xl:col-span-2">
+                    <label className="text-sm font-medium">Moneda</label>
+                    <select
+                      className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
+                      value={form.currency}
+                      onChange={(event) => setForm((prev) => ({ ...prev, currency: event.target.value }))}
+                    >
+                      <option value="USD">USD</option>
+                      <option value="ARS">ARS</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-3">
                     <label className="text-sm font-medium">Operación</label>
                     <select
                       className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
@@ -273,11 +313,146 @@ export function PropertyFormDialog({
                   </div>
 
                   <div className="space-y-2 xl:col-span-12">
-                    <label className="text-sm font-medium">Ubicación</label>
+                    <label className="text-sm font-medium">Ubicación visible</label>
                     <Input
                       placeholder="Belgrano, CABA"
                       value={form.location}
                       onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-12">
+                    <label className="text-sm font-medium">Dirección exacta</label>
+                    <Input
+                      placeholder="Av. del Libertador 2450, Belgrano, Ciudad Autónoma de Buenos Aires, Argentina"
+                      value={form.exactAddress}
+                      onChange={(event) => setForm((prev) => ({ ...prev, exactAddress: event.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Escríbela completa para que Google Maps la interprete bien y podamos mostrar la propiedad en el mapa.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-3">
+                    <label className="text-sm font-medium">Tipo de propiedad</label>
+                    <select
+                      className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
+                      value={form.propertyType}
+                      onChange={(event) => setForm((prev) => ({ ...prev, propertyType: event.target.value }))}
+                    >
+                      <option value="Departamento">Departamento</option>
+                      <option value="Casa">Casa</option>
+                      <option value="PH">PH</option>
+                      <option value="Loft">Loft</option>
+                      <option value="Townhouse">Townhouse</option>
+                      <option value="Oficina">Oficina</option>
+                      <option value="Local">Local</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-2">
+                    <label className="text-sm font-medium">Dormitorios</label>
+                    <Input
+                      placeholder="3"
+                      value={form.bedrooms}
+                      onChange={(event) => setForm((prev) => ({ ...prev, bedrooms: event.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-2">
+                    <label className="text-sm font-medium">Baños</label>
+                    <Input
+                      placeholder="2"
+                      value={form.bathrooms}
+                      onChange={(event) => setForm((prev) => ({ ...prev, bathrooms: event.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-2">
+                    <label className="text-sm font-medium">m² cubiertos</label>
+                    <Input
+                      placeholder="148"
+                      value={form.area}
+                      onChange={(event) => setForm((prev) => ({ ...prev, area: event.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-3">
+                    <label className="text-sm font-medium">Cocheras</label>
+                    <Input
+                      placeholder="1"
+                      value={form.parkingSpots}
+                      onChange={(event) => setForm((prev) => ({ ...prev, parkingSpots: event.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-4">
+                    <label className="text-sm font-medium">Expensas</label>
+                    <Input
+                      placeholder="185000"
+                      value={form.expenses}
+                      onChange={(event) => setForm((prev) => ({ ...prev, expenses: event.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-2">
+                    <label className="text-sm font-medium">Moneda expensas</label>
+                    <select
+                      className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
+                      value={form.expensesCurrency}
+                      onChange={(event) => setForm((prev) => ({ ...prev, expensesCurrency: event.target.value }))}
+                    >
+                      <option value="ARS">ARS</option>
+                      <option value="USD">USD</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-3">
+                    <label className="text-sm font-medium">Disponible desde</label>
+                    <Input
+                      type="date"
+                      value={form.availableFrom}
+                      onChange={(event) => setForm((prev) => ({ ...prev, availableFrom: event.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-3">
+                    <label className="text-sm font-medium">Amoblado</label>
+                    <label className="flex h-11 items-center gap-2 rounded-xl border px-3 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={form.furnished}
+                        onChange={(event) => setForm((prev) => ({ ...prev, furnished: event.target.checked }))}
+                      />
+                      Se entrega amoblado
+                    </label>
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-6">
+                    <label className="text-sm font-medium">Política de mascotas</label>
+                    <Input
+                      placeholder="Sí / No / Solo mascotas pequeñas / Consultar"
+                      value={form.petsPolicy}
+                      onChange={(event) => setForm((prev) => ({ ...prev, petsPolicy: event.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-6">
+                    <label className="text-sm font-medium">Amenities</label>
+                    <Input
+                      placeholder="Balcón, SUM, pileta, cochera, laundry"
+                      value={form.amenities}
+                      onChange={(event) => setForm((prev) => ({ ...prev, amenities: event.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-12">
+                    <label className="text-sm font-medium">Requisitos / condiciones para ingresar</label>
+                    <Textarea
+                      placeholder="Garantía propietaria o seguro de caución, ingresos demostrables, depósito, plazo mínimo, restricciones, documentación requerida..."
+                      rows={4}
+                      value={form.requirements}
+                      onChange={(event) => setForm((prev) => ({ ...prev, requirements: event.target.value }))}
                     />
                   </div>
 
@@ -299,7 +474,7 @@ export function PropertyFormDialog({
                     <SectionTitle
                       eyebrow="Alquiler"
                       title="Contrato y aumentos"
-                      description="Deja listo el contrato, la frecuencia de ajuste y el documento que luego interpreta Props AI."
+                      description="Deja listo el contrato, la frecuencia del ajuste y el documento que luego interpreta Props AI."
                     />
                     <label className="flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-medium">
                       <input

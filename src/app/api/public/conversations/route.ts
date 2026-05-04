@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
   const { data: property, error: propertyError } = await admin
     .from("properties")
-    .select("id, title, operation, status, location, description, price")
+    .select("id, title, operation, status, location, exact_address, description, price, currency, property_type, bedrooms, bathrooms, area, expenses, expenses_currency, available_from, pets_policy, requirements, amenities")
     .eq("id", propertyId)
     .eq("agency_id", agency.id)
     .maybeSingle();
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
     .slice(0, 10)
     .map(
       (item) =>
-        `- ${item.title} | ${item.operation} | ${item.status} | ${item.location} | ${item.price} | ${item.description}`
+        `- ${item.title} | ${item.operation} | ${item.status} | ${item.location} | direccion: ${item.exactAddress} | precio: ${item.price} ${item.currency} | tipo: ${item.propertyType} | dormitorios: ${item.bedrooms} | banos: ${item.bathrooms} | m2: ${item.area} | mascotas: ${item.petsPolicy || "consultar"} | requisitos: ${item.requirements || "sin requisitos cargados"} | amenities: ${item.amenities.join(", ") || "sin amenities"} | descripcion: ${item.description}`
     )
     .join("\n");
 
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
               {
                 type: "input_text",
                 text:
-                  "Sos la IA de captacion de Props para compradores e inquilinos. Responde en espanol rioplatense, breve, amable y comercial. Ayuda a clarificar necesidades del cliente y prepara el contacto con la inmobiliaria. No prometas visitas ni disponibilidades exactas si no estan confirmadas.",
+                  "Sos la IA de captacion de Props para compradores e inquilinos. Responde en espanol rioplatense, breve, amable y comercial. Ayuda a clarificar necesidades del cliente y prepara el contacto con la inmobiliaria. Usa direccion, moneda, expensas, requisitos, politica de mascotas y disponibilidad cuando aparezcan en la ficha. No prometas visitas ni disponibilidades exactas si no estan confirmadas.",
               },
             ],
           },
@@ -150,7 +150,7 @@ export async function POST(request: Request) {
             content: [
               {
                 type: "input_text",
-                text: `Inmobiliaria: ${agency.name} (${agency.city}). Propiedad consultada: ${property.title} | ${property.operation} | ${property.status} | ${property.location} | ${property.price} | ${property.description}.\nCatalogo adicional:\n${catalogContext}\n\nMensaje del cliente:\n${message}`,
+                text: `Inmobiliaria: ${agency.name} (${agency.city}). Propiedad consultada: ${property.title} | ${property.operation} | ${property.status} | ${property.location} | direccion: ${property.exact_address} | precio: ${property.price} ${property.currency} | tipo: ${property.property_type} | dormitorios: ${property.bedrooms} | banos: ${property.bathrooms} | m2: ${property.area} | expensas: ${property.expenses ?? "n/d"} ${property.expenses_currency ?? ""} | disponible desde: ${property.available_from ?? "inmediata"} | mascotas: ${property.pets_policy || "consultar"} | requisitos: ${property.requirements || "sin requisitos cargados"} | amenities: ${Array.isArray(property.amenities) ? property.amenities.join(", ") : "sin amenities"} | descripcion: ${property.description}.\nCatalogo adicional:\n${catalogContext}\n\nMensaje del cliente:\n${message}`,
               },
             ],
           },

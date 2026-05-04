@@ -52,14 +52,34 @@ export async function POST(request: Request) {
   const tenantSlug = String(formData.get("tenantSlug") ?? "").trim().toLowerCase();
   const title = String(formData.get("title") ?? "").trim();
   const price = Number(formData.get("price") ?? 0);
+  const currency = String(formData.get("currency") ?? "USD").trim();
   const location = String(formData.get("location") ?? "").trim();
+  const exactAddress = String(formData.get("exactAddress") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
+  const propertyType = String(formData.get("propertyType") ?? "Departamento").trim();
+  const bedrooms = Number(formData.get("bedrooms") ?? 0);
+  const bathrooms = Number(formData.get("bathrooms") ?? 0);
+  const area = Number(formData.get("area") ?? 0);
+  const parkingSpots = Number(formData.get("parkingSpots") ?? 0);
+  const furnished = String(formData.get("furnished") ?? "false") === "true";
+  const expensesRaw = String(formData.get("expenses") ?? "").trim();
+  const expenses = expensesRaw ? Number(expensesRaw) : null;
+  const expensesCurrencyRaw = String(formData.get("expensesCurrency") ?? "").trim();
+  const expensesCurrency = expensesRaw ? expensesCurrencyRaw || "ARS" : null;
+  const availableFromRaw = String(formData.get("availableFrom") ?? "").trim();
+  const availableFrom = availableFromRaw || null;
+  const petsPolicy = String(formData.get("petsPolicy") ?? "").trim();
+  const requirements = String(formData.get("requirements") ?? "").trim();
+  const amenities = String(formData.get("amenities") ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
   const manualImageUrl = String(formData.get("manualImageUrl") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
   const operation = String(formData.get("operation") ?? "").trim();
   const rentalContract = parseRentalContract(formData.get("rentalContract"));
 
-  if (!tenantSlug || !title || !location || !description || !status || !operation || !price) {
+  if (!tenantSlug || !title || !location || !exactAddress || !description || !status || !operation || !price) {
     return NextResponse.json(
       { error: "Completa todos los campos de la propiedad." },
       { status: 400 }
@@ -123,12 +143,26 @@ export async function POST(request: Request) {
       agency_id: agency.id,
       title,
       price,
+      currency,
       location,
+      exact_address: exactAddress,
       description,
       status,
       operation,
       image: primaryImage,
       images: images.length > 0 ? images : [primaryImage],
+      property_type: propertyType,
+      bedrooms,
+      bathrooms,
+      area,
+      parking_spots: parkingSpots,
+      furnished,
+      expenses,
+      expenses_currency: expensesCurrency,
+      available_from: availableFrom,
+      pets_policy: petsPolicy,
+      requirements,
+      amenities,
       created_by: current.user.id,
     })
     .select("id")

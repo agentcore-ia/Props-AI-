@@ -45,7 +45,7 @@ export function TenantCatalog({
       }
 
       const searchable =
-        `${property.title} ${property.location} ${property.description} ${property.operation} ${property.status}`.toLowerCase();
+        `${property.title} ${property.location} ${property.exactAddress} ${property.description} ${property.operation} ${property.status} ${property.requirements} ${property.petsPolicy} ${property.amenities.join(" ")}`.toLowerCase();
       return searchable.includes(query);
     });
   }, [deferredSearch, operationFilter, properties]);

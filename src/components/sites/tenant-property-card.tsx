@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ChevronRight, MapPin } from "lucide-react";
 
 import type { Property } from "@/lib/mock-data";
-import { formatCurrency } from "@/lib/utils";
+import { formatMoney } from "@/lib/utils";
 
 export function TenantPropertyCard({ property }: { property: Property }) {
   return (
@@ -43,7 +43,7 @@ export function TenantPropertyCard({ property }: { property: Property }) {
           <div className="shrink-0 text-right">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Precio</p>
             <p className="mt-1 text-lg font-semibold text-slate-950 sm:text-xl">
-              {formatCurrency(property.price)}
+              {formatMoney(property.price, property.currency)}
             </p>
           </div>
         </div>

@@ -19,10 +19,12 @@ type PropertyInput = {
   tenantSlug: string;
   title: string;
   price: number;
+  currency: Property["currency"];
   description: string;
   status: Property["status"];
   operation: Property["operation"];
   location: string;
+  exactAddress: string;
   image: string;
 };
 
@@ -68,12 +70,27 @@ export const usePropsStore = create<PropsStore>()(
               tenantSlug: input.tenantSlug,
               title: input.title,
               price: input.price,
+              currency: input.currency,
               description: input.description,
               status: input.status,
               operation: input.operation,
               location: input.location,
+              exactAddress: input.exactAddress,
               image: input.image || fallbackImage,
               images: [input.image || fallbackImage, fallbackImage, fallbackImage],
+              propertyType: "Departamento",
+              bedrooms: 0,
+              bathrooms: 0,
+              area: 0,
+              parkingSpots: 0,
+              furnished: false,
+              expenses: null,
+              expensesCurrency: null,
+              availableFrom: null,
+              petsPolicy: "",
+              requirements: "",
+              amenities: [],
+              rentalContract: null,
             },
             ...state.properties,
           ],

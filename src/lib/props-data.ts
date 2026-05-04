@@ -1,4 +1,5 @@
 import type { Agency, Property } from "@/lib/mock-data";
+import type { PropertyCurrency, PropertyType } from "@/lib/mock-data";
 import type {
   RentalAdjustmentSummary,
   RentalContractSummary,
@@ -29,12 +30,26 @@ type PropertyRow = {
   agency_id: string;
   title: string;
   price: number;
+  currency: PropertyCurrency;
   location: string;
+  exact_address: string;
   status: Property["status"];
   operation: Property["operation"];
   description: string;
   image: string;
   images: string[] | null;
+  property_type: PropertyType;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  area: number | null;
+  parking_spots: number | null;
+  furnished: boolean | null;
+  expenses: number | null;
+  expenses_currency: PropertyCurrency | null;
+  available_from: string | null;
+  pets_policy: string | null;
+  requirements: string | null;
+  amenities: string[] | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -93,6 +108,30 @@ export type AgencySummary = Agency & {
   propertyCount: number;
 };
 
+export type LeaseRosterItem = {
+  contractId: string;
+  propertyId: string;
+  agencyId: string;
+  agencyName: string;
+  agencySlug: string;
+  propertyTitle: string;
+  propertyLocation: string;
+  exactAddress: string;
+  tenantName: string;
+  tenantPhone: string;
+  tenantEmail: string | null;
+  currentRent: number;
+  currency: "ARS";
+  indexType: "IPC" | "ICL";
+  adjustmentFrequencyMonths: number;
+  contractStartDate: string;
+  nextAdjustmentDate: string;
+  lastAdjustmentDate: string | null;
+  status: "Activo" | "Pausado" | "Finalizado";
+  autoNotify: boolean;
+  requirements: string;
+};
+
 type MarketplaceConversationRow = {
   id: string;
   customer_id: string;
@@ -116,6 +155,37 @@ type MarketplaceMessageRow = {
   metadata: Record<string, unknown>;
   created_at: string;
 };
+
+const PROPERTY_SELECT = `
+  id,
+  agency_id,
+  title,
+  price,
+  currency,
+  location,
+  exact_address,
+  status,
+  operation,
+  description,
+  image,
+  images,
+  property_type,
+  bedrooms,
+  bathrooms,
+  area,
+  parking_spots,
+  furnished,
+  expenses,
+  expenses_currency,
+  available_from,
+  pets_policy,
+  requirements,
+  amenities,
+  created_by,
+  created_at,
+  updated_at,
+  agencies!inner(slug, name)
+`;
 
 export type MarketplaceConversationSummary = {
   id: string;
@@ -226,7 +296,9 @@ function mapProperty(
     tenantSlug: row.agencies?.slug ?? "",
     title: row.title,
     price: Number(row.price),
+    currency: row.currency,
     location: row.location,
+    exactAddress: row.exact_address,
     status: row.status,
     operation: row.operation,
     description: row.description,
@@ -235,6 +307,18 @@ function mapProperty(
       row.images && row.images.length > 0
         ? row.images
         : [row.image, row.image, row.image],
+    propertyType: row.property_type,
+    bedrooms: Number(row.bedrooms ?? 0),
+    bathrooms: Number(row.bathrooms ?? 0),
+    area: Number(row.area ?? 0),
+    parkingSpots: Number(row.parking_spots ?? 0),
+    furnished: Boolean(row.furnished),
+    expenses: row.expenses !== null ? Number(row.expenses) : null,
+    expensesCurrency: row.expenses_currency,
+    availableFrom: row.available_from,
+    petsPolicy: row.pets_policy ?? "",
+    requirements: row.requirements ?? "",
+    amenities: row.amenities ?? [],
     rentalContract,
   };
 }
@@ -291,9 +375,7 @@ export async function listProperties(options?: { tenantSlug?: string }) {
   const admin = createAdminClient();
   let query = admin
     .from("properties")
-    .select(
-      "id, agency_id, title, price, location, status, operation, description, image, images, created_by, created_at, updated_at, agencies!inner(slug, name)"
-    )
+    .select(PROPERTY_SELECT)
     .order("created_at", { ascending: false });
 
   if (options?.tenantSlug) {
@@ -369,9 +451,7 @@ export async function getPropertyBySlugAndId(slug: string, propertyId: string) {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("properties")
-    .select(
-      "id, agency_id, title, price, location, status, operation, description, image, images, created_by, created_at, updated_at, agencies!inner(slug, name)"
-    )
+    .select(PROPERTY_SELECT)
     .eq("id", propertyId)
     .eq("agencies.slug", slug)
     .maybeSingle();
@@ -445,6 +525,76 @@ export async function listRentalContracts(options?: { agencySlug?: string }) {
   return ((contractsResult.data ?? []) as RentalContractRow[]).map((contract) =>
     mapRentalContract(contract, instanceByAgency.get(contract.agency_id) ?? "agentcore")
   );
+}
+
+export async function listLeaseRoster(options?: { agencySlug?: string }) {
+  const admin = createAdminClient();
+  let query = admin
+    .from("rental_contracts")
+    .select(
+      "id, property_id, agency_id, tenant_name, tenant_phone, tenant_email, current_rent, currency, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, last_adjustment_date, auto_notify, status, agencies!inner(name, slug), properties!inner(title, location, exact_address, requirements)"
+    )
+    .order("next_adjustment_date", { ascending: true });
+
+  if (options?.agencySlug) {
+    query = query.eq("agencies.slug", options.agencySlug);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as Array<{
+    id: string;
+    property_id: string;
+    agency_id: string;
+    tenant_name: string;
+    tenant_phone: string;
+    tenant_email: string | null;
+    current_rent: number;
+    currency: "ARS";
+    index_type: "IPC" | "ICL";
+    adjustment_frequency_months: number;
+    contract_start_date: string;
+    next_adjustment_date: string;
+    last_adjustment_date: string | null;
+    auto_notify: boolean;
+    status: "Activo" | "Pausado" | "Finalizado";
+    agencies: { name: string; slug: string } | { name: string; slug: string }[] | null;
+    properties:
+      | { title: string; location: string; exact_address: string; requirements: string | null }
+      | { title: string; location: string; exact_address: string; requirements: string | null }[]
+      | null;
+  }>).map((item) => {
+    const agency = Array.isArray(item.agencies) ? item.agencies[0] : item.agencies;
+    const property = Array.isArray(item.properties) ? item.properties[0] : item.properties;
+
+    return {
+      contractId: item.id,
+      propertyId: item.property_id,
+      agencyId: item.agency_id,
+      agencyName: agency?.name ?? "",
+      agencySlug: agency?.slug ?? "",
+      propertyTitle: property?.title ?? "",
+      propertyLocation: property?.location ?? "",
+      exactAddress: property?.exact_address ?? "",
+      tenantName: item.tenant_name,
+      tenantPhone: item.tenant_phone,
+      tenantEmail: item.tenant_email,
+      currentRent: Number(item.current_rent),
+      currency: item.currency,
+      indexType: item.index_type,
+      adjustmentFrequencyMonths: item.adjustment_frequency_months,
+      contractStartDate: item.contract_start_date,
+      nextAdjustmentDate: item.next_adjustment_date,
+      lastAdjustmentDate: item.last_adjustment_date,
+      status: item.status,
+      autoNotify: item.auto_notify,
+      requirements: property?.requirements ?? "",
+    } satisfies LeaseRosterItem;
+  });
 }
 
 export async function listRecentRentalAdjustments(options?: { agencySlug?: string; limit?: number }) {

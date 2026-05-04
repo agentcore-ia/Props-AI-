@@ -20,10 +20,14 @@ export default async function PropertiesPage() {
     currentUser.profile.role === "agency_admin"
       ? { agencySlug: currentUser.profile.agency_slug ?? undefined }
       : undefined;
+  const propertyScope =
+    currentUser.profile.role === "agency_admin"
+      ? { tenantSlug: currentUser.profile.agency_slug ?? undefined }
+      : undefined;
 
   const [agencies, properties, rentalSummary, recentAdjustments] = await Promise.all([
     listAgencies(),
-    listProperties(),
+    listProperties(propertyScope),
     getRentalDashboardSummary(agencyScope),
     listRecentRentalAdjustments({ ...agencyScope, limit: 8 }),
   ]);

@@ -35,16 +35,58 @@ create table if not exists public.properties (
   agency_id uuid not null references public.agencies (id) on delete cascade,
   title text not null,
   price numeric(14, 2) not null default 0,
+  currency text not null default 'USD' check (currency in ('USD', 'ARS')),
   location text not null,
+  exact_address text not null default '',
   status text not null check (status in ('Disponible', 'Reservada', 'Vendida', 'Alquilada')),
   operation text not null check (operation in ('Venta', 'Alquiler')),
   description text not null,
   image text not null,
   images jsonb not null default '[]'::jsonb,
+  property_type text not null default 'Departamento' check (property_type in ('Departamento', 'Casa', 'PH', 'Loft', 'Townhouse', 'Oficina', 'Local')),
+  bedrooms integer not null default 0,
+  bathrooms numeric(5, 2) not null default 0,
+  area numeric(10, 2) not null default 0,
+  parking_spots integer not null default 0,
+  furnished boolean not null default false,
+  expenses numeric(14, 2),
+  expenses_currency text check (expenses_currency in ('USD', 'ARS')),
+  available_from date,
+  pets_policy text not null default '',
+  requirements text not null default '',
+  amenities jsonb not null default '[]'::jsonb,
   created_by uuid references auth.users (id) on delete set null,
   created_at timestamptz not null default timezone('utc'::text, now()),
   updated_at timestamptz not null default timezone('utc'::text, now())
 );
+
+alter table public.properties
+  add column if not exists currency text not null default 'USD',
+  add column if not exists exact_address text not null default '',
+  add column if not exists property_type text not null default 'Departamento',
+  add column if not exists bedrooms integer not null default 0,
+  add column if not exists bathrooms numeric(5, 2) not null default 0,
+  add column if not exists area numeric(10, 2) not null default 0,
+  add column if not exists parking_spots integer not null default 0,
+  add column if not exists furnished boolean not null default false,
+  add column if not exists expenses numeric(14, 2),
+  add column if not exists expenses_currency text,
+  add column if not exists available_from date,
+  add column if not exists pets_policy text not null default '',
+  add column if not exists requirements text not null default '',
+  add column if not exists amenities jsonb not null default '[]'::jsonb;
+
+alter table public.properties drop constraint if exists properties_currency_check;
+alter table public.properties drop constraint if exists properties_expenses_currency_check;
+alter table public.properties drop constraint if exists properties_property_type_check;
+
+alter table public.properties
+  add constraint properties_currency_check
+    check (currency in ('USD', 'ARS')),
+  add constraint properties_expenses_currency_check
+    check (expenses_currency is null or expenses_currency in ('USD', 'ARS')),
+  add constraint properties_property_type_check
+    check (property_type in ('Departamento', 'Casa', 'PH', 'Loft', 'Townhouse', 'Oficina', 'Local'));
 
 create table if not exists public.catalog_inquiries (
   id uuid primary key default gen_random_uuid(),

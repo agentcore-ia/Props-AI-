@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -10,6 +10,8 @@ import {
   Bath,
   BedDouble,
   Building2,
+  CalendarDays,
+  CarFront,
   ChartColumnIncreasing,
   Filter,
   Heart,
@@ -17,6 +19,7 @@ import {
   LayoutGrid,
   Map,
   MapPin,
+  PawPrint,
   Radar,
   Search,
   Sparkles,
@@ -24,15 +27,20 @@ import {
 } from "lucide-react";
 
 import type { Agency, Property } from "@/lib/mock-data";
+import { PublicUserActions } from "@/components/sites/public-user-actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  buildGoogleMapsEmbedUrl,
+  buildGoogleMapsExternalUrl,
+  cn,
+  formatMoney,
+} from "@/lib/utils";
 import {
   buildPublicListings,
   type MarketplaceSection,
   type PublicListing,
 } from "@/lib/public-marketplace";
-import { cn, formatCurrency } from "@/lib/utils";
-import { PublicUserActions } from "@/components/sites/public-user-actions";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 const navItems: Array<{ id: MarketplaceSection; label: string }> = [
   { id: "explorar", label: "Explorar" },
@@ -41,7 +49,7 @@ const navItems: Array<{ id: MarketplaceSection; label: string }> = [
   { id: "inversiones", label: "Inversiones" },
 ];
 
-const quickFilters = ["CABA", "Nordelta", "Venta", "Alquiler", "Balcon", "Inversion"];
+const quickFilters = ["CABA", "Nordelta", "Venta", "Alquiler", "Balcon", "Mascotas"];
 
 export function PublicMarketplace({
   agencies,
@@ -63,12 +71,10 @@ export function PublicMarketplace({
   const [operationFilter, setOperationFilter] = useState<"all" | Property["operation"]>("all");
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [comparisonIds, setComparisonIds] = useState<string[]>([]);
+  const [selectedMapListingId, setSelectedMapListingId] = useState<string | null>(null);
   const deferredQuery = useDeferredValue(query);
 
-  const listings = useMemo(
-    () => buildPublicListings(properties, agencies),
-    [agencies, properties]
-  );
+  const listings = useMemo(() => buildPublicListings(properties, agencies), [agencies, properties]);
 
   const filteredListings = useMemo(() => {
     const normalized = deferredQuery.trim().toLowerCase();
@@ -85,6 +91,7 @@ export function PublicMarketplace({
       const searchable = [
         listing.title,
         listing.location,
+        listing.exactAddress,
         listing.description,
         listing.operation,
         listing.status,
@@ -92,6 +99,8 @@ export function PublicMarketplace({
         listing.agencyName,
         listing.agencyCity,
         listing.neighborhood,
+        listing.requirements,
+        listing.petsPolicy,
         ...listing.amenities,
       ]
         .join(" ")
@@ -100,6 +109,20 @@ export function PublicMarketplace({
       return searchable.includes(normalized);
     });
   }, [deferredQuery, listings, operationFilter]);
+
+  useEffect(() => {
+    if (!filteredListings.length) {
+      setSelectedMapListingId(null);
+      return;
+    }
+
+    if (!selectedMapListingId || !filteredListings.some((listing) => listing.id === selectedMapListingId)) {
+      setSelectedMapListingId(filteredListings[0].id);
+    }
+  }, [filteredListings, selectedMapListingId]);
+
+  const selectedMapListing =
+    filteredListings.find((listing) => listing.id === selectedMapListingId) ?? filteredListings[0] ?? null;
 
   const favorites = useMemo(
     () => listings.filter((listing) => favoriteIds.includes(listing.id)),
@@ -125,29 +148,16 @@ export function PublicMarketplace({
 
   const aggregated = useMemo(() => {
     const total = filteredListings.length;
-    const avgPrice =
-      total > 0
-        ? Math.round(
-            filteredListings.reduce((acc, listing) => acc + listing.price, 0) / total
-          )
-        : 0;
+    const sales = filteredListings.filter((listing) => listing.operation === "Venta").length;
+    const rentals = filteredListings.filter((listing) => listing.operation === "Alquiler").length;
     const avgYield =
       total > 0
         ? (
             filteredListings.reduce((acc, listing) => acc + listing.yieldPercent, 0) / total
           ).toFixed(1)
         : "0.0";
-    const avgPricePerMeter =
-      total > 0
-        ? Math.round(
-            filteredListings.reduce(
-              (acc, listing) => acc + listing.pricePerSquareMeter,
-              0
-            ) / total
-          )
-        : 0;
 
-    return { total, avgPrice, avgYield, avgPricePerMeter };
+    return { total, sales, rentals, avgYield };
   }, [filteredListings]);
 
   function toggleFavorite(id: string) {
@@ -216,10 +226,11 @@ export function PublicMarketplace({
                 Marketplace para comprar y alquilar
               </div>
               <h1 className="mt-5 max-w-4xl text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl xl:text-6xl">
-                Encuentra mejores propiedades y conversa con IA antes de contactar
+                Busca mejor, compara mejor y pregunta antes de contactar
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600 sm:text-lg">
-                Props reúne publicaciones de distintas inmobiliarias para ayudarte a descubrir, comparar y decidir con más contexto antes de enviar una consulta.
+                Props reune publicaciones de distintas inmobiliarias para ayudarte a descubrir,
+                entender condiciones reales y tomar una decision con mas contexto.
               </p>
 
               <div className="mt-8 rounded-[28px] border border-slate-200 bg-slate-50 p-3">
@@ -229,14 +240,11 @@ export function PublicMarketplace({
                     <Input
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Buscar por ciudad, barrio, inmobiliaria, tipologia o amenity"
+                      placeholder="Buscar por ciudad, barrio, inmobiliaria, direccion o requisito"
                       className="h-12 rounded-2xl border-0 bg-white pl-11 shadow-none ring-1 ring-slate-200"
                     />
                   </div>
-                  <Button
-                    className="h-12 rounded-2xl px-6"
-                    onClick={() => setSection("explorar")}
-                  >
+                  <Button className="h-12 rounded-2xl px-6" onClick={() => setSection("explorar")}>
                     Buscar
                   </Button>
                 </div>
@@ -255,16 +263,11 @@ export function PublicMarketplace({
                 </div>
               </div>
 
-              <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              <div className="mt-8 grid gap-3 sm:grid-cols-4">
                 <StatCard label="Propiedades activas" value={String(aggregated.total)} />
-                <StatCard
-                  label="Precio promedio"
-                  value={aggregated.avgPrice ? formatCurrency(aggregated.avgPrice) : "-"}
-                />
-                <StatCard
-                  label="Rendimiento medio"
-                  value={`${aggregated.avgYield}% anual`}
-                />
+                <StatCard label="En venta" value={String(aggregated.sales)} />
+                <StatCard label="En alquiler" value={String(aggregated.rentals)} />
+                <StatCard label="Yield medio" value={`${aggregated.avgYield}% anual`} />
               </div>
             </div>
 
@@ -272,7 +275,11 @@ export function PublicMarketplace({
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(96,165,250,0.24),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.18),transparent_30%)]" />
               <div className="absolute inset-0 opacity-70">
                 <Image
-                  src={filteredListings[0]?.image ?? listings[0]?.image ?? "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80"}
+                  src={
+                    filteredListings[0]?.image ??
+                    listings[0]?.image ??
+                    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80"
+                  }
                   alt="Marketplace Props"
                   fill
                   className="object-cover opacity-40"
@@ -281,20 +288,21 @@ export function PublicMarketplace({
               <div className="relative flex h-full flex-col justify-between p-6 text-white sm:p-8">
                 <div className="flex flex-wrap gap-3">
                   <InfoPill icon={<LayoutGrid className="size-4" />} text="Explorador" />
-                  <InfoPill icon={<Map className="size-4" />} text="Mapa interactivo" />
+                  <InfoPill icon={<Map className="size-4" />} text="Mapa con direccion" />
                   <InfoPill icon={<Heart className="size-4" />} text="Favoritos y comparacion" />
                 </div>
 
                 <div className="space-y-4">
                   <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] backdrop-blur-md">
                     <Sparkles className="size-3.5" />
-                    Experiencia guiada para compradores
+                    Experiencia guiada para compradores e inquilinos
                   </div>
                   <h2 className="max-w-xl text-3xl font-semibold leading-tight sm:text-4xl">
-                    Busca, compara y pregunta con una experiencia pensada para decidir mejor
+                    La IA te ayuda a entender requisitos, costos y disponibilidad desde la ficha
                   </h2>
                   <p className="max-w-lg text-sm leading-7 text-white/78 sm:text-base">
-                    Crea tu cuenta para guardar favoritos, retomar consultas y recibir respuestas iniciales con IA antes de hablar con cada inmobiliaria.
+                    Guarda favoritos, retoma conversaciones y llega mejor preparado al contacto con
+                    cada inmobiliaria.
                   </p>
                 </div>
               </div>
@@ -304,25 +312,13 @@ export function PublicMarketplace({
 
         <section className="mt-6 flex flex-col gap-4 rounded-[30px] border border-slate-200 bg-white px-4 py-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.25)] lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setOperationFilter("all")}
-              className={pillClass(operationFilter === "all")}
-            >
+            <button type="button" onClick={() => setOperationFilter("all")} className={pillClass(operationFilter === "all")}>
               Todo
             </button>
-            <button
-              type="button"
-              onClick={() => setOperationFilter("Venta")}
-              className={pillClass(operationFilter === "Venta")}
-            >
+            <button type="button" onClick={() => setOperationFilter("Venta")} className={pillClass(operationFilter === "Venta")}>
               Venta
             </button>
-            <button
-              type="button"
-              onClick={() => setOperationFilter("Alquiler")}
-              className={pillClass(operationFilter === "Alquiler")}
-            >
+            <button type="button" onClick={() => setOperationFilter("Alquiler")} className={pillClass(operationFilter === "Alquiler")}>
               Alquiler
             </button>
             <button type="button" className={pillClass(false)}>
@@ -332,32 +328,16 @@ export function PublicMarketplace({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setSection("explorar")}
-              className={iconToggleClass(section === "explorar")}
-            >
+            <button type="button" onClick={() => setSection("explorar")} className={iconToggleClass(section === "explorar")}>
               <LayoutGrid className="size-4" />
             </button>
-            <button
-              type="button"
-              onClick={() => setSection("mapa")}
-              className={iconToggleClass(section === "mapa")}
-            >
+            <button type="button" onClick={() => setSection("mapa")} className={iconToggleClass(section === "mapa")}>
               <Map className="size-4" />
             </button>
-            <button
-              type="button"
-              onClick={() => setSection("favoritos")}
-              className={iconToggleClass(section === "favoritos")}
-            >
+            <button type="button" onClick={() => setSection("favoritos")} className={iconToggleClass(section === "favoritos")}>
               <Heart className="size-4" />
             </button>
-            <button
-              type="button"
-              onClick={() => setSection("inversiones")}
-              className={iconToggleClass(section === "inversiones")}
-            >
+            <button type="button" onClick={() => setSection("inversiones")} className={iconToggleClass(section === "inversiones")}>
               <ChartColumnIncreasing className="size-4" />
             </button>
           </div>
@@ -391,7 +371,7 @@ export function PublicMarketplace({
               <SectionHeading
                 eyebrow="Vista mapa"
                 title={`${filteredListings.length} propiedades en contexto`}
-                description="Filtra a la izquierda y usa el mapa como guía de descubrimiento."
+                description="Selecciona una propiedad y abre su direccion exacta sobre Google Maps sin salir del marketplace."
               />
               <div className="space-y-4">
                 {filteredListings.slice(0, 5).map((listing) => (
@@ -399,45 +379,94 @@ export function PublicMarketplace({
                     key={listing.id}
                     listing={listing}
                     isFavorite={favoriteIds.includes(listing.id)}
+                    isSelected={selectedMapListing?.id === listing.id}
                     onToggleFavorite={toggleFavorite}
+                    onSelect={() => setSelectedMapListingId(listing.id)}
                   />
                 ))}
               </div>
             </div>
 
             <div className="overflow-hidden rounded-[34px] border border-slate-200 bg-[linear-gradient(180deg,rgba(222,246,247,0.9)_0%,rgba(228,236,247,0.96)_100%)] p-5 shadow-[0_32px_90px_-60px_rgba(15,23,42,0.32)] sm:p-6">
-              <div className="relative h-[520px] overflow-hidden rounded-[28px] border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.78),transparent_30%),linear-gradient(135deg,rgba(236,244,255,0.85)_0%,rgba(221,236,240,0.88)_100%)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)]">
-                <div className="absolute inset-0 opacity-70 [background-image:linear-gradient(rgba(255,255,255,0.62)_2px,transparent_2px),linear-gradient(90deg,rgba(255,255,255,0.62)_2px,transparent_2px)] [background-size:84px_84px]" />
-                <div className="absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_20%_30%,rgba(14,165,233,0.18),transparent_12%),radial-gradient(circle_at_80%_76%,rgba(37,99,235,0.12),transparent_14%),radial-gradient(circle_at_63%_18%,rgba(99,102,241,0.14),transparent_10%)]" />
-
-                <div className="absolute left-4 right-4 top-4 rounded-[24px] border border-white/70 bg-white/90 p-3 shadow-lg backdrop-blur sm:left-6 sm:right-auto sm:w-[420px]">
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-                    <Input
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Buscar por ciudad, barrio o ZIP..."
-                      className="h-12 rounded-2xl border-0 bg-slate-50 pl-11 shadow-none ring-1 ring-slate-200"
+              <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+                <div className="overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)]">
+                  {selectedMapListing ? (
+                    <iframe
+                      title={`Mapa de ${selectedMapListing.title}`}
+                      src={buildGoogleMapsEmbedUrl(
+                        selectedMapListing.exactAddress || selectedMapListing.location
+                      )}
+                      className="h-[520px] w-full border-0"
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
                     />
-                  </div>
+                  ) : (
+                    <div className="flex h-[520px] items-center justify-center bg-white text-sm text-slate-500">
+                      No hay propiedades para mostrar en el mapa.
+                    </div>
+                  )}
                 </div>
 
-                {filteredListings.slice(0, 8).map((listing) => (
-                  <button
-                    key={listing.id}
-                    type="button"
-                    onClick={() => setSection("explorar")}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-950 px-3 py-2 text-sm font-semibold text-white shadow-[0_18px_35px_-20px_rgba(15,23,42,0.65)] transition-transform hover:scale-[1.03]"
-                    style={{ left: `${listing.mapX}%`, top: `${listing.mapY}%` }}
-                  >
-                    {formatShortPrice(listing.price)}
-                  </button>
-                ))}
+                {selectedMapListing ? (
+                  <aside className="rounded-[28px] border border-white/70 bg-white/92 p-5 shadow-lg backdrop-blur">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">
+                        Ubicacion exacta
+                      </p>
+                      <h3 className="mt-2 text-2xl font-semibold text-slate-950">
+                        {selectedMapListing.title}
+                      </h3>
+                      <p className="mt-2 text-sm leading-7 text-slate-600">
+                        {selectedMapListing.exactAddress || selectedMapListing.location}
+                      </p>
+                    </div>
 
-                <div className="absolute bottom-4 right-4 flex flex-col gap-2">
-                  <MapControl>+</MapControl>
-                  <MapControl>-</MapControl>
-                </div>
+                    <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Precio</p>
+                      <p className="mt-2 text-2xl font-semibold text-slate-950">
+                        {formatMoney(selectedMapListing.price, selectedMapListing.currency)}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {selectedMapListing.operation} · {selectedMapListing.propertyType}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 text-sm text-slate-600">
+                      <div className="inline-flex items-center gap-2">
+                        <CalendarDays className="size-4 text-slate-400" />
+                        Disponible desde: {selectedMapListing.availableFrom || "Inmediata"}
+                      </div>
+                      <div className="inline-flex items-center gap-2">
+                        <PawPrint className="size-4 text-slate-400" />
+                        Mascotas: {selectedMapListing.petsPolicy || "Consultar"}
+                      </div>
+                      <div className="inline-flex items-center gap-2">
+                        <CarFront className="size-4 text-slate-400" />
+                        Cocheras: {selectedMapListing.parkingSpots}
+                      </div>
+                    </div>
+
+                    {selectedMapListing.requirements ? (
+                      <div className="mt-4 rounded-[22px] border border-slate-200 bg-white p-4">
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Requisitos</p>
+                        <p className="mt-2 text-sm leading-7 text-slate-600">
+                          {selectedMapListing.requirements}
+                        </p>
+                      </div>
+                    ) : null}
+
+                    <a
+                      href={buildGoogleMapsExternalUrl(
+                        selectedMapListing.exactAddress || selectedMapListing.location
+                      )}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+                    >
+                      Abrir en Google Maps
+                    </a>
+                  </aside>
+                ) : null}
               </div>
             </div>
           </section>
@@ -472,7 +501,7 @@ export function PublicMarketplace({
             ) : (
               <EmptyPanel
                 title="Todavia no agregaste favoritos"
-                description="Desde Explorar o Mapa podes guardar propiedades y traerlas aca para compararlas."
+                description="Desde Explorar o Mapa puedes guardar propiedades y traerlas aqui para compararlas."
               />
             )}
 
@@ -502,23 +531,13 @@ export function PublicMarketplace({
                           Criterio
                         </th>
                         {comparison.map((listing) => (
-                          <th
-                            key={listing.id}
-                            className="min-w-[280px] px-5 py-4 text-left sm:px-6"
-                          >
+                          <th key={listing.id} className="min-w-[280px] px-5 py-4 text-left sm:px-6">
                             <div className="space-y-3">
                               <div className="relative h-28 overflow-hidden rounded-[22px] border border-slate-200">
-                                <Image
-                                  src={listing.image}
-                                  alt={listing.title}
-                                  fill
-                                  className="object-cover"
-                                />
+                                <Image src={listing.image} alt={listing.title} fill className="object-cover" />
                               </div>
                               <div>
-                                <p className="text-lg font-semibold text-slate-950">
-                                  {listing.title}
-                                </p>
+                                <p className="text-lg font-semibold text-slate-950">{listing.title}</p>
                                 <p className="text-sm text-slate-500">{listing.location}</p>
                               </div>
                             </div>
@@ -533,10 +552,7 @@ export function PublicMarketplace({
                             {row.label}
                           </td>
                           {row.values.map((value, index) => (
-                            <td
-                              key={`${row.label}-${index}`}
-                              className="px-5 py-4 text-sm text-slate-800 sm:px-6"
-                            >
+                            <td key={`${row.label}-${index}`} className="px-5 py-4 text-sm text-slate-800 sm:px-6">
                               {value}
                             </td>
                           ))}
@@ -555,15 +571,19 @@ export function PublicMarketplace({
             <SectionHeading
               eyebrow="Inversiones"
               title="Oportunidades priorizadas por retorno"
-              description="Cruza precio por metro, rendimiento anual y apreciacion estimada para detectar las mejores jugadas."
+              description="Cruza precio por metro, rendimiento anual y apreciacion estimada para detectar mejores oportunidades."
             />
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <InvestmentMetric
                 icon={<BadgeDollarSign className="size-5" />}
-                label="Precio medio por m²"
-                value={`US$ ${aggregated.avgPricePerMeter}`}
-                hint="benchmark publico del marketplace"
+                label="Precio de referencia"
+                value={
+                  selectedMapListing
+                    ? formatMoney(selectedMapListing.price, selectedMapListing.currency)
+                    : "-"
+                }
+                hint="segun la propiedad seleccionada"
               />
               <InvestmentMetric
                 icon={<Radar className="size-5" />}
@@ -587,13 +607,9 @@ export function PublicMarketplace({
 
             <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
               <section className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.28)] sm:p-6">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">Ranking de oportunidades</p>
-                    <h3 className="mt-1 text-2xl font-semibold text-slate-950">
-                      Propiedades lideres
-                    </h3>
-                  </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-500">Ranking de oportunidades</p>
+                  <h3 className="mt-1 text-2xl font-semibold text-slate-950">Propiedades lideres</h3>
                 </div>
                 <div className="mt-6 space-y-4">
                   {investmentLeaders.map((listing, index) => (
@@ -602,26 +618,19 @@ export function PublicMarketplace({
                       className="grid gap-4 rounded-[26px] border border-slate-200 bg-slate-50 p-4 md:grid-cols-[120px_1fr_auto]"
                     >
                       <div className="relative h-24 overflow-hidden rounded-[18px]">
-                        <Image
-                          src={listing.image}
-                          alt={listing.title}
-                          fill
-                          className="object-cover"
-                        />
+                        <Image src={listing.image} alt={listing.title} fill className="object-cover" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                           <span>#{index + 1}</span>
                           <span>{listing.agencyName}</span>
                         </div>
-                        <p className="mt-2 text-xl font-semibold text-slate-950">
-                          {listing.title}
-                        </p>
+                        <p className="mt-2 text-xl font-semibold text-slate-950">{listing.title}</p>
                         <p className="mt-1 text-sm text-slate-500">{listing.location}</p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <MetricBadge label={`${listing.yieldPercent}% yield`} />
                           <MetricBadge label={`${listing.appreciationPercent}% apreciacion`} />
-                          <MetricBadge label={`US$ ${listing.pricePerSquareMeter}/m2`} />
+                          <MetricBadge label={`${listing.currency} ${listing.pricePerSquareMeter}/m2`} />
                         </div>
                       </div>
                       <div className="flex flex-col items-start gap-2 md:items-end">
@@ -645,14 +654,11 @@ export function PublicMarketplace({
                   Lectura rapida del mercado
                 </p>
                 <h3 className="mt-2 text-3xl font-semibold tracking-tight">
-                  Barrios y oportunidades para vivir o invertir con mejor contexto
+                  Barrios y oportunidades con mejor contexto
                 </h3>
                 <div className="mt-6 space-y-4">
                   {investmentLeaders.slice(0, 3).map((listing) => (
-                    <div
-                      key={listing.id}
-                      className="rounded-[24px] border border-white/10 bg-white/5 p-4"
-                    >
+                    <div key={listing.id} className="rounded-[24px] border border-white/10 bg-white/5 p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <p className="text-lg font-semibold">{listing.neighborhood}</p>
@@ -712,6 +718,9 @@ function MarketplacePropertyCard({
           <span className="rounded-full bg-white/92 px-3 py-1 text-xs font-semibold text-slate-900">
             {listing.operation}
           </span>
+          <span className="rounded-full bg-slate-900/78 px-3 py-1 text-xs font-medium text-white">
+            {listing.currency}
+          </span>
         </div>
         <button
           type="button"
@@ -731,11 +740,11 @@ function MarketplacePropertyCard({
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-3xl font-semibold tracking-tight text-slate-950">
-              {formatCurrency(listing.price)}
+              {formatMoney(listing.price, listing.currency)}
             </p>
             <h3 className="mt-2 text-xl font-semibold text-slate-900">{listing.title}</h3>
-            <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
-              <MapPin className="size-4 shrink-0" />
+            <div className="mt-2 flex items-start gap-2 text-sm text-slate-500">
+              <MapPin className="mt-0.5 size-4 shrink-0" />
               <span>{listing.location}</span>
             </div>
           </div>
@@ -757,6 +766,23 @@ function MarketplacePropertyCard({
           <div className="inline-flex items-center gap-2">
             <Layers3 className="size-4" />
             {listing.propertyType}
+          </div>
+        </div>
+
+        <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+          <div className="grid gap-2 text-sm text-slate-600">
+            <div>
+              <span className="font-medium text-slate-900">Direccion:</span>{" "}
+              {listing.exactAddress || listing.location}
+            </div>
+            <div>
+              <span className="font-medium text-slate-900">Mascotas:</span>{" "}
+              {listing.petsPolicy || "Consultar"}
+            </div>
+            <div>
+              <span className="font-medium text-slate-900">Requisitos:</span>{" "}
+              {listing.requirements || "Consultar con la inmobiliaria"}
+            </div>
           </div>
         </div>
 
@@ -802,47 +828,61 @@ function MarketplacePropertyCard({
 function CompactMapListing({
   listing,
   isFavorite,
+  isSelected,
   onToggleFavorite,
+  onSelect,
 }: {
   listing: PublicListing;
   isFavorite: boolean;
+  isSelected: boolean;
   onToggleFavorite: (id: string) => void;
+  onSelect: () => void;
 }) {
   return (
-    <article className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_20px_55px_-42px_rgba(15,23,42,0.22)]">
-      <div className="grid gap-4 sm:grid-cols-[120px_1fr]">
-        <div className="relative h-28 overflow-hidden rounded-[20px]">
-          <Image src={listing.image} alt={listing.title} fill className="object-cover" />
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xl font-semibold text-slate-950">
-                {formatCurrency(listing.price)}
-              </p>
-              <h3 className="mt-1 font-semibold text-slate-900">{listing.title}</h3>
+    <article
+      className={cn(
+        "rounded-[28px] border bg-white p-4 shadow-[0_20px_55px_-42px_rgba(15,23,42,0.22)] transition-colors",
+        isSelected ? "border-slate-950 ring-2 ring-slate-950/10" : "border-slate-200"
+      )}
+    >
+      <button type="button" onClick={onSelect} className="block w-full text-left">
+        <div className="grid gap-4 sm:grid-cols-[120px_1fr]">
+          <div className="relative h-28 overflow-hidden rounded-[20px]">
+            <Image src={listing.image} alt={listing.title} fill className="object-cover" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xl font-semibold text-slate-950">
+                  {formatMoney(listing.price, listing.currency)}
+                </p>
+                <h3 className="mt-1 font-semibold text-slate-900">{listing.title}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleFavorite(listing.id);
+                }}
+                className={cn(
+                  "flex size-10 items-center justify-center rounded-full border",
+                  isFavorite
+                    ? "border-transparent bg-slate-950 text-white"
+                    : "border-slate-200 bg-white text-slate-600"
+                )}
+              >
+                <Heart className={cn("size-4", isFavorite ? "fill-current" : "")} />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => onToggleFavorite(listing.id)}
-              className={cn(
-                "flex size-10 items-center justify-center rounded-full border",
-                isFavorite
-                  ? "border-transparent bg-slate-950 text-white"
-                  : "border-slate-200 bg-white text-slate-600"
-              )}
-            >
-              <Heart className={cn("size-4", isFavorite ? "fill-current" : "")} />
-            </button>
-          </div>
-          <p className="mt-2 text-sm text-slate-500">{listing.location}</p>
-          <div className="mt-3 flex flex-wrap gap-3 text-sm text-slate-600">
-            <span>{listing.bedrooms} dorm.</span>
-            <span>{listing.bathrooms} baños</span>
-            <span>{listing.area} m²</span>
+            <p className="mt-2 text-sm text-slate-500">{listing.location}</p>
+            <div className="mt-3 flex flex-wrap gap-3 text-sm text-slate-600">
+              <span>{listing.bedrooms} dorm.</span>
+              <span>{listing.bathrooms} banos</span>
+              <span>{listing.area} m2</span>
+            </div>
           </div>
         </div>
-      </div>
+      </button>
     </article>
   );
 }
@@ -932,42 +972,31 @@ function MetricBadge({ label, dark = false }: { label: string; dark?: boolean })
   );
 }
 
-function MapControl({ children }: { children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      className="flex size-11 items-center justify-center rounded-2xl border border-white/70 bg-white/90 text-lg font-semibold text-slate-900 shadow-lg backdrop-blur"
-    >
-      {children}
-    </button>
-  );
-}
-
 function comparisonRows(listings: PublicListing[]) {
   return [
     {
       label: "Precio",
-      values: listings.map((listing) => formatCurrency(listing.price)),
+      values: listings.map((listing) => formatMoney(listing.price, listing.currency)),
     },
     {
-      label: "Precio / m²",
-      values: listings.map((listing) => `US$ ${listing.pricePerSquareMeter}`),
+      label: "Precio / m2",
+      values: listings.map((listing) => `${listing.currency} ${listing.pricePerSquareMeter}`),
     },
     {
       label: "Superficie total",
-      values: listings.map((listing) => `${listing.area} m²`),
+      values: listings.map((listing) => `${listing.area} m2`),
     },
     {
       label: "Dormitorios",
       values: listings.map((listing) => String(listing.bedrooms)),
     },
     {
-      label: "Año de construccion",
-      values: listings.map((listing) => String(listing.yearBuilt)),
+      label: "Disponible desde",
+      values: listings.map((listing) => listing.availableFrom || "Inmediata"),
     },
     {
-      label: "Amenities principales",
-      values: listings.map((listing) => listing.amenities.slice(0, 3).join(" · ")),
+      label: "Mascotas",
+      values: listings.map((listing) => listing.petsPolicy || "Consultar"),
     },
   ];
 }
@@ -988,16 +1017,4 @@ function iconToggleClass(active: boolean) {
       ? "border-slate-950 bg-slate-950 text-white"
       : "border-slate-200 bg-white text-slate-600 hover:text-slate-950"
   );
-}
-
-function formatShortPrice(value: number) {
-  if (value >= 1_000_000) {
-    return `US$ ${(value / 1_000_000).toFixed(1)}M`;
-  }
-
-  if (value >= 1000) {
-    return `US$ ${Math.round(value / 1000)}K`;
-  }
-
-  return `US$ ${value}`;
 }

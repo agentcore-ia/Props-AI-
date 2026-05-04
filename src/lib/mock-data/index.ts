@@ -1,5 +1,15 @@
 import type { RentalContractSummary } from "@/lib/rental-types";
 
+export type PropertyCurrency = "USD" | "ARS";
+export type PropertyType =
+  | "Departamento"
+  | "Casa"
+  | "PH"
+  | "Loft"
+  | "Townhouse"
+  | "Oficina"
+  | "Local";
+
 export type Metric = {
   label: string;
   value: string;
@@ -27,12 +37,26 @@ export type Property = {
   tenantSlug: string;
   title: string;
   price: number;
+  currency: PropertyCurrency;
   location: string;
+  exactAddress: string;
   status: "Disponible" | "Reservada" | "Vendida" | "Alquilada";
   operation: "Venta" | "Alquiler";
   description: string;
   image: string;
   images: string[];
+  propertyType: PropertyType;
+  bedrooms: number;
+  bathrooms: number;
+  area: number;
+  parkingSpots: number;
+  furnished: boolean;
+  expenses: number | null;
+  expensesCurrency: PropertyCurrency | null;
+  availableFrom: string | null;
+  petsPolicy: string;
+  requirements: string;
+  amenities: string[];
   rentalContract?: RentalContractSummary | null;
 };
 
@@ -144,7 +168,9 @@ export const properties: Property[] = [
     tenantSlug: "gentile",
     title: "Torre Libertad 4B",
     price: 285000,
+    currency: "USD",
     location: "Belgrano, CABA",
+    exactAddress: "Av. del Libertador 2450, Belgrano, Ciudad Autónoma de Buenos Aires, Argentina",
     status: "Disponible",
     operation: "Venta",
     description: "Semipiso con balcon corrido, amenities premium y cochera.",
@@ -154,13 +180,27 @@ export const properties: Property[] = [
       "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
       "https://images.unsplash.com/photo-1448630360428-65456885c650?auto=format&fit=crop&w=1200&q=80",
     ],
+    propertyType: "Departamento",
+    bedrooms: 3,
+    bathrooms: 2,
+    area: 148,
+    parkingSpots: 1,
+    furnished: false,
+    expenses: 185000,
+    expensesCurrency: "ARS",
+    availableFrom: null,
+    petsPolicy: "Consultar",
+    requirements: "DNI y justificación de fondos para avanzar con la reserva.",
+    amenities: ["Balcón aterrazado", "SUM", "Pileta", "Cochera"],
   },
   {
     id: "prop-2",
     tenantSlug: "gentile",
     title: "PH Arce Patio",
     price: 198000,
+    currency: "USD",
     location: "Palermo Hollywood, CABA",
+    exactAddress: "Arce 1800, Palermo Hollywood, Ciudad Autónoma de Buenos Aires, Argentina",
     status: "Reservada",
     operation: "Venta",
     description: "PH reciclado con patio interno, ideal renta temporal.",
@@ -170,13 +210,27 @@ export const properties: Property[] = [
       "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80",
       "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80",
     ],
+    propertyType: "PH",
+    bedrooms: 2,
+    bathrooms: 2,
+    area: 112,
+    parkingSpots: 0,
+    furnished: false,
+    expenses: 52000,
+    expensesCurrency: "ARS",
+    availableFrom: null,
+    petsPolicy: "Sí, mascotas pequeñas",
+    requirements: "Apto para renta temporal o primera vivienda.",
+    amenities: ["Patio", "Entrada independiente", "Terraza"],
   },
   {
     id: "prop-3",
     tenantSlug: "rodriguez",
     title: "Casa Laguna Norte",
     price: 520000,
+    currency: "USD",
     location: "Nordelta, Buenos Aires",
+    exactAddress: "Boulevard del Mirador 1200, Nordelta, Tigre, Buenos Aires, Argentina",
     status: "Vendida",
     operation: "Venta",
     description: "Casa de 4 suites con jardin al lago y galeria techada.",
@@ -186,13 +240,27 @@ export const properties: Property[] = [
       "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80",
       "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?auto=format&fit=crop&w=1200&q=80",
     ],
+    propertyType: "Casa",
+    bedrooms: 4,
+    bathrooms: 4,
+    area: 320,
+    parkingSpots: 2,
+    furnished: false,
+    expenses: 310000,
+    expensesCurrency: "ARS",
+    availableFrom: null,
+    petsPolicy: "Sí",
+    requirements: "Propiedad cerrada, referencia histórica disponible.",
+    amenities: ["Jardín", "Laguna", "Galería", "Parrilla"],
   },
   {
     id: "prop-4",
     tenantSlug: "rodriguez",
     title: "Loft Recoleta Park",
     price: 2200,
+    currency: "USD",
     location: "Recoleta, CABA",
+    exactAddress: "Av. Alvear 1800, Recoleta, Ciudad Autónoma de Buenos Aires, Argentina",
     status: "Disponible",
     operation: "Alquiler",
     description: "Loft amoblado de diseno con amenities y seguridad 24h.",
@@ -202,13 +270,27 @@ export const properties: Property[] = [
       "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80",
       "https://images.unsplash.com/photo-1502672023488-70e25813eb80?auto=format&fit=crop&w=1200&q=80",
     ],
+    propertyType: "Loft",
+    bedrooms: 1,
+    bathrooms: 1,
+    area: 78,
+    parkingSpots: 1,
+    furnished: true,
+    expenses: 240000,
+    expensesCurrency: "ARS",
+    availableFrom: "2026-05-15",
+    petsPolicy: "No",
+    requirements: "Seguro de caución o garantía propietaria, ingresos demostrables y un mes de depósito.",
+    amenities: ["Amoblado", "Seguridad 24 hs", "Laundry", "Pileta"],
   },
   {
     id: "prop-5",
     tenantSlug: "delta",
     title: "Townhouse Delta Vista",
     price: 310000,
+    currency: "USD",
     location: "Tigre, Buenos Aires",
+    exactAddress: "Camino de los Remeros 4500, Tigre, Buenos Aires, Argentina",
     status: "Disponible",
     operation: "Venta",
     description: "Townhouse nuevo con jardin, parrilla y muelle compartido.",
@@ -218,6 +300,18 @@ export const properties: Property[] = [
       "https://images.unsplash.com/photo-1576941089067-2de3c901e126?auto=format&fit=crop&w=1200&q=80",
       "https://images.unsplash.com/photo-1600566752227-8f3b29b7fdb5?auto=format&fit=crop&w=1200&q=80",
     ],
+    propertyType: "Townhouse",
+    bedrooms: 3,
+    bathrooms: 3,
+    area: 184,
+    parkingSpots: 2,
+    furnished: false,
+    expenses: 98000,
+    expensesCurrency: "ARS",
+    availableFrom: null,
+    petsPolicy: "Sí",
+    requirements: "Acepta compra con hipoteca sujeta a aprobación.",
+    amenities: ["Jardín", "Muelle compartido", "Quincho"],
   },
 ];
 
