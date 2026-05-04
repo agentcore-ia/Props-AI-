@@ -189,7 +189,7 @@ export function PropertyFormDialog({
         <Plus className="size-4" />
         Nueva propiedad
       </DialogTrigger>
-      <DialogContent className="max-h-[92vh] max-w-7xl overflow-y-auto rounded-[32px] p-0">
+      <DialogContent className="h-[min(92vh,980px)] w-[min(96vw,1360px)] max-w-[min(96vw,1360px)] overflow-x-hidden overflow-y-auto rounded-[32px] p-0 sm:max-w-[min(96vw,1360px)]">
         <div className="p-6 lg:p-8">
           <DialogHeader>
             <DialogTitle>Nueva propiedad</DialogTitle>
