@@ -1,12 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { Building2, CalendarDays, CircleDollarSign, Phone, UserRound } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Building2, CalendarDays, CircleDollarSign, Loader2, Phone, Send, UserRound } from "lucide-react";
 
 import type { LeaseRosterItem } from "@/lib/props-data";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatMoney, formatShortDate } from "@/lib/utils";
 
 const statusStyles: Record<LeaseRosterItem["status"], string> = {
@@ -20,6 +21,8 @@ export function LeasesWorkspace({
 }: {
   leases: LeaseRosterItem[];
 }) {
+  const [sendingTestId, setSendingTestId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<null | { type: "success" | "error"; message: string }>(null);
   const active = leases.filter((lease) => lease.status === "Activo").length;
   const dueSoon = leases.filter((lease) => {
     if (lease.status !== "Activo") return false;
@@ -28,6 +31,36 @@ export function LeasesWorkspace({
     return next <= inSevenDays;
   }).length;
   const autoNotify = leases.filter((lease) => lease.autoNotify).length;
+
+  async function handleSendTest(contractId: string, tenantName: string) {
+    setSendingTestId(contractId);
+    setFeedback(null);
+
+    const response = await fetch("/api/admin/rent-adjustments/test", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ contractId }),
+    });
+
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      setSendingTestId(null);
+      setFeedback({
+        type: "error",
+        message: payload?.error ?? "No se pudo enviar la prueba.",
+      });
+      return;
+    }
+
+    setSendingTestId(null);
+    setFeedback({
+      type: "success",
+      message: `Prueba enviada a ${tenantName}. Revisa ese WhatsApp para confirmar el aumento simulado.`,
+    });
+  }
 
   return (
     <div className="space-y-8">
@@ -43,23 +76,36 @@ export function LeasesWorkspace({
         <MetricCard label="Inquilinos cargados" value={String(leases.length)} hint="base actual del CRM" />
       </section>
 
+      {feedback ? (
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            feedback.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {feedback.message}
+        </div>
+      ) : null}
+
       {leases.length > 0 ? (
         <>
           <section className="hidden overflow-hidden rounded-[30px] border bg-card shadow-sm xl:block">
-            <div className="grid grid-cols-[1.1fr_1fr_0.8fr_0.9fr_0.8fr_0.7fr] gap-4 border-b px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="grid grid-cols-[1.1fr_1fr_0.8fr_0.9fr_0.8fr_0.7fr_0.8fr] gap-4 border-b px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               <span>Inquilino</span>
               <span>Propiedad</span>
               <span>Direccion</span>
               <span>Alquiler actual</span>
               <span>Proximo aumento</span>
               <span>Estado</span>
+              <span>Acciones</span>
             </div>
 
             <div className="divide-y">
               {leases.map((lease) => (
                 <div
                   key={lease.contractId}
-                  className="grid grid-cols-[1.1fr_1fr_0.8fr_0.9fr_0.8fr_0.7fr] gap-4 px-6 py-5"
+                  className="grid grid-cols-[1.1fr_1fr_0.8fr_0.9fr_0.8fr_0.7fr_0.8fr] gap-4 px-6 py-5"
                 >
                   <div className="space-y-1">
                     <p className="font-semibold">{lease.tenantName}</p>
@@ -96,6 +142,22 @@ export function LeasesWorkspace({
                       {lease.autoNotify ? "Aviso automatico activo" : "Aviso manual"}
                     </p>
                   </div>
+
+                  <div className="flex items-start">
+                    <Button
+                      variant="outline"
+                      className="rounded-2xl"
+                      disabled={sendingTestId === lease.contractId}
+                      onClick={() => handleSendTest(lease.contractId, lease.tenantName)}
+                    >
+                      {sendingTestId === lease.contractId ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Send className="size-4" />
+                      )}
+                      Enviar prueba
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -131,6 +193,22 @@ export function LeasesWorkspace({
                     {lease.requirements}
                   </div>
                 ) : null}
+
+                <div className="mt-4">
+                  <Button
+                    variant="outline"
+                    className="w-full rounded-2xl"
+                    disabled={sendingTestId === lease.contractId}
+                    onClick={() => handleSendTest(lease.contractId, lease.tenantName)}
+                  >
+                    {sendingTestId === lease.contractId ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Send className="size-4" />
+                    )}
+                    Enviar prueba de aumento
+                  </Button>
+                </div>
               </article>
             ))}
           </section>

@@ -311,6 +311,108 @@ async function sendNotificationViaN8n(payload: {
   };
 }
 
+export async function sendTestRentIncreaseMessage(contractId: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("rental_contracts")
+    .select(
+      "id, tenant_name, tenant_phone, current_rent, index_type, adjustment_frequency_months, next_adjustment_date, auto_notify, agencies(name, slug, phone, messaging_instance), properties(title, location)"
+    )
+    .eq("id", contractId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("No encontramos el contrato para enviar la prueba.");
+  }
+
+  const agency = Array.isArray(data.agencies) ? data.agencies[0] : data.agencies;
+  const property = Array.isArray(data.properties) ? data.properties[0] : data.properties;
+
+  if (!agency) {
+    throw new Error("No encontramos la inmobiliaria asociada al contrato.");
+  }
+
+  if (!data.tenant_phone) {
+    throw new Error("Este contrato no tiene WhatsApp del inquilino.");
+  }
+
+  const factor = 1.12;
+  const previousRent = Number(data.current_rent);
+  const newRent = Number((previousRent * factor).toFixed(2));
+  const nextAdjustmentDate = addMonthsIsoDate(
+    data.next_adjustment_date,
+    data.adjustment_frequency_months
+  );
+
+  const text = buildTenantMessage({
+    contract: {
+      id: data.id,
+      property_id: "",
+      agency_id: "",
+      tenant_name: data.tenant_name,
+      tenant_phone: data.tenant_phone,
+      tenant_email: null,
+      current_rent: previousRent,
+      currency: "ARS",
+      index_type: data.index_type,
+      adjustment_frequency_months: data.adjustment_frequency_months,
+      contract_start_date: "",
+      rent_reference_date: "",
+      next_adjustment_date: data.next_adjustment_date,
+      last_adjustment_date: null,
+      auto_notify: true,
+      notification_channel: "whatsapp",
+      status: "Activo",
+      notes: "",
+      agencies: {
+        id: "test-agency",
+        name: agency.name,
+        slug: agency.slug,
+        phone: agency.phone,
+        messaging_instance: agency.messaging_instance,
+      },
+      properties: property
+        ? {
+            id: "test-property",
+            title: property.title,
+            location: property.location,
+          }
+        : null,
+    },
+    propertyTitle: property?.title ?? "la propiedad",
+    agencyName: agency.name,
+    agencyPhone: agency.phone ?? "",
+    factor,
+    nextAdjustmentDate,
+    newRent,
+  });
+
+  const notification = await sendNotificationViaN8n({
+    instance: agency.messaging_instance ?? "agentcore",
+    number: normalizePhone(data.tenant_phone),
+    text,
+    adjustmentId: `test-${contractId}`,
+    agencySlug: agency.slug ?? "",
+  });
+
+  if (!notification.ok) {
+    throw new Error("n8n rechazo la prueba de WhatsApp.");
+  }
+
+  return {
+    ok: true,
+    tenantName: data.tenant_name,
+    propertyTitle: property?.title ?? "la propiedad",
+    previousRent,
+    newRent,
+    messageBody: text,
+  };
+}
+
 export async function runDueRentAdjustments(options?: {
   agencyIds?: string[];
   dryRun?: boolean;
