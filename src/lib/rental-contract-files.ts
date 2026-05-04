@@ -73,8 +73,6 @@ async function ensureBucket() {
 async function extractText(buffer: Buffer, mimeType: string) {
   if (mimeType === "application/pdf") {
     const { PDFParse } = require("pdf-parse") as typeof import("pdf-parse");
-    const workerPath = require.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs");
-    PDFParse.setWorker(workerPath);
     const parser = new PDFParse({ data: buffer });
     const parsed = await parser.getText();
     await parser.destroy();
