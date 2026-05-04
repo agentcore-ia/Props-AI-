@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 
 import mammoth from "mammoth";
 
+import { getOpenAIEnv } from "@/lib/openai-env";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const require = createRequire(import.meta.url);
@@ -101,6 +102,57 @@ async function extractText(buffer: Buffer, mimeType: string) {
   return buffer.toString("utf8").trim();
 }
 
+async function extractPdfTextWithOpenAI(buffer: Buffer, fileName: string) {
+  const openAI = getOpenAIEnv();
+  if (!openAI.configured) {
+    return "";
+  }
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${openAI.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: openAI.model,
+      input: [
+        {
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text:
+                "Extrae el texto legible del contrato adjunto en espanol. Devuelve solo texto plano, preservando montos, fechas, indice de ajuste, frecuencia y nombres propios cuando existan. No resumas ni inventes datos.",
+            },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_file",
+              filename: fileName,
+              file_data: `data:application/pdf;base64,${buffer.toString("base64")}`,
+            },
+            {
+              type: "input_text",
+              text: "Lee el PDF y transcribe el texto util del contrato.",
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("No se pudo hacer OCR del PDF con OpenAI.");
+  }
+
+  const payload = (await response.json()) as { output_text?: string };
+  return payload.output_text?.trim() ?? "";
+}
+
 export type UploadedRentalContractFile = {
   fileName: string;
   filePath: string;
@@ -156,6 +208,18 @@ export async function uploadRentalContractFile({
 
   try {
     extractedText = await extractText(buffer, normalizedMimeType);
+    if (!extractedText && normalizedMimeType === "application/pdf") {
+      extractedText = await extractPdfTextWithOpenAI(buffer, file.name || filename);
+      if (!extractedText) {
+        extractionWarning =
+          "El PDF no trae texto seleccionable y el OCR no pudo recuperar contenido legible.";
+      }
+    }
+
+    if (!extractedText && normalizedMimeType === "application/msword") {
+      extractionWarning =
+        "No pudimos leer texto del archivo .doc. Si es posible, conviertelo a .docx o exportalo como PDF con texto.";
+    }
   } catch (error) {
     extractionWarning =
       error instanceof Error
