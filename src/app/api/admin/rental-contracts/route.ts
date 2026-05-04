@@ -123,6 +123,8 @@ export async function POST(request: Request) {
         })
       : null;
 
+  const missingReadableContract = contractFile && !uploadedContract?.extractedText?.trim();
+
   const resolvedTenantName =
     tenantName || analyzedContract?.tenantName || existingContract?.tenant_name || "";
   const resolvedTenantPhone = tenantPhone || existingContract?.tenant_phone || "";
@@ -152,6 +154,19 @@ export async function POST(request: Request) {
     nextAdjustmentDate: resolvedNextAdjustmentDate,
     adjustmentFrequencyMonths: resolvedAdjustmentFrequencyMonths,
   });
+  const reviewReasons = [
+    ...(analyzedContract?.reviewReasons ?? []),
+    ...(missingReadableContract
+      ? ["Se adjuntó un contrato, pero no pudimos extraer texto legible del archivo."]
+      : []),
+  ];
+  const requiresReview = reviewReasons.length > 0;
+  const safeStatus =
+    requiresReview && status === "Activo" ? "Pausado" : status;
+  const safeAutoNotify = requiresReview ? false : autoNotify;
+  const mergedNotes = [notes, ...reviewReasons.map((reason) => `[Revision requerida] ${reason}`)]
+    .filter(Boolean)
+    .join("\n");
 
   if (!resolvedTenantName || !resolvedTenantPhone) {
     return NextResponse.json(
@@ -178,10 +193,10 @@ export async function POST(request: Request) {
       null,
     next_adjustment_date: schedule.nextAdjustmentDate,
     last_adjustment_date: existingContract?.last_adjustment_date ?? null,
-    auto_notify: autoNotify,
+    auto_notify: safeAutoNotify,
     notification_channel: "whatsapp",
-    status,
-    notes,
+    status: safeStatus,
+    notes: mergedNotes,
     contract_file_name: uploadedContract?.fileName ?? existingContract?.contract_file_name ?? null,
     contract_file_path: uploadedContract?.filePath ?? existingContract?.contract_file_path ?? null,
     contract_file_mime_type:
@@ -208,10 +223,10 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    warning:
-      uploadedContract?.extractionWarning ??
-      (!resolvedContractStartDate || !resolvedNextAdjustmentDate
-        ? "Guardamos el contrato, pero algunas fechas quedaron estimadas hasta que Props pueda interpretarlo mejor."
-        : null),
+    warning: requiresReview
+      ? "Guardamos el contrato, pero quedó pausado para automatización porque faltan datos críticos detectados con certeza. Revisa fechas, índice y frecuencia antes de activarlo."
+      : uploadedContract?.extractionWarning ?? null,
+    requiresReview,
+    reviewReasons,
   });
 }

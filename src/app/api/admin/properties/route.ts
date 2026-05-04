@@ -228,6 +228,7 @@ export async function POST(request: Request) {
             fallbackRent: price,
           })
         : null;
+    const missingReadableContract = contractFile && !uploadedContract?.extractedText?.trim();
 
     const draftCurrentRent = Number(rentalContract.currentRent ?? 0);
     const draftFrequency = Number(rentalContract.adjustmentFrequencyMonths ?? 0);
@@ -252,6 +253,18 @@ export async function POST(request: Request) {
       nextAdjustmentDate: resolvedNextAdjustmentDate,
       adjustmentFrequencyMonths: resolvedAdjustmentFrequencyMonths,
     });
+    const reviewReasons = [
+      ...(analyzedContract?.reviewReasons ?? []),
+      ...(missingReadableContract
+        ? ["Se adjuntó un contrato, pero no pudimos extraer texto legible del archivo."]
+        : []),
+    ];
+    const requiresReview = reviewReasons.length > 0;
+    const safeStatus: "Activo" | "Pausado" | "Finalizado" = requiresReview ? "Pausado" : "Activo";
+    const safeAutoNotify = requiresReview ? false : rentalContract.autoNotify;
+    const mergedNotes = [rentalContract.notes?.trim() ?? "", ...reviewReasons.map((reason) => `[Revision requerida] ${reason}`)]
+      .filter(Boolean)
+      .join("\n");
 
     const { error: contractError } = await admin.from("rental_contracts").insert({
       property_id: property.id,
@@ -266,10 +279,10 @@ export async function POST(request: Request) {
       contract_start_date: schedule.contractStartDate,
       rent_reference_date: schedule.contractStartDate,
       next_adjustment_date: schedule.nextAdjustmentDate,
-      auto_notify: rentalContract.autoNotify,
+      auto_notify: safeAutoNotify,
       notification_channel: "whatsapp",
-      status: "Activo",
-      notes: rentalContract.notes?.trim() ?? "",
+      status: safeStatus,
+      notes: mergedNotes,
       contract_file_name: uploadedContract?.fileName ?? null,
       contract_file_path: uploadedContract?.filePath ?? null,
       contract_file_mime_type: uploadedContract?.mimeType ?? null,

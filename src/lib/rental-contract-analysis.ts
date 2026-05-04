@@ -10,6 +10,8 @@ type RentalContractAnalysis = {
   contractStartDate: string | null;
   nextAdjustmentDate: string | null;
   summary: string;
+  requiresReview: boolean;
+  reviewReasons: string[];
 };
 
 function normalizeWhitespace(text: string) {
@@ -207,25 +209,49 @@ export async function analyzeRentalContractText({
 }): Promise<RentalContractAnalysis> {
   const normalizedText = normalizeWhitespace(text);
   const ai = await inferWithOpenAI(normalizedText);
+  const tenantName = inferTenantName(normalizedText) ?? ai?.tenantName ?? null;
+  const detectedCurrentRent = inferCurrentRent(normalizedText);
+  const detectedIndexType = inferIndexType(normalizedText);
+  const detectedAdjustmentFrequencyMonths = inferFrequencyMonths(normalizedText);
+  const detectedContractStartDate = inferContractStartDate(normalizedText);
+  const detectedNextAdjustmentDate = inferNextAdjustmentDate(normalizedText);
 
-  const tenantName = ai?.tenantName ?? inferTenantName(normalizedText);
-  const currentRent =
-    ai?.currentRent && ai.currentRent > 0
-      ? ai.currentRent
-      : inferCurrentRent(normalizedText) ?? fallbackRent;
-  const indexType = ai?.indexType ?? inferIndexType(normalizedText) ?? "IPC";
-  const adjustmentFrequencyMonths =
-    ai?.adjustmentFrequencyMonths && ai.adjustmentFrequencyMonths > 0
-      ? ai.adjustmentFrequencyMonths
-      : inferFrequencyMonths(normalizedText) ?? 6;
-  const contractStartDate = ai?.contractStartDate ?? inferContractStartDate(normalizedText);
+  const currentRent = detectedCurrentRent ?? fallbackRent;
+  const indexType = detectedIndexType ?? null;
+  const adjustmentFrequencyMonths = detectedAdjustmentFrequencyMonths ?? null;
+  const contractStartDate = detectedContractStartDate ?? null;
   const nextAdjustmentDate =
-    ai?.nextAdjustmentDate ??
-    inferNextAdjustmentDate(normalizedText) ??
-    (contractStartDate ? addMonthsIsoDate(contractStartDate, adjustmentFrequencyMonths) : null);
+    detectedNextAdjustmentDate ??
+    (detectedContractStartDate && detectedAdjustmentFrequencyMonths
+      ? addMonthsIsoDate(detectedContractStartDate, detectedAdjustmentFrequencyMonths)
+      : null);
+
+  const reviewReasons: string[] = [];
+
+  if (!detectedCurrentRent) {
+    reviewReasons.push("No pudimos detectar con certeza el alquiler actual en el contrato.");
+  }
+
+  if (!detectedIndexType) {
+    reviewReasons.push("No pudimos detectar con certeza si el ajuste corresponde a IPC o ICL.");
+  }
+
+  if (!detectedAdjustmentFrequencyMonths) {
+    reviewReasons.push("No pudimos detectar con certeza cada cuántos meses aumenta.");
+  }
+
+  if (!detectedContractStartDate) {
+    reviewReasons.push("No pudimos detectar con certeza la fecha de inicio del contrato.");
+  }
+
+  if (!detectedNextAdjustmentDate && !(detectedContractStartDate && detectedAdjustmentFrequencyMonths)) {
+    reviewReasons.push("No pudimos determinar con certeza la próxima fecha de ajuste.");
+  }
+
+  const requiresReview = reviewReasons.length > 0;
 
   return {
-    tenantName: tenantName ?? null,
+    tenantName,
     currentRent,
     indexType,
     adjustmentFrequencyMonths,
@@ -237,10 +263,14 @@ export async function analyzeRentalContractText({
         tenantName ? `Inquilino detectado: ${tenantName}.` : null,
         contractStartDate ? `Inicio del contrato: ${contractStartDate}.` : null,
         nextAdjustmentDate ? `Proximo ajuste estimado: ${nextAdjustmentDate}.` : null,
-        `Indice detectado: ${indexType}.`,
-        `Frecuencia: cada ${adjustmentFrequencyMonths} meses.`,
+        indexType ? `Indice detectado: ${indexType}.` : "Indice no detectado con certeza.",
+        adjustmentFrequencyMonths
+          ? `Frecuencia: cada ${adjustmentFrequencyMonths} meses.`
+          : "Frecuencia no detectada con certeza.",
       ]
         .filter(Boolean)
         .join(" "),
+    requiresReview,
+    reviewReasons,
   };
 }
