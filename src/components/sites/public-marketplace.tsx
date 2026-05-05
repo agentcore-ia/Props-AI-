@@ -85,6 +85,7 @@ export function PublicMarketplace({
   const [comparisonIds, setComparisonIds] = useState<string[]>([]);
   const [selectedMapListingId, setSelectedMapListingId] = useState<string | null>(null);
   const [mobileMapMode, setMobileMapMode] = useState<"lista" | "mapa">("lista");
+  const [isDesktopMap, setIsDesktopMap] = useState(false);
   const deferredQuery = useDeferredValue(query);
 
   const listings = useMemo(() => buildPublicListings(properties, agencies), [agencies, properties]);
@@ -139,6 +140,22 @@ export function PublicMarketplace({
       setMobileMapMode("lista");
     }
   }, [section]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const media = window.matchMedia("(min-width: 1280px)");
+    const update = () => setIsDesktopMap(media.matches);
+
+    update();
+    media.addEventListener("change", update);
+
+    return () => {
+      media.removeEventListener("change", update);
+    };
+  }, []);
 
   const selectedMapListing =
     filteredListings.find((listing) => listing.id === selectedMapListingId) ?? filteredListings[0] ?? null;
@@ -450,7 +467,7 @@ export function PublicMarketplace({
               <div
                 className={cn(
                   "space-y-3",
-                  mobileMapMode === "mapa" ? "hidden xl:block" : "block"
+                  !isDesktopMap && mobileMapMode === "mapa" ? "hidden" : "block"
                 )}
               >
                 <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.18)]">
@@ -483,16 +500,18 @@ export function PublicMarketplace({
               <div
                 className={cn(
                   "space-y-4 xl:sticky xl:top-24",
-                  mobileMapMode === "lista" ? "hidden xl:block" : "block"
+                  !isDesktopMap && mobileMapMode === "lista" ? "hidden" : "block"
                 )}
               >
-                <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,rgba(222,246,247,0.9)_0%,rgba(228,236,247,0.96)_100%)] p-3 shadow-[0_32px_90px_-60px_rgba(15,23,42,0.32)] sm:rounded-[34px] sm:p-4">
-                  <PublicMarketplaceMap
-                    listings={filteredListings}
-                    selectedListingId={selectedMapListing?.id ?? null}
-                    onSelect={setSelectedMapListingId}
-                  />
-                </div>
+                {isDesktopMap || mobileMapMode === "mapa" ? (
+                  <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,rgba(222,246,247,0.9)_0%,rgba(228,236,247,0.96)_100%)] p-3 shadow-[0_32px_90px_-60px_rgba(15,23,42,0.32)] sm:rounded-[34px] sm:p-4">
+                    <PublicMarketplaceMap
+                      listings={filteredListings}
+                      selectedListingId={selectedMapListing?.id ?? null}
+                      onSelect={setSelectedMapListingId}
+                    />
+                  </div>
+                ) : null}
 
                 {selectedMapListing ? (
                   <aside className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.2)] sm:p-5">
@@ -919,7 +938,18 @@ function CompactMapListing({
         isSelected ? "border-slate-950 ring-2 ring-slate-950/10" : "border-slate-200"
       )}
     >
-      <button type="button" onClick={onSelect} className="block w-full text-left">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onSelect}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onSelect();
+          }
+        }}
+        className="block w-full cursor-pointer text-left"
+      >
         <div className="grid gap-3 sm:grid-cols-[108px_1fr]">
           <div className="relative h-24 overflow-hidden rounded-[16px] sm:h-28 sm:rounded-[20px]">
             <Image src={listing.image} alt={listing.title} fill className="object-cover" />
@@ -956,7 +986,7 @@ function CompactMapListing({
             </div>
           </div>
         </div>
-      </button>
+      </div>
     </article>
   );
 }
