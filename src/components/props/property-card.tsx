@@ -3,6 +3,9 @@ import Link from "next/link";
 import { CalendarDays, HousePlus, MapPin, MessageCircleWarning } from "lucide-react";
 
 import type { Property } from "@/lib/mock-data";
+import type { Agency } from "@/lib/mock-data";
+import type { CurrentUserContext } from "@/lib/auth/current-user";
+import { PropertyFormDialog } from "@/components/props/property-form-dialog";
 import { RentalContractDialog } from "@/components/props/rental-contract-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -16,7 +19,15 @@ const statusStyles: Record<Property["status"], string> = {
   Alquilada: "bg-blue-500/10 text-blue-700",
 };
 
-export function PropertyCard({ property }: { property: Property }) {
+export function PropertyCard({
+  property,
+  agencies,
+  currentUser,
+}: {
+  property: Property;
+  agencies: Agency[];
+  currentUser: CurrentUserContext;
+}) {
   const isRental = property.operation === "Alquiler";
   const reviewReasons = (property.rentalContract?.notes ?? "")
     .split("\n")
@@ -64,12 +75,18 @@ export function PropertyCard({ property }: { property: Property }) {
             </div>
 
             {isRental ? (
-              <RentalContractDialog property={property} />
+              <div className="flex flex-wrap gap-2">
+                <PropertyFormDialog agencies={agencies} currentUser={currentUser} property={property} />
+                <RentalContractDialog property={property} />
+              </div>
             ) : (
-              <Button variant="outline" className="rounded-2xl" disabled>
-                <HousePlus className="size-4" />
-                Venta
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <PropertyFormDialog agencies={agencies} currentUser={currentUser} property={property} />
+                <Button variant="outline" className="rounded-2xl" disabled>
+                  <HousePlus className="size-4" />
+                  Venta
+                </Button>
+              </div>
             )}
           </div>
 

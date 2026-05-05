@@ -94,7 +94,7 @@ function SectionTitle({
 function resetRentalFields() {
   return {
     expenses: "",
-    expensesCurrency: "ARS",
+    expensesCurrency: "ARS" as Property["currency"],
     availableFrom: "",
     petsPolicy: "",
     requirements: "",
@@ -115,23 +115,65 @@ function resetRentalFields() {
 export function PropertyFormDialog({
   agencies,
   currentUser,
+  property,
 }: {
   agencies: Agency[];
   currentUser: CurrentUserContext;
+  property?: Property;
 }) {
   const router = useRouter();
+  const isEditing = Boolean(property);
   const defaultSlug =
-    currentUser.profile.role === "agency_admin"
+    property?.tenantSlug ??
+    (currentUser.profile.role === "agency_admin"
       ? currentUser.profile.agency_slug ?? agencies[0]?.slug ?? ""
-      : agencies[0]?.slug ?? "";
+      : agencies[0]?.slug ?? "");
+
+  const buildInitialForm = () => ({
+    ...initialState,
+    tenantSlug: property?.tenantSlug ?? defaultSlug,
+    title: property?.title ?? "",
+    price: property?.price ? String(property.price) : "",
+    currency: property?.currency ?? "USD",
+    location: property?.location ?? "",
+    exactAddress: property?.exactAddress ?? "",
+    description: property?.description ?? "",
+    propertyType: property?.propertyType ?? "Departamento",
+    bedrooms: property?.bedrooms ? String(property.bedrooms) : "",
+    bathrooms: property?.bathrooms ? String(property.bathrooms) : "",
+    area: property?.area ? String(property.area) : "",
+    parkingSpots: property?.parkingSpots ? String(property.parkingSpots) : "",
+    furnished: property?.furnished ?? false,
+    expenses: property?.expenses ? String(property.expenses) : "",
+    expensesCurrency: property?.expensesCurrency ?? "ARS",
+    availableFrom: property?.availableFrom ?? "",
+    petsPolicy: property?.petsPolicy ?? "",
+    requirements: property?.requirements ?? "",
+    amenities: property?.amenities?.join(", ") ?? "",
+    status: property?.status ?? ("Disponible" as Property["status"]),
+    operation: property?.operation ?? ("Venta" as Property["operation"]),
+    manualImageUrl: "",
+    rentEnabled: Boolean(property?.rentalContract),
+    tenantName: property?.rentalContract?.tenantName ?? "",
+    tenantPhone: property?.rentalContract?.tenantPhone ?? "",
+    tenantEmail: property?.rentalContract?.tenantEmail ?? "",
+    currentRent: property?.rentalContract?.currentRent
+      ? String(property.rentalContract.currentRent)
+      : "",
+    indexType: property?.rentalContract?.indexType ?? ("IPC" as "IPC" | "ICL"),
+    adjustmentFrequencyMonths: property?.rentalContract?.adjustmentFrequencyMonths
+      ? String(property.rentalContract.adjustmentFrequencyMonths)
+      : "6",
+    contractStartDate: property?.rentalContract?.contractStartDate ?? "",
+    nextAdjustmentDate: property?.rentalContract?.nextAdjustmentDate ?? "",
+    notes: property?.rentalContract?.notes ?? "",
+    autoNotify: property?.rentalContract?.autoNotify ?? true,
+  });
 
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    ...initialState,
-    tenantSlug: defaultSlug,
-  });
+  const [form, setForm] = useState(buildInitialForm);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [contractFile, setContractFile] = useState<File | null>(null);
   const [addressSuggestions, setAddressSuggestions] = useState<GoogleAutocompleteInstance[]>([]);
@@ -143,6 +185,7 @@ export function PropertyFormDialog({
     () => imageFiles.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })),
     [imageFiles]
   );
+  const existingImages = property?.images ?? [];
 
   useEffect(() => {
     return () => {
@@ -207,10 +250,7 @@ export function PropertyFormDialog({
     setContractFile(null);
     setAddressSuggestions([]);
     setAddressLoading(false);
-    setForm({
-      ...initialState,
-      tenantSlug: defaultSlug,
-    });
+    setForm(buildInitialForm());
   }
 
   function handleOperationChange(nextOperation: Property["operation"]) {
@@ -235,6 +275,9 @@ export function PropertyFormDialog({
     setError(null);
 
     const body = new FormData();
+    if (property?.id) {
+      body.set("propertyId", property.id);
+    }
     body.set("tenantSlug", form.tenantSlug);
     body.set("title", form.title);
     body.set("price", form.price);
@@ -257,6 +300,7 @@ export function PropertyFormDialog({
     body.set("status", form.status);
     body.set("operation", form.operation);
     body.set("manualImageUrl", form.manualImageUrl);
+    body.set("keepExistingImages", String(imageFiles.length === 0 && !form.manualImageUrl.trim()));
     body.set(
       "rentalContract",
       JSON.stringify({
@@ -283,7 +327,7 @@ export function PropertyFormDialog({
     }
 
     const response = await fetch("/api/admin/properties", {
-      method: "POST",
+      method: property?.id ? "PUT" : "POST",
       body,
     });
 
@@ -321,16 +365,17 @@ export function PropertyFormDialog({
       }}
     >
       <DialogTrigger render={<Button className="rounded-2xl" />}>
-        <Plus className="size-4" />
-        Nueva propiedad
+        {isEditing ? null : <Plus className="size-4" />}
+        {isEditing ? "Editar propiedad" : "Nueva propiedad"}
       </DialogTrigger>
       <DialogContent className="h-[min(92vh,980px)] w-[min(96vw,1360px)] max-w-[min(96vw,1360px)] overflow-x-hidden overflow-y-auto rounded-[32px] p-0 sm:max-w-[min(96vw,1360px)]">
         <div className="p-6 lg:p-8">
           <DialogHeader>
-            <DialogTitle>Nueva propiedad</DialogTitle>
+            <DialogTitle>{isEditing ? "Editar propiedad" : "Nueva propiedad"}</DialogTitle>
             <DialogDescription>
-              Carga la publicacion en un flujo mas agil: datos clave, imagenes reales,
-              direccion lista para mapa y, si es alquiler, informacion comercial especifica.
+              {isEditing
+                ? "Actualiza los datos de la publicacion, mantiene las imagenes actuales si no subes nuevas y ajusta la informacion comercial."
+                : "Carga la publicacion en un flujo mas agil: datos clave, imagenes reales, direccion lista para mapa y, si es alquiler, informacion comercial especifica."}
             </DialogDescription>
           </DialogHeader>
 
@@ -383,7 +428,12 @@ export function PropertyFormDialog({
                     <select
                       className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
                       value={form.currency}
-                      onChange={(event) => setForm((prev) => ({ ...prev, currency: event.target.value }))}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          currency: event.target.value as Property["currency"],
+                        }))
+                      }
                     >
                       <option value="USD">USD</option>
                       <option value="ARS">ARS</option>
@@ -500,7 +550,12 @@ export function PropertyFormDialog({
                     <select
                       className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
                       value={form.propertyType}
-                      onChange={(event) => setForm((prev) => ({ ...prev, propertyType: event.target.value }))}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          propertyType: event.target.value as Property["propertyType"],
+                        }))
+                      }
                     >
                       <option value="Departamento">Departamento</option>
                       <option value="Casa">Casa</option>
@@ -586,7 +641,10 @@ export function PropertyFormDialog({
                           className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
                           value={form.expensesCurrency}
                           onChange={(event) =>
-                            setForm((prev) => ({ ...prev, expensesCurrency: event.target.value }))
+                            setForm((prev) => ({
+                              ...prev,
+                              expensesCurrency: event.target.value as Property["currency"],
+                            }))
                           }
                         >
                           <option value="ARS">ARS</option>
@@ -857,6 +915,20 @@ export function PropertyFormDialog({
                         </div>
                       ))}
                     </div>
+                  ) : existingImages.length > 0 ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {existingImages.slice(0, 4).map((imageUrl, index) => (
+                        <div key={`${imageUrl}-${index}`} className="overflow-hidden rounded-[22px] border bg-card">
+                          <div className="relative h-36">
+                            <Image src={imageUrl} alt={`${property?.title ?? "Propiedad"} ${index + 1}`} fill className="object-cover" unoptimized />
+                          </div>
+                          <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+                            <FileImage className="size-3.5" />
+                            <span className="truncate">Imagen actual {index + 1}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   ) : (
                     <div className="flex min-h-44 items-center justify-center rounded-[24px] border border-dashed bg-muted/25">
                       <div className="text-center">
@@ -910,7 +982,7 @@ export function PropertyFormDialog({
           </Button>
           <Button onClick={handleCreateProperty} disabled={submitting}>
             {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
-            Guardar y publicar
+            {isEditing ? "Guardar cambios" : "Guardar y publicar"}
           </Button>
         </DialogFooter>
       </DialogContent>

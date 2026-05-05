@@ -79,7 +79,12 @@ export function PropertiesWorkspace({
       {filteredProperties.length > 0 ? (
         <section className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
           {filteredProperties.map((property) => (
-            <PropertyCard key={property.id} property={property} />
+            <PropertyCard
+              key={property.id}
+              property={property}
+              agencies={visibleAgencies}
+              currentUser={currentUser}
+            />
           ))}
         </section>
       ) : (
