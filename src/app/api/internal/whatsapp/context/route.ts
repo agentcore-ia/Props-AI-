@@ -53,6 +53,7 @@ export async function POST(request: Request) {
   const catalog = await buildAgencyCatalogContext({
     agencySlug: lead.agencySlug,
     selectedPropertyId: lead.propertyId,
+    messageText,
   });
 
   return NextResponse.json({
@@ -73,7 +74,11 @@ export async function POST(request: Request) {
       messageText,
       selectedProperty: catalog.selectedProperty,
     }),
+    selectedPropertyId: catalog.selectedProperty?.id ?? null,
     selectedPropertyTitle: catalog.selectedProperty?.title ?? null,
+    selectedPropertyUrl: catalog.selectedProperty
+      ? `https://props.com.ar/propiedad/${catalog.selectedProperty.tenantSlug}/${catalog.selectedProperty.id}`
+      : null,
     recentMessagesCount: recentMessages.length,
   });
 }

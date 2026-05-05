@@ -288,7 +288,9 @@ return [{
   leadId: $('Log Incoming to Supabase').first().json.leadId,
   reply: $('AI Agent').first().json.output || '',
   instanceName: $('Get Customer DB').first().json.instanceName,
-  number: $('Get Customer DB').first().json.targetPhone
+  number: $('Get Customer DB').first().json.targetPhone,
+  selectedPropertyId: $('Get Customer DB').first().json.selectedPropertyId || '',
+  selectedPropertyUrl: $('Get Customer DB').first().json.selectedPropertyUrl || ''
 }) }}`;
 
   const connections = {

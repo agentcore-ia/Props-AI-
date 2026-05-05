@@ -42,6 +42,97 @@ function normalizeMessageText(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
 
+function normalizeSearchText(value: string) {
+  return normalizeMessageText(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ");
+}
+
+function tokenizeSearchText(value: string) {
+  return Array.from(
+    new Set(
+      normalizeSearchText(value)
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 3)
+    )
+  );
+}
+
+function scorePropertyAgainstMessage(property: Property, messageText: string) {
+  const haystack = normalizeSearchText(
+    [
+      property.title,
+      property.location,
+      property.exactAddress,
+      property.description,
+      property.propertyType,
+      property.operation,
+    ]
+      .filter(Boolean)
+      .join(" ")
+  );
+  const tokens = tokenizeSearchText(messageText);
+
+  if (tokens.length === 0) {
+    return 0;
+  }
+
+  let score = 0;
+
+  for (const token of tokens) {
+    if (haystack.includes(token)) {
+      score += token.length >= 7 ? 3 : 2;
+    }
+  }
+
+  const normalizedTitle = normalizeSearchText(property.title);
+  const normalizedLocation = normalizeSearchText(property.location);
+
+  if (normalizedTitle && normalizeSearchText(messageText).includes(normalizedTitle)) {
+    score += 6;
+  }
+
+  if (normalizedLocation && normalizeSearchText(messageText).includes(normalizedLocation)) {
+    score += 5;
+  }
+
+  return score;
+}
+
+export function matchPropertyFromMessage(
+  properties: Property[],
+  messageText: string,
+  preferredPropertyId?: string | null
+) {
+  if (preferredPropertyId) {
+    const preferred = properties.find((property) => property.id === preferredPropertyId);
+    if (preferred) {
+      return preferred;
+    }
+  }
+
+  const normalizedMessage = normalizeSearchText(messageText);
+  if (!normalizedMessage) {
+    return null;
+  }
+
+  let bestMatch: Property | null = null;
+  let bestScore = 0;
+
+  for (const property of properties) {
+    const score = scorePropertyAgainstMessage(property, normalizedMessage);
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = property;
+    }
+  }
+
+  return bestScore >= 3 ? bestMatch : null;
+}
+
 function summarizeProperty(property: Property) {
   const publicUrl = `${PUBLIC_MARKETPLACE_URL}/propiedad/${property.tenantSlug}/${property.id}`;
   const imageLinks = property.images
@@ -125,10 +216,15 @@ export async function resolveAgencyByMessagingInstance(instanceName: string) {
 export async function buildAgencyCatalogContext(options: {
   agencySlug: string;
   selectedPropertyId?: string | null;
+  messageText?: string | null;
 }) {
   const properties = await listProperties({ tenantSlug: options.agencySlug });
   const selectedProperty =
-    properties.find((property) => property.id === options.selectedPropertyId) ?? null;
+    matchPropertyFromMessage(
+      properties,
+      options.messageText ?? "",
+      options.selectedPropertyId ?? null
+    ) ?? null;
   const featured = selectedProperty
     ? [selectedProperty, ...properties.filter((property) => property.id !== selectedProperty.id)]
     : properties;

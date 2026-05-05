@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 import { isAutomationRequest } from "@/lib/automation-auth";
 import { ensureLeadTask, recordCrmLeadMessage } from "@/lib/crm-automation";
 import { sendEvolutionMediaMessage, sendEvolutionTextMessage } from "@/lib/evolution";
-import { getCrmLeadById, getPropertyBySlugAndId } from "@/lib/props-data";
+import { getCrmLeadById, getPropertyBySlugAndId, listProperties } from "@/lib/props-data";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { matchPropertyFromMessage } from "@/lib/whatsapp-agent";
 
 function addHoursIso(hours: number) {
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
@@ -35,6 +36,8 @@ export async function POST(request: Request) {
   const reply = String(body?.reply ?? "").trim();
   const instanceName = String(body?.instanceName ?? "").trim();
   const rawPhone = String(body?.number ?? "").trim();
+  const selectedPropertyId = String(body?.selectedPropertyId ?? "").trim();
+  const selectedPropertyUrl = String(body?.selectedPropertyUrl ?? "").trim();
 
   if (!leadId || !reply || !instanceName || !rawPhone) {
     return NextResponse.json(
@@ -51,12 +54,20 @@ export async function POST(request: Request) {
 
   const number = rawPhone.replace(/[^\d]/g, "");
   const customerAskedForImages = wantsPropertyImages(lead.lastCustomerMessage || "");
-  const property =
-    lead.propertyId && lead.agencySlug
-      ? await getPropertyBySlugAndId(lead.agencySlug, lead.propertyId)
+  let property =
+    (selectedPropertyId || lead.propertyId) && lead.agencySlug
+      ? await getPropertyBySlugAndId(lead.agencySlug, selectedPropertyId || lead.propertyId || "")
       : null;
+
+  if (!property && lead.agencySlug) {
+    const agencyProperties = await listProperties({ tenantSlug: lead.agencySlug });
+    property =
+      matchPropertyFromMessage(agencyProperties, lead.lastCustomerMessage || "", null) ?? null;
+  }
+
   const propertyUrl =
-    property && lead.agencySlug ? buildPublicPropertyUrl(lead.agencySlug, property.id) : "";
+    selectedPropertyUrl ||
+    (property && lead.agencySlug ? buildPublicPropertyUrl(lead.agencySlug, property.id) : "");
   const propertyImages = property?.images.filter(Boolean).slice(0, 3) ?? [];
   const replyWithLink =
     customerAskedForImages && propertyUrl && !reply.includes(propertyUrl)
@@ -72,7 +83,7 @@ export async function POST(request: Request) {
   await recordCrmLeadMessage({
     leadId: lead.id,
     agencyId: lead.agencyId,
-    propertyId: lead.propertyId,
+    propertyId: property?.id ?? lead.propertyId,
     content: replyWithLink,
     direction: "outgoing",
     senderRole: "assistant",
@@ -100,7 +111,7 @@ export async function POST(request: Request) {
       await recordCrmLeadMessage({
         leadId: lead.id,
         agencyId: lead.agencyId,
-        propertyId: lead.propertyId,
+        propertyId: property?.id ?? lead.propertyId,
         content: `[imagen] ${property?.title ?? "Propiedad"} ${index + 1}`,
         direction: "outgoing",
         senderRole: "assistant",
@@ -130,7 +141,7 @@ export async function POST(request: Request) {
   await ensureLeadTask({
     agencyId: lead.agencyId,
     leadId: lead.id,
-    propertyId: lead.propertyId,
+    propertyId: property?.id ?? lead.propertyId,
     title: `Revisar respuesta de ${lead.fullName}`,
     details: "Chequea si el cliente respondio y mueve la oportunidad a la siguiente etapa si corresponde.",
     dueAt: addHoursIso(24),
