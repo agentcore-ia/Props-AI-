@@ -8,8 +8,11 @@ import {
   Building2,
   CalendarDays,
   CarFront,
+  ExternalLink,
+  Mail,
   MapPin,
   PawPrint,
+  Phone,
   Ruler,
   Sparkles,
 } from "lucide-react";
@@ -66,6 +69,12 @@ export function MarketplacePropertyDetail({
   const [listing] = buildPublicListings([property], [agency]);
   const relatedListings = buildPublicListings(relatedProperties, allAgencies).slice(0, 3);
   const address = listing.exactAddress || listing.location;
+  const agencyLocationLabel = agency.city || listing.location;
+  const normalizedPhone = agency.phone.replace(/\D/g, "");
+  const portfolioHref = listing.catalogHref;
+  const mapsHref = buildGoogleMapsExternalUrl(agencyLocationLabel);
+  const whatsappHref = normalizedPhone ? `https://wa.me/${normalizedPhone}` : null;
+  const emailHref = agency.email ? `mailto:${agency.email}` : null;
   const keyFacts = [
     {
       icon: <PawPrint className="size-4" />,
@@ -123,11 +132,11 @@ export function MarketplacePropertyDetail({
 
           <div className="flex min-w-0 max-w-full flex-wrap justify-end gap-2 self-end sm:self-auto">
             <Link
-              href={listing.catalogHref}
+              href={portfolioHref}
               className="inline-flex h-10 items-center rounded-2xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:text-slate-950 sm:h-auto sm:px-4 sm:py-2"
             >
-              <span className="sm:hidden">Catalogo</span>
-              <span className="hidden sm:inline">Ver catalogo de {agency.name}</span>
+              <span className="sm:hidden">Portafolio</span>
+              <span className="hidden sm:inline">Ver propiedades de {agency.name}</span>
             </Link>
             <PublicUserActions currentUser={currentUser} />
           </div>
@@ -198,15 +207,72 @@ export function MarketplacePropertyDetail({
                 </div>
                 <div>
                   <p className="text-sm font-medium text-slate-500">Inmobiliaria responsable</p>
-                  <h2 className="mt-1 text-2xl font-semibold text-slate-950">{agency.ownerName}</h2>
-                  <p className="mt-2 text-sm text-slate-500">{agency.tagline}</p>
+                  <h2 className="mt-1 text-2xl font-semibold text-slate-950">{agency.name}</h2>
+                  <p className="mt-2 text-sm text-slate-500">{agency.tagline || `${agency.ownerName} y su equipo comercial.`}</p>
                 </div>
               </div>
 
-              <div className="mt-5 space-y-2 text-sm text-slate-600">
-                <p>{agency.email}</p>
-                <p>{agency.phone}</p>
-                <p>{agency.city}</p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Ejecutivo comercial</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-950">{agency.ownerName}</p>
+                  <div className="mt-3 space-y-2 text-sm text-slate-600">
+                    <p className="inline-flex items-center gap-2">
+                      <Mail className="size-4" />
+                      {agency.email}
+                    </p>
+                    <p className="inline-flex items-center gap-2">
+                      <Phone className="size-4" />
+                      {agency.phone}
+                    </p>
+                    <p className="inline-flex items-center gap-2">
+                      <MapPin className="size-4" />
+                      {agencyLocationLabel}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Portafolio y canales</p>
+                  <div className="mt-3 flex flex-col gap-2">
+                    <a
+                      href={portfolioHref}
+                      className="inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                    >
+                      Ver portafolio completo
+                      <ExternalLink className="size-4" />
+                    </a>
+                    <a
+                      href={mapsHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                    >
+                      Ver ubicacion
+                      <ExternalLink className="size-4" />
+                    </a>
+                    {whatsappHref ? (
+                      <a
+                        href={whatsappHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                      >
+                        WhatsApp
+                        <ExternalLink className="size-4" />
+                      </a>
+                    ) : null}
+                    {emailHref ? (
+                      <a
+                        href={emailHref}
+                        className="inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                      >
+                        Email
+                        <ExternalLink className="size-4" />
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
               </div>
 
               <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-4">

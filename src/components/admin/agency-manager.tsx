@@ -108,7 +108,7 @@ export function AgencyManager({ agencies }: { agencies: AgencySummary[] }) {
                 <DialogHeader>
                   <DialogTitle>Crear inmobiliaria</DialogTitle>
                   <DialogDescription>
-                    Se crea el usuario real en Supabase, su perfil de acceso y el catalogo bajo el subdominio correspondiente.
+                    Se crea el usuario real en Supabase, su perfil de acceso y la vidriera publica bajo el subdominio correspondiente.
                   </DialogDescription>
                 </DialogHeader>
 
@@ -153,7 +153,7 @@ export function AgencyManager({ agencies }: { agencies: AgencySummary[] }) {
                       Password: {success.password}
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Catalogo: {success.slug}.props.com.ar
+                      Portafolio: {success.slug}.props.com.ar
                     </p>
                   </div>
                 ) : null}
@@ -226,7 +226,7 @@ export function AgencyManager({ agencies }: { agencies: AgencySummary[] }) {
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 rounded-2xl border bg-background px-4 py-3 text-sm font-medium hover:bg-muted/40"
                 >
-                  Ver catalogo
+                  Ver portafolio
                   <ExternalLink className="size-4" />
                 </a>
               </div>

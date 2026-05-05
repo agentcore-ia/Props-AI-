@@ -57,7 +57,7 @@ export const usePropsStore = create<PropsStore>()(
               city: input.city,
               plan: "Starter",
               status: "En onboarding",
-              tagline: `Catalogo digital de ${input.name}.`,
+              tagline: `Propiedades seleccionadas por ${input.name}.`,
             },
             ...state.agencies,
           ],

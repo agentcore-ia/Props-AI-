@@ -103,7 +103,7 @@ export function buildPublicListings(
       ...property,
       agencyName: agency?.name ?? property.tenantSlug,
       agencyCity: agency?.city ?? "Buenos Aires",
-      agencyTagline: agency?.tagline ?? "Coleccion curada en Props",
+      agencyTagline: agency?.tagline ?? "Propiedades seleccionadas para comprar o alquilar.",
       routeHref: `/propiedad/${property.tenantSlug}/${property.id}`,
       catalogHref: `https://${property.tenantSlug}.props.com.ar`,
       bedrooms,

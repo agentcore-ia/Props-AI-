@@ -43,7 +43,7 @@ export function TenantPropertyDetail({
         <div className="rounded-[32px] border bg-white p-8 text-center shadow-sm">
           <h1 className="text-2xl font-semibold">Propiedad no encontrada</h1>
           <p className="mt-3 text-sm text-slate-600">
-            La publicacion que buscas no existe para este catalogo.
+            La publicacion que buscas no existe para este portafolio.
           </p>
         </div>
       </div>
@@ -61,7 +61,7 @@ export function TenantPropertyDetail({
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
           >
             <ArrowLeft className="size-4" />
-            Volver al catalogo
+            Volver al portafolio
           </Link>
 
           <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -205,7 +205,7 @@ export function TenantPropertyDetail({
         {relatedProperties.length > 0 ? (
           <section className="space-y-6">
             <div>
-              <p className="text-sm font-medium text-slate-500">Mas opciones del catalogo</p>
+              <p className="text-sm font-medium text-slate-500">Mas propiedades de la inmobiliaria</p>
               <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
                 Propiedades relacionadas
               </h2>

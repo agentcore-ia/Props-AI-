@@ -79,7 +79,7 @@ export function TenantCatalog({
                   <div>
                     <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">
                       <Building2 className="size-3.5" />
-                      Catalogo inteligente
+                      Portafolio online
                     </div>
                     <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">
                       {agency.name}
@@ -165,7 +165,7 @@ export function TenantCatalog({
         <section className="space-y-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Coleccion disponible</p>
+              <p className="text-sm font-medium text-slate-500">Portafolio disponible</p>
               <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
                 Propiedades listas para explorar
               </h2>

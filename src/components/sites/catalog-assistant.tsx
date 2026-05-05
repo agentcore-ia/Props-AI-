@@ -33,7 +33,7 @@ export function CatalogAssistant({
       id: "assistant-welcome",
       role: "assistant",
       content:
-        "Contame que tipo de propiedad buscas y te sugiero las opciones mas convenientes de este catalogo.",
+        "Contame que tipo de propiedad buscas y te sugiero las opciones mas convenientes de este portafolio.",
     },
   ]);
 

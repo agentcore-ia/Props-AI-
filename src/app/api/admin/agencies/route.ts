@@ -107,7 +107,7 @@ export async function POST(request: Request) {
       owner_name: ownerName,
       owner_email: ownerEmail,
       city,
-      tagline: `Catalogo digital de ${name}.`,
+      tagline: `Propiedades seleccionadas por ${name}.`,
       messaging_instance: buildSuggestedMessagingInstance(slug),
       plan: "Starter",
       status: "Activa",
