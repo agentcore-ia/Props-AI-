@@ -804,9 +804,6 @@ function MarketplacePropertyCard({
           <span className="rounded-full bg-white/92 px-3 py-1 text-xs font-semibold text-slate-900">
             {listing.operation}
           </span>
-          <span className="rounded-full bg-slate-900/78 px-3 py-1 text-xs font-medium text-white">
-            {listing.currency}
-          </span>
         </div>
         <button
           type="button"
@@ -828,7 +825,11 @@ function MarketplacePropertyCard({
               <p className="text-lg font-semibold tracking-tight text-slate-950 sm:text-3xl">
                 {formatMoney(listing.price, listing.currency)}
               </p>
-              <h3 className="mt-2 line-clamp-2 text-sm font-semibold text-slate-900 sm:text-xl">{listing.title}</h3>
+              <Link href={listing.routeHref} className="mt-2 block">
+                <h3 className="line-clamp-2 text-sm font-semibold text-slate-900 transition-colors hover:text-blue-700 sm:text-xl">
+                  {listing.title}
+                </h3>
+              </Link>
               <div className="mt-2 flex items-start gap-2 text-sm text-slate-500">
                 <MapPin className="mt-0.5 size-4 shrink-0" />
                 <span className="line-clamp-2 text-xs sm:text-sm">{listing.location}</span>
@@ -854,21 +855,6 @@ function MarketplacePropertyCard({
             {listing.propertyType}
           </div>
         </div>
-
-          <div className="flex flex-wrap gap-2">
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 sm:px-3 sm:py-1.5 sm:text-xs">
-            {listing.agencyName}
-          </span>
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 sm:px-3 sm:py-1.5 sm:text-xs">
-            {listing.petsPolicy || "Mascotas a consultar"}
-          </span>
-          {listing.availableFrom ? (
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 sm:px-3 sm:py-1.5 sm:text-xs">
-              Disponible {listing.availableFrom}
-            </span>
-          ) : null}
-        </div>
-
           <div className="flex items-center justify-between gap-2 pt-1">
           <button
             type="button"
