@@ -33,7 +33,9 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
-const navigation = [
+type AppRole = "superadmin" | "agency_admin" | "agent" | "customer";
+
+const defaultNavigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/propiedades", label: "Propiedades", icon: Building2 },
   { href: "/alquileres", label: "Alquileres", icon: KeyRound },
@@ -45,8 +47,18 @@ const navigation = [
   { href: "/configuracion", label: "Configuracion", icon: Settings },
 ];
 
-function SidebarContent() {
+const adminNavigation = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/inmobiliarias", label: "Inmobiliarias", icon: Users },
+  { href: "/propiedades", label: "Propiedades", icon: Building2 },
+  { href: "/alquileres", label: "Alquileres", icon: KeyRound },
+  { href: "/mensajes", label: "Mensajes", icon: MessageSquareText },
+  { href: "/configuracion", label: "Configuracion", icon: Settings },
+];
+
+function SidebarContent({ userRole = "agency_admin" }: { userRole?: AppRole | null }) {
   const pathname = usePathname();
+  const navigation = userRole === "superadmin" ? adminNavigation : defaultNavigation;
 
   return (
     <div className="flex h-full flex-col">
@@ -94,17 +106,19 @@ export function AppShell({
   userEmail,
   accountLabel,
   accountSubLabel,
+  userRole,
 }: {
   children: ReactNode;
   userEmail?: null | string;
   accountLabel?: string | null;
   accountSubLabel?: string | null;
+  userRole?: AppRole | null;
 }) {
   return (
     <div className="min-h-screen">
       <div className="flex min-h-screen w-full">
         <aside className="glass-panel sticky top-0 hidden h-screen w-72 border-r border-sidebar-border xl:block">
-          <SidebarContent />
+          <SidebarContent userRole={userRole} />
         </aside>
 
         <div className="flex min-h-screen flex-1 flex-col">
@@ -120,7 +134,7 @@ export function AppShell({
                       <SheetTitle>Menu principal</SheetTitle>
                       <SheetDescription>Navegacion del CRM Props</SheetDescription>
                     </SheetHeader>
-                    <SidebarContent />
+                    <SidebarContent userRole={userRole} />
                   </SheetContent>
                 </Sheet>
               </div>

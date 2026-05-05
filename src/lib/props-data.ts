@@ -147,6 +147,12 @@ export type DashboardSnapshot = {
   recentActivity: string[];
 };
 
+export type AdminDashboardSnapshot = {
+  metrics: Metric[];
+  recentActivity: string[];
+  agencies: AgencySummary[];
+};
+
 type MarketplaceConversationRow = {
   id: string;
   customer_id: string;
@@ -1010,6 +1016,130 @@ export async function getDashboardSnapshot(options?: { agencySlug?: string }): P
       activityItems.length > 0
         ? activityItems
         : ["Todavía no hay movimientos recientes para esta cuenta."],
+  };
+}
+
+export async function getAdminDashboardSnapshot(): Promise<AdminDashboardSnapshot> {
+  const admin = createAdminClient();
+  const agencies = await listAgencySummaries();
+
+  const [
+    usersResult,
+    propertyCountResult,
+    openLeadsResult,
+    activeLeasesResult,
+    recentPropertiesResult,
+    recentAgenciesResult,
+    recentLeadsResult,
+  ] = await Promise.all([
+    admin
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .in("role", ["agency_admin", "agent"]),
+    admin.from("properties").select("id", { count: "exact", head: true }),
+    admin
+      .from("crm_leads")
+      .select("id", { count: "exact", head: true })
+      .not("stage", "in", "(Cerrado,Descartado)"),
+    admin
+      .from("rental_contracts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "Activo"),
+    admin
+      .from("properties")
+      .select("title, location, created_at, agencies!inner(name)")
+      .order("created_at", { ascending: false })
+      .limit(4),
+    admin
+      .from("agencies")
+      .select("name, city, created_at")
+      .order("created_at", { ascending: false })
+      .limit(4),
+    admin
+      .from("crm_leads")
+      .select("full_name, stage, created_at, agencies!inner(name)")
+      .order("created_at", { ascending: false })
+      .limit(4),
+  ]);
+
+  if (usersResult.error) throw usersResult.error;
+  if (propertyCountResult.error) throw propertyCountResult.error;
+  if (openLeadsResult.error) throw openLeadsResult.error;
+  if (activeLeasesResult.error) throw activeLeasesResult.error;
+  if (recentPropertiesResult.error) throw recentPropertiesResult.error;
+  if (recentAgenciesResult.error) throw recentAgenciesResult.error;
+  if (recentLeadsResult.error) throw recentLeadsResult.error;
+
+  const recentAgencyItems = ((recentAgenciesResult.data ?? []) as Array<{
+    name: string;
+    city: string;
+    created_at: string;
+  }>).map((agency) => ({
+    at: agency.created_at,
+    text: `Se dio de alta ${agency.name} en ${agency.city}.`,
+  }));
+
+  const recentPropertyItems = ((recentPropertiesResult.data ?? []) as Array<{
+    title: string;
+    location: string;
+    created_at: string;
+    agencies: { name: string } | { name: string }[] | null;
+  }>).map((property) => {
+    const agency = Array.isArray(property.agencies) ? property.agencies[0] : property.agencies;
+    return {
+      at: property.created_at,
+      text: `${agency?.name ?? "Una inmobiliaria"} publico ${property.title} en ${property.location}.`,
+    };
+  });
+
+  const recentLeadItems = ((recentLeadsResult.data ?? []) as Array<{
+    full_name: string;
+    stage: string;
+    created_at: string;
+    agencies: { name: string } | { name: string }[] | null;
+  }>).map((lead) => {
+    const agency = Array.isArray(lead.agencies) ? lead.agencies[0] : lead.agencies;
+    return {
+      at: lead.created_at,
+      text: `${agency?.name ?? "Una inmobiliaria"} recibio un lead nuevo: ${lead.full_name} (${lead.stage}).`,
+    };
+  });
+
+  const recentActivity = [...recentAgencyItems, ...recentPropertyItems, ...recentLeadItems]
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+    .slice(0, 6)
+    .map((item) => item.text);
+
+  return {
+    metrics: [
+      {
+        label: "Inmobiliarias activas",
+        value: String(agencies.filter((agency) => agency.status === "Activa").length),
+        delta: `${agencies.length} cuentas`,
+        hint: "clientes administrados desde Props",
+      },
+      {
+        label: "Usuarios de inmobiliarias",
+        value: String(usersResult.count ?? 0),
+        hint: "admins y empleados con acceso al CRM",
+      },
+      {
+        label: "Propiedades publicadas",
+        value: String(propertyCountResult.count ?? 0),
+        hint: "inventario total cargado en la plataforma",
+      },
+      {
+        label: "Consultas activas",
+        value: String(openLeadsResult.count ?? 0),
+        delta: `${activeLeasesResult.count ?? 0} alquileres activos`,
+        hint: "oportunidades abiertas en seguimiento",
+      },
+    ],
+    recentActivity:
+      recentActivity.length > 0
+        ? recentActivity
+        : ["Todavia no hubo movimientos recientes en la plataforma."],
+    agencies,
   };
 }
 

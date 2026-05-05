@@ -13,6 +13,7 @@ export default async function CrmLayout({ children }: { children: ReactNode }) {
       userEmail={currentUser?.user.email ?? null}
       accountLabel={currentUser?.profile.full_name ?? currentUser?.profile.agency_slug ?? "Cuenta activa"}
       accountSubLabel={currentUser?.profile.role === "superadmin" ? "Administracion" : currentUser?.user.email ?? null}
+      userRole={currentUser?.profile.role}
     >
       {children}
     </AppShell>
