@@ -46,14 +46,6 @@ const propertyTypes: PublicListing["propertyType"][] = [
   "Townhouse",
 ];
 
-const featuredLabels = [
-  "Nuevo",
-  "Destacado",
-  "Precio reducido",
-  "Inversion",
-  null,
-];
-
 const mapAnchors = [
   { x: 24, y: 30 },
   { x: 48, y: 41 },
@@ -96,7 +88,7 @@ export function buildPublicListings(
     const lotArea = area + 40 + (index % 4) * 35;
     const yearBuilt = 2019 + (index % 6);
     const propertyType = resolvePropertyType(property, index);
-    const featuredLabel = featuredLabels[index % featuredLabels.length];
+    const featuredLabel = resolveFeaturedLabel(property);
     const amenities = property.amenities.length > 0 ? property.amenities : amenitySets[index % amenitySets.length];
     const neighborhood = property.location.split(",")[0]?.trim() ?? property.location;
     const pricePerSquareMeter = Math.max(900, Math.round(property.price / area));
@@ -133,6 +125,16 @@ export function buildPublicListings(
       summary: buildSummary(property, agency?.name),
     };
   });
+}
+
+function resolveFeaturedLabel(property: Property) {
+  const visitCount = typeof property.visitCount === "number" ? property.visitCount : 0;
+
+  if (visitCount >= 20) {
+    return "Destacado";
+  }
+
+  return null;
 }
 
 function resolvePropertyType(

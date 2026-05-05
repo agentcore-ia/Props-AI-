@@ -36,6 +36,7 @@ export type Property = {
   id: string;
   tenantSlug: string;
   title: string;
+  visitCount?: number | null;
   price: number;
   currency: PropertyCurrency;
   location: string;
