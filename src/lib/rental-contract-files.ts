@@ -169,6 +169,12 @@ export async function uploadRentalContractFile({
   propertyId: string;
   file: File;
 }): Promise<UploadedRentalContractFile> {
+  console.info("[rental-contract] extractor version 2026-05-04-local-first-a839ac4", {
+    tenantSlug,
+    propertyId,
+    fileName: file?.name ?? null,
+  });
+
   if (!(file instanceof File) || file.size === 0) {
     throw new Error("Archivo de contrato invalido.");
   }
