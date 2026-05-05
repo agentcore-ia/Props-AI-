@@ -203,11 +203,59 @@ export async function uploadRentalContractFile({
 
   let extractedText = "";
   let extractionWarning: string | null = null;
+  let parserWarning: string | null = null;
+  const openAI = getOpenAIEnv();
 
   try {
-    extractedText = await extractText(buffer, normalizedMimeType);
-    if (!extractedText && normalizedMimeType === "application/pdf") {
+    if (normalizedMimeType === "application/pdf" && openAI.configured) {
+      console.info("[rental-contract] using OpenAI as primary PDF extractor", {
+        filePath,
+        openAIConfigured: openAI.configured,
+        openAIModel: openAI.model,
+      });
       extractedText = await extractPdfTextWithOpenAI(buffer, file.name || filename);
+      console.info("[rental-contract] primary PDF extraction finished", {
+        filePath,
+        extractedLength: extractedText.length,
+      });
+    } else {
+      extractedText = await extractText(buffer, normalizedMimeType);
+      console.info("[rental-contract] base extraction finished", {
+        filePath,
+        mimeType: normalizedMimeType,
+        extractedLength: extractedText.length,
+      });
+    }
+  } catch (error) {
+    parserWarning =
+      error instanceof Error
+        ? error.message
+        : "No se pudo extraer el texto del contrato.";
+    console.warn("[rental-contract] base extraction failed", {
+      filePath,
+      mimeType: normalizedMimeType,
+      parserWarning,
+      openAIConfigured: openAI.configured,
+      openAIModel: openAI.model,
+    });
+  }
+
+  try {
+    if (!extractedText && normalizedMimeType === "application/pdf") {
+      console.info("[rental-contract] attempting PDF fallback", {
+        filePath,
+        openAIConfigured: openAI.configured,
+        openAIModel: openAI.model,
+      });
+      if (openAI.configured) {
+        extractedText = await extractPdfTextWithOpenAI(buffer, file.name || filename);
+      } else {
+        extractedText = await extractText(buffer, normalizedMimeType);
+      }
+      console.info("[rental-contract] PDF fallback finished", {
+        filePath,
+        extractedLength: extractedText.length,
+      });
       if (!extractedText) {
         extractionWarning =
           "El PDF no trae texto seleccionable y el OCR no pudo recuperar contenido legible.";
@@ -223,11 +271,18 @@ export async function uploadRentalContractFile({
       error instanceof Error
         ? error.message
         : "No se pudo extraer el texto del contrato.";
-    console.warn("[rental-contract] text extraction failed", {
+    console.warn("[rental-contract] fallback extraction failed", {
       filePath,
       mimeType: normalizedMimeType,
       extractionWarning,
+      parserWarning,
+      openAIConfigured: openAI.configured,
+      openAIModel: openAI.model,
     });
+  }
+
+  if (!extractedText && parserWarning && !extractionWarning) {
+    extractionWarning = parserWarning;
   }
 
   return {
