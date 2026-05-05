@@ -135,11 +135,7 @@ export function matchPropertyFromMessage(
 
 function summarizeProperty(property: Property) {
   const publicUrl = `${PUBLIC_MARKETPLACE_URL}/propiedad/${property.tenantSlug}/${property.id}`;
-  const imageLinks = property.images
-    .filter(Boolean)
-    .slice(0, 3)
-    .map((image) => image.trim())
-    .filter(Boolean);
+  const imageCount = property.images.filter(Boolean).length;
   const blocks = [
     property.title,
     property.operation,
@@ -157,7 +153,7 @@ function summarizeProperty(property: Property) {
     property.amenities.length ? `amenities: ${property.amenities.join(", ")}` : "",
     property.description ? `descripcion: ${property.description}` : "",
     `link: ${publicUrl}`,
-    imageLinks.length ? `imagenes: ${imageLinks.join(", ")}` : "",
+    imageCount > 0 ? `imagenes disponibles: ${imageCount}` : "",
   ].filter(Boolean);
 
   return `- ${blocks.join(" | ")}`;
@@ -252,8 +248,7 @@ export function buildWhatsappSystemPrompt(input: {
     : "";
   const selectedPropertyImages = input.selectedProperty?.images
     .filter(Boolean)
-    .slice(0, 5)
-    .join(", ");
+    .length;
 
   return [
     `Eres el asistente comercial de WhatsApp de ${input.agency.name}, una inmobiliaria de ${input.agency.city}.`,
@@ -270,7 +265,7 @@ export function buildWhatsappSystemPrompt(input: {
       ? `Link publico de la propiedad asociada: ${selectedPropertyPublicUrl}`
       : "No hay link publico asociado porque todavia no tenemos una propiedad seleccionada.",
     selectedPropertyImages
-      ? `Imagenes de la propiedad asociada: ${selectedPropertyImages}`
+      ? `Imagenes de la propiedad asociada disponibles para envio: ${selectedPropertyImages}`
       : "No hay imagenes adicionales cargadas para la propiedad asociada.",
     "Catalogo de propiedades disponibles para responder:",
     input.catalogSummary || "Sin propiedades disponibles en este momento.",

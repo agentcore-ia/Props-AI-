@@ -26,6 +26,15 @@ function saysNoPhotos(text: string) {
   );
 }
 
+function stripImageLinksFromReply(text: string) {
+  return text
+    .replace(/!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/gi, "")
+    .replace(/\bhttps?:\/\/[^\s]*property-images[^\s]*/gi, "")
+    .replace(/^\s*\d+\.\s*$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function buildPublicPropertyUrl(tenantSlug: string, propertyId: string) {
   return `${PUBLIC_MARKETPLACE_URL}/propiedad/${tenantSlug}/${propertyId}`;
 }
@@ -75,7 +84,7 @@ export async function POST(request: Request) {
     selectedPropertyUrl ||
     (property && lead.agencySlug ? buildPublicPropertyUrl(lead.agencySlug, property.id) : "");
   const propertyImages = property?.images.filter(Boolean).slice(0, 3) ?? [];
-  let replyWithLink = reply;
+  let replyWithLink = stripImageLinksFromReply(reply);
 
   if (customerAskedForImages) {
     if (propertyImages.length > 0 || propertyUrl) {
