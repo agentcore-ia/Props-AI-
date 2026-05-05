@@ -98,6 +98,25 @@ html {
   .text-balance {
     text-wrap: balance;
   }
+
+  .props-scrollbar {
+    scrollbar-color: rgba(148, 163, 184, 0.75) transparent;
+    scrollbar-width: thin;
+  }
+
+  .props-scrollbar::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+
+  .props-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.8);
+    border-radius: 999px;
+  }
+
+  .props-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
 
 @media (max-width: 640px) {

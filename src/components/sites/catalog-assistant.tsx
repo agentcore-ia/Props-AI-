@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bath,
   BedDouble,
@@ -13,12 +13,12 @@ import {
   Ruler,
   SendHorizonal,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 
 import type { Property } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { cn, formatMoney } from "@/lib/utils";
 
@@ -67,6 +67,7 @@ export function CatalogAssistant({
   const [assistantInput, setAssistantInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(mode === "inline");
+  const conversationEndRef = useRef<HTMLDivElement | null>(null);
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([
     {
       id: "assistant-welcome",
@@ -84,6 +85,10 @@ export function CatalogAssistant({
       },
     ]);
   }, [welcomeMessage]);
+
+  useEffect(() => {
+    conversationEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [assistantMessages, open]);
 
   const propertyIds = useMemo(() => properties.map((property) => property.id), [properties]);
 
@@ -147,6 +152,16 @@ export function CatalogAssistant({
     }
   }
 
+  function resetConversation() {
+    setAssistantMessages([
+      {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: welcomeMessage,
+      },
+    ]);
+  }
+
   if (mode === "floating") {
     return (
       <div className="fixed bottom-4 right-4 z-40 flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-3 sm:bottom-6 sm:right-6">
@@ -160,18 +175,27 @@ export function CatalogAssistant({
                 </p>
                 <h3 className="mt-3 text-lg font-semibold sm:text-xl">{heading}</h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="inline-flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50"
-              >
-                <X className="size-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={resetConversation}
+                  className="inline-flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="inline-flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
             </div>
 
-            <ScrollArea className="max-h-[calc(100vh-18rem)] px-4 py-4 sm:px-5">
-              <AssistantConversation messages={assistantMessages} />
-            </ScrollArea>
+            <div className="max-h-[calc(100vh-18rem)] overflow-y-auto px-4 py-4 props-scrollbar sm:px-5">
+              <AssistantConversation messages={assistantMessages} endRef={conversationEndRef} />
+            </div>
 
             <div className="border-t border-slate-200 px-4 py-4 sm:px-5">
               <AssistantComposer
@@ -220,11 +244,23 @@ export function CatalogAssistant({
         </div>
       </div>
 
-      <div className="mt-5 space-y-3">
-        <AssistantConversation messages={assistantMessages} />
+      <div className="mt-5 max-h-[520px] overflow-y-auto pr-2 props-scrollbar">
+        <AssistantConversation messages={assistantMessages} endRef={conversationEndRef} />
       </div>
 
-      <div className="mt-5">
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <p className="text-xs text-slate-400">Presiona Enter para enviar y Shift+Enter para salto de línea.</p>
+        <button
+          type="button"
+          onClick={resetConversation}
+          className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-xs font-medium text-slate-500 transition-colors hover:text-slate-900"
+        >
+          <Trash2 className="size-3.5" />
+          Reiniciar
+        </button>
+      </div>
+
+      <div className="mt-4">
         <AssistantComposer
           input={assistantInput}
           onInputChange={setAssistantInput}
@@ -237,7 +273,13 @@ export function CatalogAssistant({
   );
 }
 
-function AssistantConversation({ messages }: { messages: AssistantMessage[] }) {
+function AssistantConversation({
+  messages,
+  endRef,
+}: {
+  messages: AssistantMessage[];
+  endRef: { current: HTMLDivElement | null };
+}) {
   return (
     <div className="space-y-3">
       {messages.map((message) => (
@@ -261,6 +303,7 @@ function AssistantConversation({ messages }: { messages: AssistantMessage[] }) {
           ) : null}
         </div>
       ))}
+      <div ref={endRef} />
     </div>
   );
 }
@@ -328,11 +371,19 @@ function AssistantComposer({
   onQuickPrompt: (prompt: string) => void;
   onSubmit: () => void;
 }) {
+  function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      onSubmit();
+    }
+  }
+
   return (
     <div className="space-y-3">
       <Textarea
         value={input}
         onChange={(event) => onInputChange(event.target.value)}
+        onKeyDown={handleKeyDown}
         placeholder="Ej: busco alquiler de 2 ambientes en Palermo con balcon."
         className="min-h-24 rounded-[24px] border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 placeholder:text-slate-400"
       />
