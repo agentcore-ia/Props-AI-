@@ -122,7 +122,7 @@ export function buildPublicListings(
       yieldPercent,
       appreciationPercent,
       neighborhood,
-      summary: buildSummary(property, agency?.name),
+      summary: buildSummary(property),
     };
   });
 }
@@ -158,10 +158,37 @@ function resolvePropertyType(
   return propertyTypes[index % propertyTypes.length];
 }
 
-function buildSummary(property: Property, agencyName?: string) {
-  const owner = agencyName ? `Publicado por ${agencyName}.` : "";
-  const requirements = property.requirements
-    ? ` Requisitos y observaciones: ${property.requirements}`
-    : "";
-  return `${property.description} ${owner} Ideal para quienes priorizan ${property.operation.toLowerCase()} con una experiencia cuidada en ${property.location}.${requirements}`;
+function buildSummary(property: Property) {
+  const location = property.location || "una ubicacion destacada";
+  const descriptor = `${property.propertyType.toLowerCase()} para ${property.operation.toLowerCase()} en ${location}`;
+  const area = property.area ? `${property.area} m2` : null;
+  const layout = [
+    property.bedrooms ? `${property.bedrooms} dormitorio${property.bedrooms > 1 ? "s" : ""}` : null,
+    property.bathrooms ? `${property.bathrooms} baño${property.bathrooms > 1 ? "s" : ""}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const baseCopy = compactSentence(property.description);
+
+  return [descriptor, [area, layout].filter(Boolean).join(" · "), baseCopy]
+    .filter(Boolean)
+    .join(". ");
+}
+
+function compactSentence(description: string) {
+  const normalized = description.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "";
+  }
+
+  const firstSentence = normalized
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .find(Boolean);
+
+  if (firstSentence && firstSentence.length <= 180) {
+    return firstSentence;
+  }
+
+  return `${normalized.slice(0, 170).trimEnd()}...`;
 }

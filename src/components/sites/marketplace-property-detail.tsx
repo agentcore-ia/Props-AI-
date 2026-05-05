@@ -8,7 +8,6 @@ import {
   Building2,
   CalendarDays,
   CarFront,
-  ChartColumnIncreasing,
   MapPin,
   PawPrint,
   Ruler,
@@ -20,6 +19,7 @@ import { CatalogInquiryForm } from "@/components/sites/catalog-inquiry-form";
 import { PropertyGallery } from "@/components/sites/property-gallery";
 import { PublicCustomerChat } from "@/components/sites/public-customer-chat";
 import { PublicUserActions } from "@/components/sites/public-user-actions";
+import { ExpandableText } from "@/components/sites/expandable-text";
 import { buildPublicListings } from "@/lib/public-marketplace";
 import {
   buildGoogleMapsEmbedUrl,
@@ -66,6 +66,41 @@ export function MarketplacePropertyDetail({
   const [listing] = buildPublicListings([property], [agency]);
   const relatedListings = buildPublicListings(relatedProperties, allAgencies).slice(0, 3);
   const address = listing.exactAddress || listing.location;
+  const keyFacts = [
+    {
+      icon: <PawPrint className="size-4" />,
+      label: "Mascotas",
+      value: listing.petsPolicy || "Consultar",
+      show: listing.operation === "Alquiler",
+    },
+    {
+      icon: <CarFront className="size-4" />,
+      label: "Cocheras",
+      value: String(listing.parkingSpots),
+      show: listing.parkingSpots > 0,
+    },
+    {
+      icon: <CalendarDays className="size-4" />,
+      label: "Disponible desde",
+      value: listing.availableFrom || "Inmediata",
+      show: true,
+    },
+    {
+      icon: <Ruler className="size-4" />,
+      label: "Superficie",
+      value: `${listing.area} m2`,
+      show: true,
+    },
+    {
+      icon: <Bath className="size-4" />,
+      label: "Expensas",
+      value:
+        listing.expenses && listing.expensesCurrency
+          ? formatMoney(listing.expenses, listing.expensesCurrency)
+          : "No informadas",
+      show: listing.operation === "Alquiler",
+    },
+  ].filter((item) => item.show);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,rgba(237,242,255,0.88)_0%,rgba(247,249,252,1)_24%,rgba(255,255,255,1)_100%)]">
@@ -175,7 +210,7 @@ export function MarketplacePropertyDetail({
               </div>
 
               <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Resumen de la oportunidad</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Resumen de la propiedad</p>
                 <p className="mt-2 text-sm leading-7 text-slate-600">{listing.summary}</p>
               </div>
             </section>
@@ -202,12 +237,13 @@ export function MarketplacePropertyDetail({
             <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)] sm:p-6">
               <p className="text-sm font-medium text-slate-500">Acerca de esta propiedad</p>
               <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-                Una ficha clara para acelerar la decision
+                Descripción completa
               </h2>
-              <div className="mt-5 space-y-4 text-sm leading-8 text-slate-600 sm:text-base">
-                <p>{listing.description}</p>
-                <p>{listing.summary}</p>
-              </div>
+              <ExpandableText
+                text={listing.description}
+                maxLength={420}
+                className="mt-5 text-sm leading-8 text-slate-600 sm:text-base"
+              />
             </section>
 
             <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)] sm:p-6">
@@ -215,75 +251,22 @@ export function MarketplacePropertyDetail({
               <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
                 Informacion clave antes de consultar
               </h2>
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <DetailTile icon={<PawPrint className="size-4" />} label="Mascotas" value={listing.petsPolicy || "Consultar"} />
-                <DetailTile icon={<CarFront className="size-4" />} label="Cocheras" value={String(listing.parkingSpots)} />
-                <DetailTile
-                  icon={<ChartColumnIncreasing className="size-4" />}
-                  label="Expensas"
-                  value={
-                    listing.expenses && listing.expensesCurrency
-                      ? formatMoney(listing.expenses, listing.expensesCurrency)
-                      : "No informadas"
-                  }
-                />
-                <DetailTile
-                  icon={<CalendarDays className="size-4" />}
-                  label="Disponible desde"
-                  value={listing.availableFrom || "Inmediata"}
-                />
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                {keyFacts.map((item) => (
+                  <DetailTile key={item.label} icon={item.icon} label={item.label} value={item.value} />
+                ))}
               </div>
 
-              <div className="mt-5 rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+              <div className="mt-4 rounded-[22px] border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Requisitos</p>
                 <p className="mt-2 text-sm leading-7 text-slate-600">
                   {listing.requirements || "La inmobiliaria no cargo requisitos adicionales por el momento."}
                 </p>
               </div>
             </section>
-
-            <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)] sm:p-6">
-              <p className="text-sm font-medium text-slate-500">Amenities y ventajas</p>
-              <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-                Lo mas importante en una sola vista
-              </h2>
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                {listing.amenities.map((amenity) => (
-                  <div
-                    key={amenity}
-                    className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium text-slate-700"
-                  >
-                    {amenity}
-                  </div>
-                ))}
-              </div>
-            </section>
           </div>
 
           <div className="space-y-6">
-            <section className="rounded-[26px] border border-slate-200 bg-slate-950 p-5 text-white shadow-[0_28px_90px_-58px_rgba(15,23,42,0.34)] sm:p-6">
-              <p className="text-sm font-medium uppercase tracking-[0.18em] text-blue-100">
-                Lectura de inversion
-              </p>
-              <h2 className="mt-2 text-xl font-semibold tracking-tight sm:text-3xl">
-                Indicadores para comparar rapido
-              </h2>
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <DarkMetric label="Yield" value={`${listing.yieldPercent}%`} />
-                <DarkMetric label="Apreciacion" value={`${listing.appreciationPercent}%`} />
-                <DarkMetric label="Score" value={`${listing.investmentScore}`} />
-              </div>
-              <div className="mt-5 rounded-[24px] border border-white/10 bg-white/5 p-4">
-                <p className="inline-flex items-center gap-2 text-sm font-medium text-white/88">
-                  <ChartColumnIncreasing className="size-4" />
-                  Lectura de valor
-                </p>
-                <p className="mt-3 text-sm leading-7 text-white/75">
-                  Esta propiedad combina {listing.propertyType.toLowerCase()}, ubicacion en {listing.neighborhood} y un precio por metro competitivo para el rango actual del marketplace.
-                </p>
-              </div>
-            </section>
-
             <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)] sm:p-6">
               <p className="text-sm font-medium text-slate-500">Ubicacion</p>
               <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
@@ -379,21 +362,12 @@ function DetailTile({
   value: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
+    <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 sm:px-4 sm:py-4">
       <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-500">
         {icon}
         {label}
       </div>
-      <p className="mt-2 text-base font-semibold text-slate-950">{value}</p>
-    </div>
-  );
-}
-
-function DarkMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[22px] border border-white/10 bg-white/5 px-4 py-4">
-      <p className="text-xs uppercase tracking-[0.18em] text-white/45">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
+      <p className="mt-2 text-sm font-semibold text-slate-950 sm:text-base">{value}</p>
     </div>
   );
 }
