@@ -146,7 +146,7 @@ export async function POST(request: Request) {
               {
                 type: "input_text",
                 text:
-                  "Sos la IA de captacion de Props para compradores e inquilinos. Responde en espanol rioplatense, breve, amable y comercial. Debes responder la pregunta concreta del usuario usando primero la propiedad consultada y luego, si ayuda, el catalogo adicional. Si te preguntan por precio, expensas, mascotas, ubicacion, disponibilidad, requisitos o ambientes, responde con esos datos. No repitas un mensaje generico si ya hay informacion suficiente. Cierra con una sola pregunta de avance o siguiente paso.",
+      "Sos la IA de captacion de Props para compradores e inquilinos. Responde en espanol rioplatense, breve, amable y comercial. Debes responder la pregunta concreta del usuario usando primero la propiedad consultada y luego, si ayuda, el portafolio adicional. Si te preguntan por precio, expensas, mascotas, ubicacion, disponibilidad, requisitos o ambientes, responde con esos datos. No repitas un mensaje generico si ya hay informacion suficiente. Cierra con una sola pregunta de avance o siguiente paso.",
               },
             ],
           },
@@ -155,7 +155,7 @@ export async function POST(request: Request) {
             content: [
               {
                 type: "input_text",
-                text: `Inmobiliaria: ${agency.name} (${agency.city}). Propiedad consultada: ${property.title} | ${property.operation} | ${property.status} | ${property.location} | direccion: ${property.exact_address} | precio: ${property.price} ${property.currency} | tipo: ${property.property_type} | dormitorios: ${property.bedrooms} | banos: ${property.bathrooms} | m2: ${property.area} | expensas: ${property.expenses ?? "n/d"} ${property.expenses_currency ?? ""} | disponible desde: ${property.available_from ?? "inmediata"} | mascotas: ${property.pets_policy || "consultar"} | requisitos: ${property.requirements || "sin requisitos cargados"} | amenities: ${Array.isArray(property.amenities) ? property.amenities.join(", ") : "sin amenities"} | descripcion: ${property.description}.\nCatalogo adicional:\n${catalogContext}\n\nMensaje del cliente:\n${message}`,
+        text: `Inmobiliaria: ${agency.name} (${agency.city}). Propiedad consultada: ${property.title} | ${property.operation} | ${property.status} | ${property.location} | direccion: ${property.exact_address} | precio: ${property.price} ${property.currency} | tipo: ${property.property_type} | dormitorios: ${property.bedrooms} | banos: ${property.bathrooms} | m2: ${property.area} | expensas: ${property.expenses ?? "n/d"} ${property.expenses_currency ?? ""} | disponible desde: ${property.available_from ?? "inmediata"} | mascotas: ${property.pets_policy || "consultar"} | requisitos: ${property.requirements || "sin requisitos cargados"} | amenities: ${Array.isArray(property.amenities) ? property.amenities.join(", ") : "sin amenities"} | descripcion: ${property.description}.\nPortafolio adicional:\n${catalogContext}\n\nMensaje del cliente:\n${message}`,
               },
             ],
           },

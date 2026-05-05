@@ -242,7 +242,7 @@ export function buildWhatsappSystemPrompt(input: {
   const threadSummary = summarizeThread(input.recentMessages);
   const selectedPropertySummary = input.selectedProperty
     ? summarizeProperty(input.selectedProperty)
-    : "No hay una propiedad puntual asociada todavia; puedes guiarte por el catalogo y por lo que pida el cliente.";
+    : "No hay una propiedad puntual asociada todavia; puedes guiarte por el portafolio y por lo que pida el cliente.";
   const selectedPropertyPublicUrl = input.selectedProperty
     ? `${PUBLIC_MARKETPLACE_URL}/propiedad/${input.selectedProperty.tenantSlug}/${input.selectedProperty.id}`
     : "";
@@ -267,7 +267,7 @@ export function buildWhatsappSystemPrompt(input: {
     selectedPropertyImages
       ? `Imagenes de la propiedad asociada disponibles para envio: ${selectedPropertyImages}`
       : "No hay imagenes adicionales cargadas para la propiedad asociada.",
-    "Catalogo de propiedades disponibles para responder:",
+    "Portafolio de propiedades disponibles para responder:",
     input.catalogSummary || "Sin propiedades disponibles en este momento.",
     "Historial reciente del hilo:",
     threadSummary,

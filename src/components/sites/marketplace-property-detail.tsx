@@ -14,7 +14,6 @@ import {
   PawPrint,
   Phone,
   Ruler,
-  Sparkles,
 } from "lucide-react";
 
 import type { Agency, Property } from "@/lib/mock-data";
@@ -70,11 +69,8 @@ export function MarketplacePropertyDetail({
   const relatedListings = buildPublicListings(relatedProperties, allAgencies).slice(0, 3);
   const address = listing.exactAddress || listing.location;
   const agencyLocationLabel = agency.city || listing.location;
-  const normalizedPhone = agency.phone.replace(/\D/g, "");
   const portfolioHref = listing.catalogHref;
-  const mapsHref = buildGoogleMapsExternalUrl(agencyLocationLabel);
-  const whatsappHref = normalizedPhone ? `https://wa.me/${normalizedPhone}` : null;
-  const emailHref = agency.email ? `mailto:${agency.email}` : null;
+  const publicTagline = normalizeAgencyTagline(agency.tagline, agency);
   const keyFacts = [
     {
       icon: <PawPrint className="size-4" />,
@@ -202,77 +198,43 @@ export function MarketplacePropertyDetail({
           <div className="min-w-0 space-y-4 xl:sticky xl:top-24 xl:h-fit xl:space-y-5">
             <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.25)] sm:p-6">
               <div className="flex items-start gap-4">
-                <div className="flex size-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-                  <Sparkles className="size-6" />
-                </div>
                 <div>
                   <p className="text-sm font-medium text-slate-500">Inmobiliaria responsable</p>
-                  <h2 className="mt-1 text-2xl font-semibold text-slate-950">{agency.name}</h2>
-                  <p className="mt-2 text-sm text-slate-500">{agency.tagline || `${agency.ownerName} y su equipo comercial.`}</p>
+                  <Link
+                    href={portfolioHref}
+                    className="mt-1 inline-flex items-center gap-2 text-2xl font-semibold text-slate-950 transition-colors hover:text-blue-700"
+                  >
+                    {agency.name}
+                    <ExternalLink className="size-4 text-slate-400" />
+                  </Link>
+                  <p className="mt-2 text-sm text-slate-500">{publicTagline}</p>
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Ejecutivo comercial</p>
-                  <p className="mt-2 text-lg font-semibold text-slate-950">{agency.ownerName}</p>
-                  <div className="mt-3 space-y-2 text-sm text-slate-600">
-                    <p className="inline-flex items-center gap-2">
-                      <Mail className="size-4" />
-                      {agency.email}
-                    </p>
-                    <p className="inline-flex items-center gap-2">
-                      <Phone className="size-4" />
-                      {agency.phone}
-                    </p>
-                    <p className="inline-flex items-center gap-2">
-                      <MapPin className="size-4" />
-                      {agencyLocationLabel}
-                    </p>
-                  </div>
+              <div className="mt-5 rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Perfil de la inmobiliaria</p>
+                <div className="mt-3 space-y-2 text-sm text-slate-600">
+                  <p className="font-semibold text-slate-950">{agency.ownerName}</p>
+                  <p className="inline-flex items-center gap-2">
+                    <Mail className="size-4" />
+                    {agency.email}
+                  </p>
+                  <p className="inline-flex items-center gap-2">
+                    <Phone className="size-4" />
+                    {agency.phone}
+                  </p>
+                  <p className="inline-flex items-center gap-2">
+                    <MapPin className="size-4" />
+                    {agencyLocationLabel}
+                  </p>
                 </div>
-
-                <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Portafolio y canales</p>
-                  <div className="mt-3 flex flex-col gap-2">
-                    <a
-                      href={portfolioHref}
-                      className="inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
-                    >
-                      Ver portafolio completo
-                      <ExternalLink className="size-4" />
-                    </a>
-                    <a
-                      href={mapsHref}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
-                    >
-                      Ver ubicacion
-                      <ExternalLink className="size-4" />
-                    </a>
-                    {whatsappHref ? (
-                      <a
-                        href={whatsappHref}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
-                      >
-                        WhatsApp
-                        <ExternalLink className="size-4" />
-                      </a>
-                    ) : null}
-                    {emailHref ? (
-                      <a
-                        href={emailHref}
-                        className="inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
-                      >
-                        Email
-                        <ExternalLink className="size-4" />
-                      </a>
-                    ) : null}
-                  </div>
-                </div>
+                <Link
+                  href={portfolioHref}
+                  className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                >
+                  Ver perfil y propiedades
+                  <ExternalLink className="size-4" />
+                </Link>
               </div>
 
               <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
@@ -396,6 +358,20 @@ export function MarketplacePropertyDetail({
       </main>
     </div>
   );
+}
+
+function normalizeAgencyTagline(tagline: string | null | undefined, agency: Agency) {
+  const clean = (tagline ?? "").trim();
+
+  if (!clean) {
+    return `${agency.ownerName} y su equipo comercial te ayudan a encontrar la propiedad indicada.`;
+  }
+
+  if (clean.toLowerCase().includes("catalogo")) {
+    return `${agency.ownerName} y su equipo comercial te ayudan a encontrar la propiedad indicada.`;
+  }
+
+  return clean;
 }
 
 function SpecCard({

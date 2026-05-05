@@ -159,7 +159,7 @@ export const pipelineData = [
 export const recentActivity = [
   "Gentile publico un nuevo departamento premium en Belgrano.",
   "Rodriguez recibio una consulta web y disparo una automatizacion.",
-  "Delta completo el onboarding y preparo su catalogo publico.",
+  "Delta completo el onboarding y preparo su vidriera publica.",
   "Un lead cambio de estado a Propuesta luego de una visita.",
 ];
 

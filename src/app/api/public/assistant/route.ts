@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   if (properties.length === 0) {
     return NextResponse.json({
       reply:
-        "Todavia no hay propiedades publicadas para este catalogo. Proba de nuevo mas tarde o dejanos tu consulta.",
+      "Todavia no hay propiedades publicadas para este portafolio. Proba de nuevo mas tarde o dejanos tu consulta.",
     });
   }
 
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
             {
               type: "input_text",
               text:
-                "Sos un asesor inmobiliario digital de Props. Responde en espanol claro, breve y comercial. Solo podes recomendar propiedades del catalogo provisto. Usa direccion, moneda, requisitos, politica de mascotas, expensas, disponibilidad y amenities cuando existan. Si faltan datos, pedi presupuesto, zona y cantidad de ambientes. No inventes propiedades ni disponibilidad.",
+      "Sos un asesor inmobiliario digital de Props. Responde en espanol claro, breve y comercial. Solo podes recomendar propiedades del portafolio provisto. Usa direccion, moneda, requisitos, politica de mascotas, expensas, disponibilidad y amenities cuando existan. Si faltan datos, pedi presupuesto, zona y cantidad de ambientes. No inventes propiedades ni disponibilidad.",
             },
           ],
         },
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
           content: [
             {
               type: "input_text",
-              text: `Catalogo disponible:\n${catalogContext}\n\nConsulta del cliente:\n${prompt}`,
+        text: `Portafolio disponible:\n${catalogContext}\n\nConsulta del cliente:\n${prompt}`,
             },
           ],
         },
