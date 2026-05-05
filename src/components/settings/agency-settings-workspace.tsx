@@ -39,6 +39,9 @@ type ManagedAgency = {
   owner_name: string;
   owner_email: string;
   messaging_instance: string;
+  website_url?: string | null;
+  instagram_url?: string | null;
+  facebook_url?: string | null;
 };
 
 type ConnectionState = "loading" | "open" | "close" | "error";
@@ -89,6 +92,9 @@ function buildInitialForm(agency: ManagedAgency | null) {
     city: agency?.city ?? "",
     tagline: agency?.tagline ?? "",
     messagingInstance: agency?.messaging_instance ?? "",
+    websiteUrl: agency?.website_url ?? "",
+    instagramUrl: agency?.instagram_url ?? "",
+    facebookUrl: agency?.facebook_url ?? "",
   };
 }
 
@@ -259,6 +265,9 @@ export function AgencySettingsWorkspace({
         phone: form.phone,
         city: form.city,
         tagline: form.tagline,
+        websiteUrl: form.websiteUrl,
+        instagramUrl: form.instagramUrl,
+        facebookUrl: form.facebookUrl,
         messagingInstance: normalizeInstance(form.messagingInstance),
       }),
     });
@@ -351,6 +360,36 @@ export function AgencySettingsWorkspace({
                 rows={3}
                 value={form.tagline}
                 onChange={(event) => setForm((prev) => ({ ...prev, tagline: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Sitio web</label>
+              <Input
+                value={form.websiteUrl}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, websiteUrl: event.target.value }))
+                }
+                placeholder="https://tuinmobiliaria.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Instagram</label>
+              <Input
+                value={form.instagramUrl}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, instagramUrl: event.target.value }))
+                }
+                placeholder="instagram.com/tuinmobiliaria"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium">Facebook</label>
+              <Input
+                value={form.facebookUrl}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, facebookUrl: event.target.value }))
+                }
+                placeholder="facebook.com/tuinmobiliaria"
               />
             </div>
             <div className="space-y-2 md:col-span-2">

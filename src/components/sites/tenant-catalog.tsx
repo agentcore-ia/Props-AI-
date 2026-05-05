@@ -3,7 +3,7 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Building2, Mail, MapPin, Phone, Search } from "lucide-react";
+import { Building2, Camera, Globe, Mail, MapPin, Phone, Search } from "lucide-react";
 
 import type { Agency, Property } from "@/lib/mock-data";
 import { CatalogAssistant } from "@/components/sites/catalog-assistant";
@@ -55,6 +55,11 @@ export function TenantCatalog({
     sale: properties.filter((property) => property.operation === "Venta").length,
     rent: properties.filter((property) => property.operation === "Alquiler").length,
   };
+  const socialLinks = [
+    agency?.websiteUrl ? { label: "Sitio web", href: agency.websiteUrl, icon: <Globe className="size-4" /> } : null,
+    agency?.instagramUrl ? { label: "Instagram", href: agency.instagramUrl, icon: <Camera className="size-4" /> } : null,
+    agency?.facebookUrl ? { label: "Facebook", href: agency.facebookUrl, icon: <Building2 className="size-4" /> } : null,
+  ].filter(Boolean) as Array<{ label: string; href: string; icon: React.ReactNode }>;
   const initials = agency?.name
     .split(" ")
     .filter(Boolean)
@@ -124,6 +129,23 @@ export function TenantCatalog({
                         value={agency.ownerName}
                       />
                     </div>
+
+                    {socialLinks.length > 0 ? (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {socialLinks.map((link) => (
+                          <a
+                            key={link.label}
+                            href={link.href}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-blue-200 hover:text-blue-700"
+                          >
+                            {link.icon}
+                            {link.label}
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="mt-8 rounded-[28px] border border-slate-200 bg-slate-50 p-3">

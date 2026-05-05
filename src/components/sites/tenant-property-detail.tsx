@@ -4,8 +4,10 @@ import {
   ArrowLeft,
   Building2,
   CalendarDays,
+  Camera,
   CarFront,
   CheckCircle2,
+  Globe,
   MapPin,
   MessageSquareMore,
   PawPrint,
@@ -51,6 +53,11 @@ export function TenantPropertyDetail({
   }
 
   const address = property.exactAddress || property.location;
+  const socialLinks = [
+    agency.websiteUrl ? { label: "Sitio web", href: agency.websiteUrl, icon: <Globe className="size-4" /> } : null,
+    agency.instagramUrl ? { label: "Instagram", href: agency.instagramUrl, icon: <Camera className="size-4" /> } : null,
+    agency.facebookUrl ? { label: "Facebook", href: agency.facebookUrl, icon: <Building2 className="size-4" /> } : null,
+  ].filter(Boolean) as Array<{ label: string; href: string; icon: ReactNode }>;
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,rgba(241,245,249,0.95)_0%,rgba(255,255,255,1)_28%,rgba(255,255,255,1)_100%)]">
@@ -164,6 +171,27 @@ export function TenantPropertyDetail({
                   {agency.phone}
                 </p>
                 <p>{agency.city}</p>
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Link
+                  href={`/${agency.slug}`}
+                  className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition-colors hover:bg-blue-50"
+                >
+                  Ver perfil y propiedades
+                </Link>
+                {socialLinks.map((item) => (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white/85 transition-colors hover:bg-white/10"
+                  >
+                    {item.icon}
+                    {item.label}
+                  </a>
+                ))}
               </div>
             </section>
 

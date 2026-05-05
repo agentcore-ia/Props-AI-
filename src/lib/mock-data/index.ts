@@ -30,6 +30,9 @@ export type Agency = {
   city: string;
   tagline: string;
   messagingInstance?: string;
+  websiteUrl?: string | null;
+  instagramUrl?: string | null;
+  facebookUrl?: string | null;
 };
 
 export type Property = {
@@ -111,6 +114,9 @@ export const agencies: Agency[] = [
     status: "Activa",
     city: "CABA",
     tagline: "Propiedades seleccionadas en Buenos Aires.",
+    websiteUrl: "https://gentile.com.ar",
+    instagramUrl: "https://instagram.com/gentilepropiedades",
+    facebookUrl: "https://facebook.com/gentilepropiedades",
   },
   {
     id: "agency-2",
@@ -124,6 +130,9 @@ export const agencies: Agency[] = [
     status: "Activa",
     city: "Zona Norte",
     tagline: "Casas y departamentos para vivir o invertir.",
+    websiteUrl: "https://rodriguezre.com",
+    instagramUrl: "https://instagram.com/rodriguezrealestate",
+    facebookUrl: "https://facebook.com/rodriguezrealestate",
   },
   {
     id: "agency-3",
@@ -137,6 +146,9 @@ export const agencies: Agency[] = [
     status: "En onboarding",
     city: "Nordelta",
     tagline: "Especialistas en barrios privados y lagos.",
+    websiteUrl: "https://deltabrokers.com",
+    instagramUrl: "https://instagram.com/deltabrokers",
+    facebookUrl: "https://facebook.com/deltabrokers",
   },
 ];
 

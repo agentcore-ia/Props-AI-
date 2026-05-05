@@ -28,6 +28,9 @@ type AgencyRow = {
   city: string;
   tagline: string;
   messaging_instance: string;
+  website_url?: string | null;
+  instagram_url?: string | null;
+  facebook_url?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -445,6 +448,9 @@ function mapAgency(row: AgencyRow): Agency {
     city: row.city,
     tagline: row.tagline,
     messagingInstance: row.messaging_instance,
+    websiteUrl: row.website_url ?? null,
+    instagramUrl: row.instagram_url ?? null,
+    facebookUrl: row.facebook_url ?? null,
   };
 }
 

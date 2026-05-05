@@ -14,6 +14,9 @@ export type ManagedAgency = {
   owner_name: string;
   owner_email: string;
   messaging_instance: string;
+  website_url?: string | null;
+  instagram_url?: string | null;
+  facebook_url?: string | null;
 };
 
 function normalizeInstanceSegment(value: string) {
@@ -45,7 +48,7 @@ export async function listManagedAgencies(current: CurrentUserContext) {
   const admin = createAdminClient();
   let query = admin
     .from("agencies")
-    .select("id, slug, name, email, phone, city, tagline, owner_name, owner_email, messaging_instance")
+    .select("*")
     .order("name", { ascending: true });
 
   if (current.profile.role === "agency_admin") {
@@ -91,7 +94,7 @@ export async function persistMessagingInstance(
     .from("agencies")
     .update({ messaging_instance: nextInstance })
     .eq("id", agencyId)
-    .select("id, slug, name, email, phone, city, tagline, owner_name, owner_email, messaging_instance")
+    .select("*")
     .single();
 
   if (error) {

@@ -7,8 +7,10 @@ import {
   BedDouble,
   Building2,
   CalendarDays,
+  Camera,
   CarFront,
   ExternalLink,
+  Globe,
   Mail,
   MapPin,
   PawPrint,
@@ -71,6 +73,7 @@ export function MarketplacePropertyDetail({
   const agencyLocationLabel = agency.city || listing.location;
   const portfolioHref = listing.catalogHref;
   const publicTagline = normalizeAgencyTagline(agency.tagline, agency);
+  const socialLinks = buildAgencySocialLinks(agency);
   const keyFacts = [
     {
       icon: <PawPrint className="size-4" />,
@@ -235,6 +238,22 @@ export function MarketplacePropertyDetail({
                   Ver perfil y propiedades
                   <ExternalLink className="size-4" />
                 </Link>
+                {socialLinks.length > 0 ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {socialLinks.map((item) => (
+                      <a
+                        key={item.label}
+                        href={item.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:text-slate-950"
+                      >
+                        {item.icon}
+                        {item.label}
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
@@ -372,6 +391,20 @@ function normalizeAgencyTagline(tagline: string | null | undefined, agency: Agen
   }
 
   return clean;
+}
+
+function buildAgencySocialLinks(agency: Agency) {
+  return [
+    agency.websiteUrl
+      ? { label: "Sitio web", href: agency.websiteUrl, icon: <Globe className="size-3.5" /> }
+      : null,
+    agency.instagramUrl
+      ? { label: "Instagram", href: agency.instagramUrl, icon: <Camera className="size-3.5" /> }
+      : null,
+    agency.facebookUrl
+      ? { label: "Facebook", href: agency.facebookUrl, icon: <Building2 className="size-3.5" /> }
+      : null,
+  ].filter(Boolean) as Array<{ label: string; href: string; icon: ReactNode }>;
 }
 
 function SpecCard({

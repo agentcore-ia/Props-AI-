@@ -26,6 +26,9 @@ create table if not exists public.agencies (
   city text not null,
   tagline text not null default '',
   messaging_instance text not null default 'agentcore',
+  website_url text,
+  instagram_url text,
+  facebook_url text,
   created_at timestamptz not null default timezone('utc'::text, now()),
   updated_at timestamptz not null default timezone('utc'::text, now())
 );
@@ -258,7 +261,10 @@ create unique index if not exists crm_lead_messages_wa_message_id_idx
   where wa_message_id is not null;
 
 alter table public.agencies
-  add column if not exists messaging_instance text not null default 'agentcore';
+  add column if not exists messaging_instance text not null default 'agentcore',
+  add column if not exists website_url text,
+  add column if not exists instagram_url text,
+  add column if not exists facebook_url text;
 
 alter table public.rental_contracts
   add column if not exists contract_file_name text,

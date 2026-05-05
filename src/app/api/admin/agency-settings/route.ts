@@ -18,6 +18,20 @@ function normalizeMessagingInstance(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
+function normalizeOptionalUrl(value: unknown) {
+  const raw = String(value ?? "").trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(raw)) {
+    return raw;
+  }
+
+  return `https://${raw}`;
+}
+
 export async function POST(request: Request) {
   const current = await getCurrentUserContext();
 
@@ -42,6 +56,9 @@ export async function POST(request: Request) {
   const phone = String(body.phone ?? "").trim();
   const city = String(body.city ?? "").trim();
   const tagline = String(body.tagline ?? "").trim();
+  const websiteUrl = normalizeOptionalUrl(body.websiteUrl);
+  const instagramUrl = normalizeOptionalUrl(body.instagramUrl);
+  const facebookUrl = normalizeOptionalUrl(body.facebookUrl);
   const messagingInstanceInput = String(body.messagingInstance ?? "").trim();
   const messagingInstance = messagingInstanceInput
     ? normalizeMessagingInstance(messagingInstanceInput)
@@ -55,18 +72,47 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
-  const { data: updated, error } = await admin
+  const basePayload = {
+    email,
+    phone,
+    city,
+    tagline,
+    messaging_instance: messagingInstance,
+  };
+  const extendedPayload = {
+    ...basePayload,
+    website_url: websiteUrl,
+    instagram_url: instagramUrl,
+    facebook_url: facebookUrl,
+  };
+
+  let updated: Record<string, unknown> | null = null;
+  let error: { message?: string } | null = null;
+
+  const firstAttempt = await admin
     .from("agencies")
-    .update({
-      email,
-      phone,
-      city,
-      tagline,
-      messaging_instance: messagingInstance,
-    })
+    .update(extendedPayload)
     .eq("id", agency.id)
-    .select("id, slug, name, email, phone, city, tagline, owner_name, owner_email, messaging_instance")
+    .select("*")
     .single();
+
+  updated = firstAttempt.data as Record<string, unknown> | null;
+  error = firstAttempt.error;
+
+  if (
+    error?.message &&
+    /(website_url|instagram_url|facebook_url)/i.test(error.message)
+  ) {
+    const fallbackAttempt = await admin
+      .from("agencies")
+      .update(basePayload)
+      .eq("id", agency.id)
+      .select("*")
+      .single();
+
+    updated = fallbackAttempt.data as Record<string, unknown> | null;
+    error = fallbackAttempt.error;
+  }
 
   if (error || !updated) {
     return NextResponse.json(
@@ -76,7 +122,7 @@ export async function POST(request: Request) {
   }
 
   if (updated.messaging_instance !== messagingInstance) {
-    await persistMessagingInstance(updated.id, messagingInstance);
+    await persistMessagingInstance(String(updated.id), messagingInstance);
   }
 
   return NextResponse.json({
