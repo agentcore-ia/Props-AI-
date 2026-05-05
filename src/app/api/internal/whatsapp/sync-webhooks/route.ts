@@ -28,6 +28,11 @@ export async function POST(request: Request) {
       continue;
     }
 
+    if (instanceName === "agentcore") {
+      results.push({ agency: agency.slug, status: "skipped", reason: "shared_instance" });
+      continue;
+    }
+
     const exists = instances.some(
       (instance) =>
         instance.name === instanceName || instance.instance?.instanceName === instanceName
