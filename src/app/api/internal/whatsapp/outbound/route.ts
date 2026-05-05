@@ -20,6 +20,12 @@ function wantsPropertyImages(text: string) {
   );
 }
 
+function saysNoPhotos(text: string) {
+  return /\b(no\s+tengo\s+fotos|no\s+hay\s+fotos|no\s+dispongo\s+de\s+fotos|lamentablemente\s+no\s+tengo\s+fotos)\b/i.test(
+    text
+  );
+}
+
 function buildPublicPropertyUrl(tenantSlug: string, propertyId: string) {
   return `${PUBLIC_MARKETPLACE_URL}/propiedad/${tenantSlug}/${propertyId}`;
 }
@@ -69,10 +75,27 @@ export async function POST(request: Request) {
     selectedPropertyUrl ||
     (property && lead.agencySlug ? buildPublicPropertyUrl(lead.agencySlug, property.id) : "");
   const propertyImages = property?.images.filter(Boolean).slice(0, 3) ?? [];
-  const replyWithLink =
-    customerAskedForImages && propertyUrl && !reply.includes(propertyUrl)
-      ? `${reply}\n\nPodes ver fotos y detalles aca: ${propertyUrl}`
-      : reply;
+  let replyWithLink = reply;
+
+  if (customerAskedForImages) {
+    if (propertyImages.length > 0 || propertyUrl) {
+      const parts = [];
+
+      if (!saysNoPhotos(reply)) {
+        parts.push(reply);
+      } else if (property?.title) {
+        parts.push(`Te comparto fotos y la ficha del ${property.title}.`);
+      } else {
+        parts.push("Te comparto fotos y la ficha de la propiedad.");
+      }
+
+      if (propertyUrl) {
+        parts.push(`Podes ver imagenes y detalles aca: ${propertyUrl}`);
+      }
+
+      replyWithLink = parts.join("\n\n").trim();
+    }
+  }
 
   await sendEvolutionTextMessage({
     instanceName,
