@@ -198,12 +198,14 @@ export async function setEvolutionWebhook(instanceName: string, url: string, eve
   return evolutionFetch<Record<string, unknown>>(`/webhook/set/${instanceName}`, {
     method: "POST",
     body: {
-      enabled: true,
-      url,
-      events,
-      webhook_by_events: true,
-      webhook_base64: true,
-      base64: true,
+      webhook: {
+        enabled: true,
+        url,
+        events,
+        webhook_by_events: true,
+        webhook_base64: true,
+        base64: true,
+      },
     },
   });
 }
