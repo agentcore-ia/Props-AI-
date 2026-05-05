@@ -14,9 +14,10 @@ type RentalContractAnalysis = {
   reviewReasons: string[];
 };
 
-function normalizeWhitespace(text: string) {
-  return text.replace(/\s+/g, " ").trim();
-}
+type AIRentalContractAnalysis = Partial<RentalContractAnalysis> & {
+  confidence?: "high" | "medium" | "low" | null;
+  notes?: string[] | null;
+};
 
 const SPANISH_MONTHS: Record<string, string> = {
   enero: "01",
@@ -33,6 +34,10 @@ const SPANISH_MONTHS: Record<string, string> = {
   noviembre: "11",
   diciembre: "12",
 };
+
+function normalizeWhitespace(text: string) {
+  return text.replace(/\s+/g, " ").trim();
+}
 
 function normalizeTextForMatching(text: string) {
   return text
@@ -78,6 +83,41 @@ function parseAmount(raw: string) {
   }
 
   return Number(cleaned.replace(/\./g, ""));
+}
+
+function normalizeIndexType(value: unknown): "IPC" | "ICL" | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toUpperCase();
+  return normalized === "IPC" || normalized === "ICL" ? normalized : null;
+}
+
+function normalizePositiveInteger(value: unknown) {
+  const numeric =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+      ? Number(value.replace(/[^\d.-]/g, ""))
+      : NaN;
+  return Number.isFinite(numeric) && numeric > 0 ? Math.round(numeric) : null;
+}
+
+function normalizePositiveAmount(value: unknown) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const parsed = parseAmount(value);
+    return parsed && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  return null;
+}
+
+function normalizeIsoDate(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : null;
 }
 
 function addMonthsIsoDate(isoDate: string, months: number) {
@@ -216,7 +256,7 @@ function inferCurrentRent(text: string) {
   return null;
 }
 
-async function inferWithOpenAI(text: string): Promise<Partial<RentalContractAnalysis> | null> {
+async function inferWithOpenAI(text: string): Promise<AIRentalContractAnalysis | null> {
   const openAI = getOpenAIEnv();
   if (!openAI.configured) return null;
 
@@ -235,7 +275,7 @@ async function inferWithOpenAI(text: string): Promise<Partial<RentalContractAnal
             {
               type: "input_text",
               text:
-                "Extrae datos de contratos de alquiler argentinos. Devuelve solo JSON valido con las claves tenantName, currentRent, indexType, adjustmentFrequencyMonths, contractStartDate, nextAdjustmentDate y summary. Usa null si no encuentras algo. Las fechas deben estar en formato YYYY-MM-DD. indexType solo puede ser IPC o ICL.",
+                "Lee un contrato de alquiler argentino y extrae datos estructurados. Devuelve solo JSON valido con las claves tenantName, currentRent, indexType, adjustmentFrequencyMonths, contractStartDate, nextAdjustmentDate, summary, confidence y notes. Usa null si un dato no está expresado con claridad suficiente. Las fechas deben salir como YYYY-MM-DD incluso si el contrato usa formatos legales como '01 de Abril del año 2024' o 'mes de OCTUBRE del año 2024'. indexType solo puede ser IPC o ICL. confidence solo puede ser high, medium o low. No inventes datos faltantes.",
             },
           ],
         },
@@ -244,7 +284,7 @@ async function inferWithOpenAI(text: string): Promise<Partial<RentalContractAnal
           content: [
             {
               type: "input_text",
-              text: normalizeWhitespace(text).slice(0, 14000),
+              text: normalizeWhitespace(text).slice(0, 20000),
             },
           ],
         },
@@ -261,7 +301,7 @@ async function inferWithOpenAI(text: string): Promise<Partial<RentalContractAnal
   const normalized = output.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
 
   try {
-    return JSON.parse(normalized) as Partial<RentalContractAnalysis>;
+    return JSON.parse(normalized) as AIRentalContractAnalysis;
   } catch {
     return null;
   }
@@ -276,15 +316,32 @@ export async function analyzeRentalContractText({
 }): Promise<RentalContractAnalysis> {
   const normalizedText = normalizeWhitespace(text);
   const ai = await inferWithOpenAI(normalizedText);
-  const tenantName = inferTenantName(normalizedText) ?? ai?.tenantName ?? null;
-  const detectedCurrentRent = inferCurrentRent(normalizedText);
-  const detectedIndexType = inferIndexType(normalizedText);
-  const detectedAdjustmentFrequencyMonths = inferFrequencyMonths(normalizedText);
-  const detectedContractStartDate = inferContractStartDate(normalizedText);
-  const detectedNextAdjustmentDate = inferNextAdjustmentDate(
-    normalizedText,
-    detectedContractStartDate
-  );
+
+  const ruleTenantName = inferTenantName(normalizedText);
+  const ruleCurrentRent = inferCurrentRent(normalizedText);
+  const ruleIndexType = inferIndexType(normalizedText);
+  const ruleAdjustmentFrequencyMonths = inferFrequencyMonths(normalizedText);
+  const ruleContractStartDate = inferContractStartDate(normalizedText);
+  const ruleNextAdjustmentDate = inferNextAdjustmentDate(normalizedText, ruleContractStartDate);
+
+  const aiTenantName =
+    typeof ai?.tenantName === "string" && ai.tenantName.trim() ? ai.tenantName.trim() : null;
+  const aiCurrentRent = normalizePositiveAmount(ai?.currentRent);
+  const aiIndexType = normalizeIndexType(ai?.indexType);
+  const aiAdjustmentFrequencyMonths = normalizePositiveInteger(ai?.adjustmentFrequencyMonths);
+  const aiContractStartDate = normalizeIsoDate(ai?.contractStartDate);
+  const aiNextAdjustmentDate = normalizeIsoDate(ai?.nextAdjustmentDate);
+
+  const tenantName = aiTenantName ?? ruleTenantName ?? null;
+  const detectedCurrentRent = aiCurrentRent ?? ruleCurrentRent;
+  const detectedIndexType = aiIndexType ?? ruleIndexType;
+  const detectedAdjustmentFrequencyMonths =
+    aiAdjustmentFrequencyMonths ?? ruleAdjustmentFrequencyMonths;
+  const detectedContractStartDate = aiContractStartDate ?? ruleContractStartDate;
+  const detectedNextAdjustmentDate =
+    aiNextAdjustmentDate ??
+    inferNextAdjustmentDate(normalizedText, detectedContractStartDate) ??
+    ruleNextAdjustmentDate;
 
   const currentRent = detectedCurrentRent ?? fallbackRent;
   const indexType = detectedIndexType ?? null;
@@ -318,7 +375,36 @@ export async function analyzeRentalContractText({
     reviewReasons.push("No pudimos determinar con certeza la próxima fecha de ajuste.");
   }
 
-  const requiresReview = reviewReasons.length > 0;
+  if (ai?.confidence === "low") {
+    reviewReasons.push("La IA marcó baja confianza en la lectura del contrato.");
+  }
+
+  if (Array.isArray(ai?.notes)) {
+    for (const note of ai.notes) {
+      if (typeof note === "string" && note.trim()) {
+        reviewReasons.push(note.trim());
+      }
+    }
+  }
+
+  if (aiCurrentRent && ruleCurrentRent && Math.abs(aiCurrentRent - ruleCurrentRent) > 1) {
+    reviewReasons.push("La IA y la validación automática detectaron montos de alquiler diferentes.");
+  }
+
+  if (aiIndexType && ruleIndexType && aiIndexType !== ruleIndexType) {
+    reviewReasons.push("La IA y la validación automática detectaron índices de ajuste diferentes.");
+  }
+
+  if (
+    aiAdjustmentFrequencyMonths &&
+    ruleAdjustmentFrequencyMonths &&
+    aiAdjustmentFrequencyMonths !== ruleAdjustmentFrequencyMonths
+  ) {
+    reviewReasons.push("La IA y la validación automática detectaron frecuencias de ajuste diferentes.");
+  }
+
+  const uniqueReviewReasons = Array.from(new Set(reviewReasons));
+  const requiresReview = uniqueReviewReasons.length > 0;
 
   return {
     tenantName,
@@ -332,8 +418,8 @@ export async function analyzeRentalContractText({
       [
         tenantName ? `Inquilino detectado: ${tenantName}.` : null,
         contractStartDate ? `Inicio del contrato: ${contractStartDate}.` : null,
-        nextAdjustmentDate ? `Proximo ajuste estimado: ${nextAdjustmentDate}.` : null,
-        indexType ? `Indice detectado: ${indexType}.` : "Indice no detectado con certeza.",
+        nextAdjustmentDate ? `Próximo ajuste estimado: ${nextAdjustmentDate}.` : null,
+        indexType ? `Índice detectado: ${indexType}.` : "Índice no detectado con certeza.",
         adjustmentFrequencyMonths
           ? `Frecuencia: cada ${adjustmentFrequencyMonths} meses.`
           : "Frecuencia no detectada con certeza.",
@@ -341,6 +427,6 @@ export async function analyzeRentalContractText({
         .filter(Boolean)
         .join(" "),
     requiresReview,
-    reviewReasons,
+    reviewReasons: uniqueReviewReasons,
   };
 }
