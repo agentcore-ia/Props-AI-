@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarDays,
@@ -9,6 +9,7 @@ import {
   FileText,
   ImagePlus,
   Loader2,
+  MapPinned,
   Plus,
   Sparkles,
   UploadCloud,
@@ -65,6 +66,37 @@ const initialState = {
   autoNotify: true,
 };
 
+type GoogleAutocompleteInstance = {
+  addListener: (eventName: string, handler: () => void) => void;
+  getPlace: () => {
+    formatted_address?: string;
+    address_components?: Array<{
+      long_name: string;
+      short_name: string;
+      types: string[];
+    }>;
+  };
+};
+
+declare global {
+  interface Window {
+    google?: {
+      maps?: {
+        places?: {
+          Autocomplete: new (
+            input: HTMLInputElement,
+            options?: {
+              fields?: string[];
+              componentRestrictions?: { country: string | string[] };
+            }
+          ) => GoogleAutocompleteInstance;
+        };
+      };
+    };
+    __propsGooglePlacesReady?: () => void;
+  }
+}
+
 function SectionTitle({
   eyebrow,
   title,
@@ -81,6 +113,53 @@ function SectionTitle({
       <p className="mt-1 text-sm text-muted-foreground">{description}</p>
     </div>
   );
+}
+
+function buildLocationFromAddressComponents(
+  addressComponents:
+    | Array<{
+        long_name: string;
+        short_name: string;
+        types: string[];
+      }>
+    | undefined
+) {
+  if (!addressComponents?.length) {
+    return "";
+  }
+
+  const findComponent = (...types: string[]) =>
+    addressComponents.find((component) => types.some((type) => component.types.includes(type)));
+
+  const neighborhood =
+    findComponent("sublocality_level_1", "neighborhood", "administrative_area_level_3")?.long_name ??
+    "";
+  const city =
+    findComponent("locality", "administrative_area_level_2", "administrative_area_level_1")?.long_name ??
+    "";
+
+  return [neighborhood, city].filter(Boolean).join(", ");
+}
+
+function resetRentalFields() {
+  return {
+    expenses: "",
+    expensesCurrency: "ARS",
+    availableFrom: "",
+    petsPolicy: "",
+    requirements: "",
+    rentEnabled: false,
+    tenantName: "",
+    tenantPhone: "",
+    tenantEmail: "",
+    currentRent: "",
+    indexType: "IPC" as "IPC" | "ICL",
+    adjustmentFrequencyMonths: "6",
+    contractStartDate: "",
+    nextAdjustmentDate: "",
+    notes: "",
+    autoNotify: true,
+  };
 }
 
 export function PropertyFormDialog({
@@ -105,6 +184,9 @@ export function PropertyFormDialog({
   });
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [contractFile, setContractFile] = useState<File | null>(null);
+  const [placesLoaded, setPlacesLoaded] = useState(false);
+  const addressInputRef = useRef<HTMLInputElement | null>(null);
+  const autocompleteRef = useRef<GoogleAutocompleteInstance | null>(null);
 
   const previews = useMemo(
     () => imageFiles.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })),
@@ -120,6 +202,105 @@ export function PropertyFormDialog({
   }, [previews]);
 
   const isRental = form.operation === "Alquiler";
+  const exactAddressMapUrl = form.exactAddress.trim()
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(form.exactAddress.trim())}`
+    : null;
+  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  useEffect(() => {
+    if (!open || !googleMapsApiKey) {
+      return;
+    }
+
+    if (window.google?.maps?.places?.Autocomplete) {
+      setPlacesLoaded(true);
+      return;
+    }
+
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[data-props-google-places="true"]'
+    );
+
+    if (existingScript) {
+      const onLoad = () => setPlacesLoaded(true);
+      existingScript.addEventListener("load", onLoad);
+      return () => existingScript.removeEventListener("load", onLoad);
+    }
+
+    const callbackName = "__propsGooglePlacesReady";
+    window.__propsGooglePlacesReady = () => setPlacesLoaded(true);
+
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places&callback=${callbackName}`;
+    script.async = true;
+    script.defer = true;
+    script.dataset.propsGooglePlaces = "true";
+    script.addEventListener("load", () => setPlacesLoaded(true));
+    document.head.appendChild(script);
+
+    return () => {
+      if (window.__propsGooglePlacesReady) {
+        delete window.__propsGooglePlacesReady;
+      }
+    };
+  }, [googleMapsApiKey, open]);
+
+  useEffect(() => {
+    if (!open || !placesLoaded || autocompleteRef.current || !addressInputRef.current) {
+      return;
+    }
+
+    if (!window.google?.maps?.places?.Autocomplete) {
+      return;
+    }
+
+    const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current, {
+      fields: ["formatted_address", "address_components"],
+      componentRestrictions: { country: "ar" },
+    });
+
+    autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      const formattedAddress = place.formatted_address ?? addressInputRef.current?.value ?? "";
+      const derivedLocation = buildLocationFromAddressComponents(place.address_components);
+
+      setForm((prev) => ({
+        ...prev,
+        exactAddress: formattedAddress,
+        location: derivedLocation || prev.location || formattedAddress,
+      }));
+    });
+
+    autocompleteRef.current = autocomplete;
+  }, [open, placesLoaded]);
+
+  function resetDialogState() {
+    setError(null);
+    setImageFiles([]);
+    setContractFile(null);
+    setForm({
+      ...initialState,
+      tenantSlug: defaultSlug,
+    });
+    autocompleteRef.current = null;
+  }
+
+  function handleOperationChange(nextOperation: Property["operation"]) {
+    setForm((prev) => {
+      if (nextOperation === "Venta") {
+        return {
+          ...prev,
+          operation: nextOperation,
+          ...resetRentalFields(),
+        };
+      }
+
+      return {
+        ...prev,
+        operation: nextOperation,
+      };
+    });
+  }
 
   async function handleCreateProperty() {
     setSubmitting(true);
@@ -139,11 +320,11 @@ export function PropertyFormDialog({
     body.set("area", form.area);
     body.set("parkingSpots", form.parkingSpots);
     body.set("furnished", String(form.furnished));
-    body.set("expenses", form.expenses);
-    body.set("expensesCurrency", form.expensesCurrency);
-    body.set("availableFrom", form.availableFrom);
-    body.set("petsPolicy", form.petsPolicy);
-    body.set("requirements", form.requirements);
+    body.set("expenses", isRental ? form.expenses : "");
+    body.set("expensesCurrency", isRental ? form.expensesCurrency : "ARS");
+    body.set("availableFrom", isRental ? form.availableFrom : "");
+    body.set("petsPolicy", isRental ? form.petsPolicy : "");
+    body.set("requirements", isRental ? form.requirements : "");
     body.set("amenities", form.amenities);
     body.set("status", form.status);
     body.set("operation", form.operation);
@@ -186,12 +367,7 @@ export function PropertyFormDialog({
       return;
     }
 
-    setForm({
-      ...initialState,
-      tenantSlug: defaultSlug,
-    });
-    setImageFiles([]);
-    setContractFile(null);
+    resetDialogState();
     setSubmitting(false);
     setOpen(false);
     router.refresh();
@@ -203,13 +379,7 @@ export function PropertyFormDialog({
       onOpenChange={(nextOpen) => {
         setOpen(nextOpen);
         if (!nextOpen) {
-          setError(null);
-          setImageFiles([]);
-          setContractFile(null);
-          setForm({
-            ...initialState,
-            tenantSlug: defaultSlug,
-          });
+          resetDialogState();
         }
       }}
     >
@@ -222,7 +392,8 @@ export function PropertyFormDialog({
           <DialogHeader>
             <DialogTitle>Nueva propiedad</DialogTitle>
             <DialogDescription>
-              Carga la publicación en un flujo más ágil: datos clave, imágenes reales, información útil para respuestas con IA y, si es alquiler, contrato listo para automatización.
+              Carga la publicacion en un flujo mas agil: datos clave, imagenes reales,
+              direccion lista para mapa y, si es alquiler, informacion comercial especifica.
             </DialogDescription>
           </DialogHeader>
 
@@ -232,7 +403,7 @@ export function PropertyFormDialog({
                 <SectionTitle
                   eyebrow="Base"
                   title="Datos comerciales y operativos"
-                  description="Carga la información que va a leer el equipo, el marketplace y la IA de Props."
+                  description="Carga la informacion que va a leer el equipo, el marketplace y la IA de Props."
                 />
 
                 <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-12">
@@ -253,7 +424,7 @@ export function PropertyFormDialog({
                   </div>
 
                   <div className="space-y-2 xl:col-span-7">
-                    <label className="text-sm font-medium">Título</label>
+                    <label className="text-sm font-medium">Titulo</label>
                     <Input
                       placeholder="Torre Libertad 4B"
                       value={form.title}
@@ -283,12 +454,12 @@ export function PropertyFormDialog({
                   </div>
 
                   <div className="space-y-2 xl:col-span-3">
-                    <label className="text-sm font-medium">Operación</label>
+                    <label className="text-sm font-medium">Operacion</label>
                     <select
                       className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
                       value={form.operation}
                       onChange={(event) =>
-                        setForm((prev) => ({ ...prev, operation: event.target.value as Property["operation"] }))
+                        handleOperationChange(event.target.value as Property["operation"])
                       }
                     >
                       <option value="Venta">Venta</option>
@@ -313,7 +484,7 @@ export function PropertyFormDialog({
                   </div>
 
                   <div className="space-y-2 xl:col-span-12">
-                    <label className="text-sm font-medium">Ubicación visible</label>
+                    <label className="text-sm font-medium">Ubicacion visible</label>
                     <Input
                       placeholder="Belgrano, CABA"
                       value={form.location}
@@ -322,15 +493,36 @@ export function PropertyFormDialog({
                   </div>
 
                   <div className="space-y-2 xl:col-span-12">
-                    <label className="text-sm font-medium">Dirección exacta</label>
+                    <label className="text-sm font-medium">Direccion exacta</label>
                     <Input
-                      placeholder="Av. del Libertador 2450, Belgrano, Ciudad Autónoma de Buenos Aires, Argentina"
+                      ref={addressInputRef}
+                      placeholder="Av. del Libertador 2450, Belgrano, Ciudad Autonoma de Buenos Aires, Argentina"
                       value={form.exactAddress}
-                      onChange={(event) => setForm((prev) => ({ ...prev, exactAddress: event.target.value }))}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, exactAddress: event.target.value }))
+                      }
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Escríbela completa para que Google Maps la interprete bien y podamos mostrar la propiedad en el mapa.
-                    </p>
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      <span>
+                        Escribela completa para que Google Maps la interprete bien y podamos mostrar la propiedad en el mapa.
+                      </span>
+                      {googleMapsApiKey ? (
+                        <span>Autocomplete activo con Google Places.</span>
+                      ) : (
+                        <span>Carga manual por ahora. Si agregas la key, se autocompleta.</span>
+                      )}
+                    </div>
+                    {exactAddressMapUrl ? (
+                      <a
+                        href={exactAddressMapUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 text-xs font-medium text-primary transition-colors hover:text-primary/80"
+                      >
+                        <MapPinned className="size-3.5" />
+                        Ver como la toma Google Maps
+                      </a>
+                    ) : null}
                   </div>
 
                   <div className="space-y-2 xl:col-span-3">
@@ -360,7 +552,7 @@ export function PropertyFormDialog({
                   </div>
 
                   <div className="space-y-2 xl:col-span-2">
-                    <label className="text-sm font-medium">Baños</label>
+                    <label className="text-sm font-medium">Banos</label>
                     <Input
                       placeholder="2"
                       value={form.bathrooms}
@@ -369,7 +561,7 @@ export function PropertyFormDialog({
                   </div>
 
                   <div className="space-y-2 xl:col-span-2">
-                    <label className="text-sm font-medium">m² cubiertos</label>
+                    <label className="text-sm font-medium">m2 cubiertos</label>
                     <Input
                       placeholder="148"
                       value={form.area}
@@ -386,36 +578,6 @@ export function PropertyFormDialog({
                     />
                   </div>
 
-                  <div className="space-y-2 xl:col-span-4">
-                    <label className="text-sm font-medium">Expensas</label>
-                    <Input
-                      placeholder="185000"
-                      value={form.expenses}
-                      onChange={(event) => setForm((prev) => ({ ...prev, expenses: event.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2 xl:col-span-2">
-                    <label className="text-sm font-medium">Moneda expensas</label>
-                    <select
-                      className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
-                      value={form.expensesCurrency}
-                      onChange={(event) => setForm((prev) => ({ ...prev, expensesCurrency: event.target.value }))}
-                    >
-                      <option value="ARS">ARS</option>
-                      <option value="USD">USD</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2 xl:col-span-3">
-                    <label className="text-sm font-medium">Disponible desde</label>
-                    <Input
-                      type="date"
-                      value={form.availableFrom}
-                      onChange={(event) => setForm((prev) => ({ ...prev, availableFrom: event.target.value }))}
-                    />
-                  </div>
-
                   <div className="space-y-2 xl:col-span-3">
                     <label className="text-sm font-medium">Amoblado</label>
                     <label className="flex h-11 items-center gap-2 rounded-xl border px-3 text-sm">
@@ -429,35 +591,82 @@ export function PropertyFormDialog({
                   </div>
 
                   <div className="space-y-2 xl:col-span-6">
-                    <label className="text-sm font-medium">Política de mascotas</label>
-                    <Input
-                      placeholder="Sí / No / Solo mascotas pequeñas / Consultar"
-                      value={form.petsPolicy}
-                      onChange={(event) => setForm((prev) => ({ ...prev, petsPolicy: event.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2 xl:col-span-6">
                     <label className="text-sm font-medium">Amenities</label>
                     <Input
-                      placeholder="Balcón, SUM, pileta, cochera, laundry"
+                      placeholder="Balcon, SUM, pileta, cochera, laundry"
                       value={form.amenities}
                       onChange={(event) => setForm((prev) => ({ ...prev, amenities: event.target.value }))}
                     />
                   </div>
 
-                  <div className="space-y-2 xl:col-span-12">
-                    <label className="text-sm font-medium">Requisitos / condiciones para ingresar</label>
-                    <Textarea
-                      placeholder="Garantía propietaria o seguro de caución, ingresos demostrables, depósito, plazo mínimo, restricciones, documentación requerida..."
-                      rows={4}
-                      value={form.requirements}
-                      onChange={(event) => setForm((prev) => ({ ...prev, requirements: event.target.value }))}
-                    />
-                  </div>
+                  {isRental ? (
+                    <>
+                      <div className="space-y-2 xl:col-span-4">
+                        <label className="text-sm font-medium">Expensas</label>
+                        <Input
+                          placeholder="185000"
+                          value={form.expenses}
+                          onChange={(event) => setForm((prev) => ({ ...prev, expenses: event.target.value }))}
+                        />
+                      </div>
+
+                      <div className="space-y-2 xl:col-span-2">
+                        <label className="text-sm font-medium">Moneda expensas</label>
+                        <select
+                          className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
+                          value={form.expensesCurrency}
+                          onChange={(event) =>
+                            setForm((prev) => ({ ...prev, expensesCurrency: event.target.value }))
+                          }
+                        >
+                          <option value="ARS">ARS</option>
+                          <option value="USD">USD</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2 xl:col-span-3">
+                        <label className="text-sm font-medium">Disponible desde</label>
+                        <Input
+                          type="date"
+                          value={form.availableFrom}
+                          onChange={(event) =>
+                            setForm((prev) => ({ ...prev, availableFrom: event.target.value }))
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-2 xl:col-span-6">
+                        <label className="text-sm font-medium">Politica de mascotas</label>
+                        <Input
+                          placeholder="Si / No / Solo mascotas pequenas / Consultar"
+                          value={form.petsPolicy}
+                          onChange={(event) =>
+                            setForm((prev) => ({ ...prev, petsPolicy: event.target.value }))
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-2 xl:col-span-12">
+                        <label className="text-sm font-medium">Requisitos / condiciones para ingresar</label>
+                        <Textarea
+                          placeholder="Garantia propietaria o seguro de caucion, ingresos demostrables, deposito, plazo minimo, restricciones, documentacion requerida..."
+                          rows={4}
+                          value={form.requirements}
+                          onChange={(event) =>
+                            setForm((prev) => ({ ...prev, requirements: event.target.value }))
+                          }
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="xl:col-span-12 rounded-[22px] border border-dashed bg-muted/20 px-4 py-4 text-sm text-muted-foreground">
+                      Para publicaciones de venta no pedimos expensas, politica de ingreso ni requisitos
+                      de alquiler en este formulario.
+                    </div>
+                  )}
 
                   <div className="space-y-2 xl:col-span-12">
-                    <label className="text-sm font-medium">Descripción</label>
+                    <label className="text-sm font-medium">Descripcion</label>
                     <Textarea
                       placeholder="Detalles destacados, amenities, target de cliente y contexto comercial..."
                       rows={5}
@@ -524,7 +733,7 @@ export function PropertyFormDialog({
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">Índice</label>
+                          <label className="text-sm font-medium">Indice</label>
                           <select
                             className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
                             value={form.indexType}
@@ -537,7 +746,7 @@ export function PropertyFormDialog({
                           </select>
                         </div>
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">Cada cuántos meses aumenta</label>
+                          <label className="text-sm font-medium">Cada cuantos meses aumenta</label>
                           <Input
                             placeholder="6"
                             value={form.adjustmentFrequencyMonths}
@@ -560,7 +769,7 @@ export function PropertyFormDialog({
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">Próximo aumento</label>
+                          <label className="text-sm font-medium">Proximo aumento</label>
                           <Input
                             type="date"
                             value={form.nextAdjustmentDate}
@@ -573,7 +782,7 @@ export function PropertyFormDialog({
                           <label className="text-sm font-medium">Notas internas</label>
                           <Textarea
                             rows={4}
-                            placeholder="Cláusulas, observaciones del alquiler o recordatorios del equipo..."
+                            placeholder="Clausulas, observaciones del alquiler o recordatorios del equipo..."
                             value={form.notes}
                             onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
                           />
@@ -584,7 +793,7 @@ export function PropertyFormDialog({
                         <div className="rounded-[20px] border bg-background p-4">
                           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                             <CalendarDays className="size-4 text-primary" />
-                            Aviso automático al inquilino
+                            Aviso automatico al inquilino
                           </div>
                           <p className="mt-2 text-sm text-muted-foreground">
                             Cuando llegue la fecha, Props calculara el aumento por {form.indexType} y enviara el nuevo valor por WhatsApp automaticamente.
@@ -597,7 +806,7 @@ export function PropertyFormDialog({
                             Adjuntar contrato
                           </div>
                           <p className="text-muted-foreground">
-                            Guarda el PDF, DOCX o TXT con las cláusulas y deja el texto listo para Props AI.
+                            Guarda el PDF, DOCX o TXT con las clausulas y deja el texto listo para Props AI.
                           </p>
                           <input
                             className="hidden"
@@ -609,7 +818,7 @@ export function PropertyFormDialog({
                             {contractFile ? contractFile.name : "Elegir contrato"}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            Hasta 12 MB. La IA podrá usar el texto extraído del archivo.
+                            Hasta 12 MB. La IA podra usar el texto extraido del archivo.
                           </span>
                         </label>
 
@@ -633,8 +842,8 @@ export function PropertyFormDialog({
               <section className="rounded-[28px] border bg-card p-5">
                 <SectionTitle
                   eyebrow="Visual"
-                  title="Galería de publicación"
-                  description="Sube fotos reales con preview para la web de la inmobiliaria y su publicaci?n p?blica."
+                  title="Galeria de publicacion"
+                  description="Sube fotos reales con preview para la web de la inmobiliaria y su publicacion publica."
                 />
 
                 <div className="mt-5 space-y-4">
@@ -642,7 +851,7 @@ export function PropertyFormDialog({
                     <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                       <UploadCloud className="size-5" />
                     </div>
-                    <p className="font-medium">Arrastra o elige imágenes reales</p>
+                    <p className="font-medium">Arrastra o elige imagenes reales</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Hasta 10 MB por imagen. Se suben a storage y quedan listas para el marketplace.
                     </p>
@@ -684,9 +893,9 @@ export function PropertyFormDialog({
                         <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                           <ImagePlus className="size-5" />
                         </div>
-                        <p className="font-medium">Todavía no cargaste imágenes</p>
+                        <p className="font-medium">Todavia no cargaste imagenes</p>
                         <p className="text-sm text-muted-foreground">
-                          La primera foto será la portada en el CRM y el marketplace.
+                          La primera foto sera la portada en el CRM y el marketplace.
                         </p>
                       </div>
                     </div>
@@ -696,9 +905,9 @@ export function PropertyFormDialog({
 
               <section className="rounded-[28px] border bg-card p-5">
                 <SectionTitle
-                  eyebrow="Publicación"
-                  title="Salida automática"
-                  description="Al guardar, la propiedad se vincula al CRM y al sitio p?blico de la inmobiliaria."
+                  eyebrow="Publicacion"
+                  title="Salida automatica"
+                  description="Al guardar, la propiedad se vincula al CRM y al sitio publico de la inmobiliaria."
                 />
 
                 <div className="mt-5 rounded-[24px] border border-dashed bg-muted/30 p-5">
@@ -707,9 +916,9 @@ export function PropertyFormDialog({
                       <ImagePlus className="size-5" />
                     </div>
                     <div>
-                      <p className="font-medium">Publicación enlazada automáticamente</p>
+                      <p className="font-medium">Publicacion enlazada automaticamente</p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Cuando guardes esta propiedad y la vincules a una inmobiliaria, aparecerá en el CRM, en {form.tenantSlug || "el subdominio del cliente"} y en el marketplace público.
+                        Cuando guardes esta propiedad y la vincules a una inmobiliaria, aparecera en el CRM, en {form.tenantSlug || "el subdominio del cliente"} y en el marketplace publico.
                       </p>
                     </div>
                   </div>
