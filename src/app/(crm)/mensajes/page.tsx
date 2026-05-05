@@ -1,14 +1,16 @@
-import { PageHeader } from "@/components/layout/page-header";
-import { MessageCenter } from "@/components/messages/message-center";
+import { InboxWorkspace } from "@/components/messages/inbox-workspace";
+import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { getAgencyScopeFromUser } from "@/lib/crm-automation";
+import { listCrmLeads } from "@/lib/props-data";
 
-export default function MessagesPage() {
-  return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Mensajes"
-        description="Inbox unificado para responder rapido, mantener contexto y dejar lista la integracion con IA y WhatsApp."
-      />
-      <MessageCenter />
-    </div>
-  );
+export const dynamic = "force-dynamic";
+
+export default async function MessagesPage() {
+  const currentUser = await getCurrentUserContext();
+  if (!currentUser) {
+    return null;
+  }
+
+  const leads = await listCrmLeads(getAgencyScopeFromUser(currentUser));
+  return <InboxWorkspace leads={leads.filter((lead) => lead.needsResponse || lead.stage !== "Cerrado")} />;
 }

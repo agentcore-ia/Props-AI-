@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { upsertLeadFromSignal } from "@/lib/crm-automation";
 import { getCurrentUserContext } from "@/lib/auth/current-user";
 import { getOpenAIEnv } from "@/lib/openai-env";
 import { listProperties } from "@/lib/props-data";
@@ -100,7 +101,7 @@ export async function POST(request: Request) {
     },
   });
 
-  await admin.from("catalog_inquiries").insert({
+  const { data: inquiry } = await admin.from("catalog_inquiries").insert({
     agency_id: agency.id,
     property_id: property.id,
     name: current.profile.full_name ?? current.user.email ?? "Cliente Props",
@@ -110,7 +111,7 @@ export async function POST(request: Request) {
     operation: property.operation,
     budget: null,
     source: "marketplace_chat",
-  });
+  }).select("id").single();
 
   const openAI = getOpenAIEnv();
   const relatedProperties = await listProperties({ tenantSlug });
@@ -183,6 +184,24 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", conversationId);
+
+  await upsertLeadFromSignal({
+    agency: {
+      id: agency.id,
+      name: agency.name,
+      slug: agency.slug,
+      city: agency.city,
+    },
+    property: relatedProperties.find((item) => item.id === property.id) ?? null,
+    customerId: current.user.id,
+    conversationId,
+    inquiryId: inquiry?.id ?? null,
+    fullName: current.profile.full_name ?? current.user.email ?? "Cliente Props",
+    email: current.user.email ?? null,
+    phone: null,
+    source: "chat_marketplace",
+    message,
+  });
 
   return NextResponse.json({
     ok: true,

@@ -29,13 +29,13 @@ export function PropertiesWorkspace({
   recentAdjustments: RentalAdjustmentSummary[];
 }) {
   const [filter, setFilter] = useState<string>(
-    currentUser.profile.role === "agency_admin"
+    currentUser.profile.role !== "superadmin"
       ? currentUser.profile.agency_slug ?? "all"
       : "all"
   );
 
   const visibleAgencies =
-    currentUser.profile.role === "agency_admin"
+    currentUser.profile.role !== "superadmin"
       ? agencies.filter((agency) => agency.slug === currentUser.profile.agency_slug)
       : agencies;
 
@@ -54,7 +54,7 @@ export function PropertiesWorkspace({
 
       <RentAutomationPanel summary={rentalSummary} recentAdjustments={recentAdjustments} />
 
-      {currentUser.profile.role !== "agency_admin" ? (
+      {currentUser.profile.role === "superadmin" ? (
         <div className="flex flex-wrap gap-2">
           <Button
             variant={filter === "all" ? "default" : "outline"}

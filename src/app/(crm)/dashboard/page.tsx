@@ -1,9 +1,11 @@
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { PipelineChart } from "@/components/dashboard/pipeline-chart";
+import { TodayPanel } from "@/components/dashboard/today-panel";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUserContext } from "@/lib/auth/current-user";
-import { getDashboardSnapshot } from "@/lib/props-data";
+import { getAgencyScopeFromUser } from "@/lib/crm-automation";
+import { getDashboardSnapshot, getTodayWorkspaceSnapshot } from "@/lib/props-data";
 
 export const dynamic = "force-dynamic";
 
@@ -14,12 +16,11 @@ export default async function DashboardPage() {
     return null;
   }
 
-  const scope =
-    currentUser.profile.role === "agency_admin"
-      ? { agencySlug: currentUser.profile.agency_slug ?? undefined }
-      : undefined;
-
-  const snapshot = await getDashboardSnapshot(scope);
+  const scope = getAgencyScopeFromUser(currentUser);
+  const [snapshot, todaySnapshot] = await Promise.all([
+    getDashboardSnapshot(scope),
+    getTodayWorkspaceSnapshot(scope),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -33,6 +34,8 @@ export default async function DashboardPage() {
           <MetricCard key={metric.label} metric={metric} />
         ))}
       </section>
+
+      <TodayPanel snapshot={todaySnapshot} />
 
       <section className="grid gap-6 xl:grid-cols-[1.45fr_0.85fr]">
         <Card className="rounded-[30px] border-0 bg-card shadow-sm">

@@ -1,5 +1,6 @@
 import { LeasesWorkspace } from "@/components/rentals/leases-workspace";
 import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { getAgencyScopeFromUser } from "@/lib/crm-automation";
 import { listLeaseRoster } from "@/lib/props-data";
 
 export const dynamic = "force-dynamic";
@@ -11,10 +12,7 @@ export default async function LeasesPage() {
     return null;
   }
 
-  const agencyScope =
-    currentUser.profile.role === "agency_admin"
-      ? { agencySlug: currentUser.profile.agency_slug ?? undefined }
-      : undefined;
+  const agencyScope = getAgencyScopeFromUser(currentUser);
 
   const leases = await listLeaseRoster(agencyScope);
 

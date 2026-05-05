@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { upsertLeadFromSignal } from "@/lib/crm-automation";
+import { listProperties } from "@/lib/props-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
@@ -24,7 +26,7 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   const { data: agency, error: agencyError } = await admin
     .from("agencies")
-    .select("id")
+    .select("id, name, slug, city, messaging_instance")
     .eq("slug", tenantSlug)
     .maybeSingle();
 
@@ -48,7 +50,9 @@ export async function POST(request: Request) {
     validPropertyId = property?.id ?? null;
   }
 
-  const { error } = await admin.from("catalog_inquiries").insert({
+  const { data: inquiry, error } = await admin
+    .from("catalog_inquiries")
+    .insert({
     agency_id: agency.id,
     property_id: validPropertyId,
     name,
@@ -58,7 +62,9 @@ export async function POST(request: Request) {
     budget,
     operation,
     source: validPropertyId ? "property_detail" : "catalog",
-  });
+    })
+    .select("id")
+    .single();
 
   if (error) {
     return NextResponse.json(
@@ -66,6 +72,28 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+
+  const property =
+    validPropertyId && tenantSlug
+      ? (await listProperties({ tenantSlug })).find((item) => item.id === validPropertyId) ?? null
+      : null;
+
+  await upsertLeadFromSignal({
+    agency: {
+      id: agency.id,
+      name: agency.name,
+      slug: agency.slug,
+      city: agency.city,
+      messagingInstance: agency.messaging_instance,
+    },
+    property,
+    inquiryId: inquiry?.id ?? null,
+    fullName: name,
+    email,
+    phone,
+    source: validPropertyId ? "web_propiedad" : "web_marketplace",
+    message,
+  });
 
   return NextResponse.json({ ok: true });
 }

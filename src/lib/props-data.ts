@@ -1,6 +1,12 @@
 import type { Agency, Metric, Property } from "@/lib/mock-data";
 import type { PropertyCurrency, PropertyType } from "@/lib/mock-data";
 import type {
+  CrmLeadSummary,
+  EmployeeTaskSummary,
+  TodayWorkspaceSnapshot,
+  VisitAppointmentSummary,
+} from "@/lib/crm-types";
+import type {
   RentalAdjustmentSummary,
   RentalContractSummary,
   RentalDashboardSummary,
@@ -161,6 +167,86 @@ type MarketplaceMessageRow = {
   created_at: string;
 };
 
+type CrmLeadRow = {
+  id: string;
+  agency_id: string;
+  property_id: string | null;
+  conversation_id: string | null;
+  inquiry_id: string | null;
+  customer_id: string | null;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  source: string;
+  stage: "Nuevo" | "Precalificado" | "Visita" | "Seguimiento" | "Propuesta" | "Cerrado" | "Descartado";
+  priority: "Alta" | "Media" | "Baja";
+  score: number;
+  qualification_summary: string;
+  ai_reply_draft: string;
+  intent: string | null;
+  desired_operation: string | null;
+  desired_location: string | null;
+  desired_timeline: string | null;
+  budget: string | null;
+  requirements_summary: string | null;
+  last_customer_message: string;
+  needs_response: boolean;
+  next_follow_up_at: string | null;
+  last_contacted_at: string | null;
+  last_activity_at: string;
+  owner_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+  agencies:
+    | Pick<AgencyRow, "slug" | "name">
+    | Pick<AgencyRow, "slug" | "name">[]
+    | null;
+  properties:
+    | Pick<PropertyRow, "id" | "title" | "location" | "price" | "currency" | "operation" | "status">
+    | Pick<PropertyRow, "id" | "title" | "location" | "price" | "currency" | "operation" | "status">[]
+    | null;
+};
+
+type VisitAppointmentRow = {
+  id: string;
+  lead_id: string;
+  agency_id: string;
+  property_id: string | null;
+  scheduled_for: string;
+  status: "Programada" | "Confirmada" | "Realizada" | "Reprogramar" | "Cancelada";
+  notes: string;
+  reminder_sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+  crm_leads:
+    | { full_name: string; phone: string | null }
+    | { full_name: string; phone: string | null }[]
+    | null;
+  properties:
+    | { title: string; location: string }
+    | { title: string; location: string }[]
+    | null;
+};
+
+type EmployeeTaskRow = {
+  id: string;
+  agency_id: string;
+  lead_id: string | null;
+  property_id: string | null;
+  visit_id: string | null;
+  title: string;
+  details: string;
+  due_at: string;
+  task_type: "Responder" | "Seguimiento" | "Visita" | "Contrato" | "General";
+  priority: "Alta" | "Media" | "Baja";
+  status: "Pendiente" | "Hecha";
+  automation_source: string | null;
+  assigned_user_id: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 const PROPERTY_SELECT = `
   id,
   agency_id,
@@ -225,6 +311,94 @@ export type MarketplaceThreadMessage = {
   createdAt: string;
   metadata: Record<string, unknown>;
 };
+
+function mapCrmLead(row: CrmLeadRow): CrmLeadSummary {
+  const agency = Array.isArray(row.agencies) ? row.agencies[0] : row.agencies;
+  const property = Array.isArray(row.properties) ? row.properties[0] : row.properties;
+
+  return {
+    id: row.id,
+    agencyId: row.agency_id,
+    agencySlug: agency?.slug ?? "",
+    agencyName: agency?.name ?? "",
+    propertyId: row.property_id,
+    propertyTitle: property?.title ?? null,
+    propertyLocation: property?.location ?? null,
+    propertyPrice: property?.price ? Number(property.price) : null,
+    propertyCurrency: property?.currency ?? null,
+    propertyOperation: property?.operation ?? null,
+    propertyStatus: property?.status ?? null,
+    customerId: row.customer_id,
+    conversationId: row.conversation_id,
+    inquiryId: row.inquiry_id,
+    fullName: row.full_name,
+    email: row.email,
+    phone: row.phone,
+    source: row.source,
+    stage: row.stage,
+    priority: row.priority,
+    score: Number(row.score ?? 0),
+    qualificationSummary: row.qualification_summary,
+    aiReplyDraft: row.ai_reply_draft,
+    intent: row.intent,
+    desiredOperation: row.desired_operation,
+    desiredLocation: row.desired_location,
+    desiredTimeline: row.desired_timeline,
+    budget: row.budget,
+    requirementsSummary: row.requirements_summary,
+    lastCustomerMessage: row.last_customer_message,
+    needsResponse: row.needs_response,
+    nextFollowUpAt: row.next_follow_up_at,
+    lastContactedAt: row.last_contacted_at,
+    lastActivityAt: row.last_activity_at,
+    ownerUserId: row.owner_user_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapVisitAppointment(row: VisitAppointmentRow): VisitAppointmentSummary {
+  const lead = Array.isArray(row.crm_leads) ? row.crm_leads[0] : row.crm_leads;
+  const property = Array.isArray(row.properties) ? row.properties[0] : row.properties;
+
+  return {
+    id: row.id,
+    leadId: row.lead_id,
+    agencyId: row.agency_id,
+    propertyId: row.property_id,
+    leadName: lead?.full_name ?? "",
+    leadPhone: lead?.phone ?? null,
+    propertyTitle: property?.title ?? null,
+    propertyLocation: property?.location ?? null,
+    scheduledFor: row.scheduled_for,
+    status: row.status,
+    notes: row.notes,
+    reminderSentAt: row.reminder_sent_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapEmployeeTask(row: EmployeeTaskRow): EmployeeTaskSummary {
+  return {
+    id: row.id,
+    agencyId: row.agency_id,
+    leadId: row.lead_id,
+    propertyId: row.property_id,
+    visitId: row.visit_id,
+    title: row.title,
+    details: row.details,
+    dueAt: row.due_at,
+    taskType: row.task_type,
+    priority: row.priority,
+    status: row.status,
+    automationSource: row.automation_source,
+    assignedUserId: row.assigned_user_id,
+    completedAt: row.completed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
 
 function mapAgency(row: AgencyRow): Agency {
   return {
@@ -915,5 +1089,115 @@ export async function getMarketplaceConversationThread(
       createdAt: message.created_at,
       metadata: message.metadata ?? {},
     })),
+  };
+}
+
+export async function listCrmLeads(options?: { agencySlug?: string }) {
+  const admin = createAdminClient();
+  let query = admin
+    .from("crm_leads")
+    .select(
+      "*, agencies!inner(slug, name), properties(id, title, location, price, currency, operation, status)"
+    )
+    .order("last_activity_at", { ascending: false });
+
+  if (options?.agencySlug) {
+    query = query.eq("agencies.slug", options.agencySlug);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return ((data ?? []) as unknown as CrmLeadRow[]).map(mapCrmLead);
+}
+
+export async function getCrmLeadById(leadId: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("crm_leads")
+    .select(
+      "*, agencies!inner(slug, name), properties(id, title, location, price, currency, operation, status)"
+    )
+    .eq("id", leadId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? mapCrmLead(data as unknown as CrmLeadRow) : null;
+}
+
+export async function listVisitAppointments(options?: { agencySlug?: string }) {
+  const admin = createAdminClient();
+  let query = admin
+    .from("visit_appointments")
+    .select(
+      "id, lead_id, agency_id, property_id, scheduled_for, status, notes, reminder_sent_at, created_at, updated_at, crm_leads!inner(full_name, phone), properties(title, location), agencies!inner(slug)"
+    )
+    .order("scheduled_for", { ascending: true });
+
+  if (options?.agencySlug) {
+    query = query.eq("agencies.slug", options.agencySlug);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return ((data ?? []) as unknown as VisitAppointmentRow[]).map(mapVisitAppointment);
+}
+
+export async function listEmployeeTasks(options?: { agencySlug?: string; includeDone?: boolean }) {
+  const admin = createAdminClient();
+  let query = admin
+    .from("employee_tasks")
+    .select("*, agencies!inner(slug)")
+    .order("due_at", { ascending: true });
+
+  if (options?.agencySlug) {
+    query = query.eq("agencies.slug", options.agencySlug);
+  }
+
+  if (!options?.includeDone) {
+    query = query.eq("status", "Pendiente");
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return ((data ?? []) as unknown as EmployeeTaskRow[]).map(mapEmployeeTask);
+}
+
+export async function getTodayWorkspaceSnapshot(options?: { agencySlug?: string }): Promise<TodayWorkspaceSnapshot> {
+  const [leads, visits, tasks] = await Promise.all([
+    listCrmLeads(options),
+    listVisitAppointments(options),
+    listEmployeeTasks(options),
+  ]);
+
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(startOfDay);
+  endOfDay.setDate(endOfDay.getDate() + 1);
+
+  const visitsToday = visits.filter((visit) => {
+    const at = new Date(visit.scheduledFor).getTime();
+    return at >= startOfDay.getTime() && at < endOfDay.getTime();
+  });
+
+  const dueNow = tasks.filter((task) => new Date(task.dueAt).getTime() <= Date.now());
+  const leadsToAnswer = leads.filter((lead) => lead.needsResponse).slice(0, 8);
+  const automaticFollowUps = leads.filter(
+    (lead) =>
+      Boolean(lead.nextFollowUpAt) &&
+      new Date(lead.nextFollowUpAt!).getTime() <= Date.now() + 24 * 60 * 60 * 1000
+  ).length;
+
+  return {
+    myDay: {
+      dueNow,
+      visitsToday,
+      leadsToAnswer,
+    },
+    counters: {
+      pendingTasks: tasks.length,
+      visitsToday: visitsToday.length,
+      urgentLeads: leads.filter((lead) => lead.priority === "Alta" || lead.needsResponse).length,
+      automaticFollowUps,
+    },
   };
 }

@@ -1,37 +1,16 @@
-import { EmptyState } from "@/components/layout/empty-state";
-import { LeadsKanban } from "@/components/leads/leads-kanban";
-import { LeadsTable } from "@/components/leads/leads-table";
-import { PageHeader } from "@/components/layout/page-header";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { leads } from "@/lib/mock-data";
+import { LeadsWorkspace } from "@/components/leads/leads-workspace";
+import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { getAgencyScopeFromUser } from "@/lib/crm-automation";
+import { listCrmLeads } from "@/lib/props-data";
 
-export default function LeadsPage() {
-  return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Leads"
-        description="Centraliza contactos, etapas del embudo y seguimiento comercial con vista analitica y operativa."
-      />
+export const dynamic = "force-dynamic";
 
-      {leads.length > 0 ? (
-        <Tabs defaultValue="tabla">
-          <TabsList className="rounded-2xl">
-            <TabsTrigger value="tabla">Tabla</TabsTrigger>
-            <TabsTrigger value="kanban">Kanban</TabsTrigger>
-          </TabsList>
-          <TabsContent value="tabla" className="pt-5">
-            <LeadsTable leads={leads} />
-          </TabsContent>
-          <TabsContent value="kanban" className="pt-5">
-            <LeadsKanban leads={leads} />
-          </TabsContent>
-        </Tabs>
-      ) : (
-        <EmptyState
-          title="Sin leads todavia"
-          description="Puedes conectar formularios, portales y campanas para empezar a centralizar contactos aqui."
-        />
-      )}
-    </div>
-  );
+export default async function LeadsPage() {
+  const currentUser = await getCurrentUserContext();
+  if (!currentUser) {
+    return null;
+  }
+
+  const leads = await listCrmLeads(getAgencyScopeFromUser(currentUser));
+  return <LeadsWorkspace leads={leads} />;
 }

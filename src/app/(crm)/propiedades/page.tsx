@@ -1,5 +1,6 @@
 import { PropertiesWorkspace } from "@/components/props/properties-workspace";
 import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { getAgencyScopeFromUser } from "@/lib/crm-automation";
 import {
   getRentalDashboardSummary,
   listAgencies,
@@ -16,14 +17,8 @@ export default async function PropertiesPage() {
     return null;
   }
 
-  const agencyScope =
-    currentUser.profile.role === "agency_admin"
-      ? { agencySlug: currentUser.profile.agency_slug ?? undefined }
-      : undefined;
-  const propertyScope =
-    currentUser.profile.role === "agency_admin"
-      ? { tenantSlug: currentUser.profile.agency_slug ?? undefined }
-      : undefined;
+  const agencyScope = getAgencyScopeFromUser(currentUser);
+  const propertyScope = agencyScope ? { tenantSlug: agencyScope.agencySlug } : undefined;
 
   const [agencies, properties, rentalSummary, recentAdjustments] = await Promise.all([
     listAgencies(),

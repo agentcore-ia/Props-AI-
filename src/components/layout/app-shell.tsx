@@ -12,6 +12,7 @@ import {
   Menu,
   MessageSquareText,
   Phone,
+  CalendarDays,
   Search,
   Settings,
   Users,
@@ -37,6 +38,7 @@ const navigation = [
   { href: "/propiedades", label: "Propiedades", icon: Building2 },
   { href: "/alquileres", label: "Alquileres", icon: KeyRound },
   { href: "/leads", label: "Leads", icon: Users },
+  { href: "/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/mensajes", label: "Mensajes", icon: MessageSquareText },
   { href: "/ia", label: "IA", icon: Bot },
   { href: "/llamadas", label: "Llamadas", icon: Phone },
@@ -90,9 +92,13 @@ function SidebarContent() {
 export function AppShell({
   children,
   userEmail,
+  accountLabel,
+  accountSubLabel,
 }: {
   children: ReactNode;
   userEmail?: null | string;
+  accountLabel?: string | null;
+  accountSubLabel?: string | null;
 }) {
   return (
     <div className="min-h-screen">
@@ -140,8 +146,8 @@ export function AppShell({
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden sm:block">
-                  <p className="text-sm font-semibold">Agentcore Realty</p>
-                  <p className="text-xs text-muted-foreground">{userEmail ?? "Sesion activa"}</p>
+                  <p className="text-sm font-semibold">{accountLabel ?? "Cuenta activa"}</p>
+                  <p className="text-xs text-muted-foreground">{accountSubLabel ?? userEmail ?? "Sesion activa"}</p>
                 </div>
                 <form action="/auth/logout" method="post" className="hidden sm:block">
                   <button

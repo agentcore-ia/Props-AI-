@@ -1,15 +1,20 @@
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUserContext } from "@/lib/auth/current-user";
 
 export const dynamic = "force-dynamic";
 
 export default async function CrmLayout({ children }: { children: ReactNode }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const currentUser = await getCurrentUserContext();
 
-  return <AppShell userEmail={user?.email ?? null}>{children}</AppShell>;
+  return (
+    <AppShell
+      userEmail={currentUser?.user.email ?? null}
+      accountLabel={currentUser?.profile.full_name ?? currentUser?.profile.agency_slug ?? "Cuenta activa"}
+      accountSubLabel={currentUser?.profile.role === "superadmin" ? "Administracion" : currentUser?.user.email ?? null}
+    >
+      {children}
+    </AppShell>
+  );
 }
