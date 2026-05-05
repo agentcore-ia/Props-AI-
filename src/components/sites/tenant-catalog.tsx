@@ -2,7 +2,8 @@
 
 import { useDeferredValue, useMemo, useState } from "react";
 import Image from "next/image";
-import { Building2, Search, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { Building2, Mail, MapPin, Phone, Search } from "lucide-react";
 
 import type { Agency, Property } from "@/lib/mock-data";
 import { CatalogAssistant } from "@/components/sites/catalog-assistant";
@@ -54,6 +55,12 @@ export function TenantCatalog({
     sale: properties.filter((property) => property.operation === "Venta").length,
     rent: properties.filter((property) => property.operation === "Alquiler").length,
   };
+  const initials = agency?.name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 
   if (!agency) {
     return (
@@ -74,19 +81,49 @@ export function TenantCatalog({
         <div className="mx-auto flex max-w-[1440px] flex-col gap-8 px-4 py-6 sm:px-6 lg:py-8 xl:px-8">
           <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
             <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_24px_80px_-48px_rgba(15,23,42,0.45)]">
-              <div className="grid gap-0 lg:grid-cols-[1.05fr_0.95fr]">
+              <div className="grid gap-0 lg:grid-cols-[1.08fr_0.92fr]">
                 <div className="flex flex-col justify-between px-5 py-6 sm:px-7 sm:py-7">
                   <div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">
-                      <Building2 className="size-3.5" />
-                      Portafolio online
+                    <div className="flex items-start gap-4">
+                      <div className="flex size-16 shrink-0 items-center justify-center rounded-[22px] bg-blue-50 text-lg font-semibold text-blue-700 ring-1 ring-blue-100">
+                        {initials || "PR"}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">
+                          <Building2 className="size-3.5" />
+                          Perfil inmobiliario
+                        </div>
+                        <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">
+                          {agency.name}
+                        </h1>
+                        <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">
+                          {agency.tagline || `${agency.ownerName} y su equipo comercial te acompañan a encontrar la propiedad indicada.`}
+                        </p>
+                      </div>
                     </div>
-                    <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">
-                      {agency.name}
-                    </h1>
-                    <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">
-                      {agency.tagline} Explora oportunidades de venta y alquiler con una experiencia guiada para encontrar la propiedad correcta mas rapido.
-                    </p>
+
+                    <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                      <ProfileInfo
+                        icon={<MapPin className="size-4" />}
+                        label="Ubicación"
+                        value={agency.city}
+                      />
+                      <ProfileInfo
+                        icon={<Mail className="size-4" />}
+                        label="Email"
+                        value={agency.email}
+                      />
+                      <ProfileInfo
+                        icon={<Phone className="size-4" />}
+                        label="Teléfono"
+                        value={agency.phone}
+                      />
+                      <ProfileInfo
+                        icon={<Building2 className="size-4" />}
+                        label="Asesor principal"
+                        value={agency.ownerName}
+                      />
+                    </div>
                   </div>
 
                   <div className="mt-8 rounded-[28px] border border-slate-200 bg-slate-50 p-3">
@@ -126,16 +163,31 @@ export function TenantCatalog({
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-5 text-white sm:p-6">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-medium backdrop-blur-md">
-                      <Sparkles className="size-3.5" />
-                      Seleccion curada
-                    </div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/75">
+                      Portafolio activo
+                    </p>
                     <p className="mt-3 text-2xl font-semibold">
-                      Propiedades que se presentan mejor, convierten mejor
+                      {stats.sale} en venta · {stats.rent} en alquiler
                     </p>
                     <p className="mt-2 max-w-sm text-sm text-white/80">
-                      Una experiencia clara y moderna para acompanar la decision de compra o alquiler.
+                      Explora publicaciones actualizadas y consulta directo con la inmobiliaria desde cada ficha.
                     </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Link
+                        href={`mailto:${agency.email}`}
+                        className="inline-flex items-center rounded-full bg-white/90 px-4 py-2 text-sm font-semibold text-slate-950 transition-colors hover:bg-white"
+                      >
+                        Escribir por email
+                      </Link>
+                      <a
+                        href={`https://wa.me/${agency.phone.replace(/\D/g, "")}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center rounded-full border border-white/35 bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/15"
+                      >
+                        WhatsApp
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -216,6 +268,26 @@ export function TenantCatalog({
           <CatalogInquiryForm tenantSlug={agency.slug} />
         </div>
       </main>
+    </div>
+  );
+}
+
+function ProfileInfo({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
+      <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-500">
+        {icon}
+        {label}
+      </div>
+      <p className="mt-2 text-sm font-semibold text-slate-950 sm:text-base">{value}</p>
     </div>
   );
 }
