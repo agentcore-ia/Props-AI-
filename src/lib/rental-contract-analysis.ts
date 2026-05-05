@@ -185,7 +185,7 @@ function inferIndexType(text: string) {
 function inferContractStartDate(text: string) {
   const normalized = normalizeTextForMatching(text);
   const candidates = [
-    /(?:inicio|vigencia|comienza|comenzara|inicia|fecha de inicio)[^0-9]{0,25}(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/i,
+    /(?:inicio|vigencia|comienza|comenzara|comenzando|inicia|fecha de inicio)[^0-9]{0,25}(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/i,
     /(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/i,
   ];
 
@@ -197,7 +197,7 @@ function inferContractStartDate(text: string) {
   }
 
   const textualCandidates = [
-    /(?:a partir del|inicio|vigencia|comienza|comenzara|inicia|fecha de inicio)[^a-z0-9]{0,20}(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\s+del?\s+ano)?\s+(\d{4})/i,
+    /(?:a partir del|inicio|vigencia|comienza|comenzara|comenzando|inicia|fecha de inicio)[^a-z0-9]{0,20}(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\s+del?\s+ano)?\s+(\d{4})/i,
     /(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\s+del?\s+ano)?\s+(\d{4})/i,
   ];
 
@@ -240,7 +240,8 @@ function inferTenantName(text: string) {
 
 function inferCurrentRent(text: string) {
   const patterns = [
-    /(?:canon locativo|alquiler(?: inicial| mensual| actual)?|precio mensual)[^$\d]{0,20}(?:ars|\$)?\s*([\d.,]+)/i,
+    /(?:canon locativo(?: inicial)?|alquiler(?: inicial| mensual| actual)?|precio mensual)[\s\S]{0,120}?\(\s*(?:ars\s*)?\$\s*([\d.]+(?:,\d{2})?)\s*\)/i,
+    /(?:canon locativo(?: inicial)?|alquiler(?: inicial| mensual| actual)?|precio mensual)[\s\S]{0,80}?(?:ars\s*)?\$\s*([\d.]+(?:,\d{2})?)/i,
     /(?:ars|\$)\s*([\d.]{3,}(?:,\d{2})?)/i,
   ];
 

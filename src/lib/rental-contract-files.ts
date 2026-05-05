@@ -207,25 +207,12 @@ export async function uploadRentalContractFile({
   const openAI = getOpenAIEnv();
 
   try {
-    if (normalizedMimeType === "application/pdf" && openAI.configured) {
-      console.info("[rental-contract] using OpenAI as primary PDF extractor", {
-        filePath,
-        openAIConfigured: openAI.configured,
-        openAIModel: openAI.model,
-      });
-      extractedText = await extractPdfTextWithOpenAI(buffer, file.name || filename);
-      console.info("[rental-contract] primary PDF extraction finished", {
-        filePath,
-        extractedLength: extractedText.length,
-      });
-    } else {
-      extractedText = await extractText(buffer, normalizedMimeType);
-      console.info("[rental-contract] base extraction finished", {
-        filePath,
-        mimeType: normalizedMimeType,
-        extractedLength: extractedText.length,
-      });
-    }
+    extractedText = await extractText(buffer, normalizedMimeType);
+    console.info("[rental-contract] base extraction finished", {
+      filePath,
+      mimeType: normalizedMimeType,
+      extractedLength: extractedText.length,
+    });
   } catch (error) {
     parserWarning =
       error instanceof Error
