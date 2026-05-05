@@ -19,6 +19,12 @@ import {
 
 import type { Property } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { cn, formatMoney } from "@/lib/utils";
 
@@ -67,6 +73,8 @@ export function CatalogAssistant({
   const [assistantInput, setAssistantInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(mode === "inline");
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const conversationEndRef = useRef<HTMLDivElement | null>(null);
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([
     {
@@ -88,7 +96,18 @@ export function CatalogAssistant({
 
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [assistantMessages, open]);
+  }, [assistantMessages, open, mobileSheetOpen]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 639px)");
+
+    const syncViewport = () => setIsMobileViewport(media.matches);
+
+    syncViewport();
+    media.addEventListener("change", syncViewport);
+
+    return () => media.removeEventListener("change", syncViewport);
+  }, []);
 
   const propertyIds = useMemo(() => properties.map((property) => property.id), [properties]);
 
@@ -107,7 +126,11 @@ export function CatalogAssistant({
       setAssistantInput("");
       setLoading(true);
       if (mode === "floating") {
-        setOpen(true);
+        if (isMobileViewport) {
+          setMobileSheetOpen(true);
+        } else {
+          setOpen(true);
+        }
       }
     });
 
@@ -165,7 +188,65 @@ export function CatalogAssistant({
   if (mode === "floating") {
     return (
       <div className="fixed bottom-4 right-4 z-40 flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-3 sm:bottom-6 sm:right-6">
-        {open ? (
+        {isMobileViewport ? (
+          <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
+            <SheetContent
+              side="bottom"
+              showCloseButton={false}
+              className="h-[min(88vh,760px)] rounded-t-[28px] border-t border-slate-200 bg-white p-0"
+            >
+              <SheetHeader className="border-b border-slate-200 px-4 py-4">
+                <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-slate-200" />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-700">
+                      <Sparkles className="size-3.5" />
+                      IA de busqueda
+                    </p>
+                    <SheetTitle className="mt-3 text-left text-lg font-semibold text-slate-950">
+                      {heading}
+                    </SheetTitle>
+                    <p className="mt-1 text-left text-sm text-slate-500">
+                      Te ayudo con zona, presupuesto y tipo de propiedad.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={resetConversation}
+                      className="inline-flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMobileSheetOpen(false)}
+                      className="inline-flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                </div>
+              </SheetHeader>
+
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 props-scrollbar">
+                  <AssistantConversation messages={assistantMessages} endRef={conversationEndRef} />
+                </div>
+                <div className="border-t border-slate-200 px-4 py-4">
+                  <AssistantComposer
+                    input={assistantInput}
+                    onInputChange={setAssistantInput}
+                    loading={loading}
+                    onQuickPrompt={sendAssistantPrompt}
+                    onSubmit={() => sendAssistantPrompt(assistantInput)}
+                    compact
+                  />
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+        ) : open ? (
           <div className="w-[min(430px,calc(100vw-1.5rem))] overflow-hidden rounded-[28px] border border-slate-200 bg-white text-slate-950 shadow-[0_32px_90px_-42px_rgba(15,23,42,0.28)]">
             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-5">
               <div className="min-w-0">
@@ -211,15 +292,25 @@ export function CatalogAssistant({
 
         <button
           type="button"
-          onClick={() => setOpen((current) => !current)}
-          className="inline-flex max-w-[calc(100vw-1.5rem)] items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-3 text-left text-slate-950 shadow-[0_24px_60px_-34px_rgba(15,23,42,0.22)] transition-transform hover:-translate-y-0.5 sm:px-5"
+          onClick={() =>
+            isMobileViewport
+              ? setMobileSheetOpen(true)
+              : setOpen((current) => !current)
+          }
+          className="inline-flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-3 text-left text-slate-950 shadow-[0_24px_60px_-34px_rgba(15,23,42,0.22)] transition-transform hover:-translate-y-0.5 sm:max-w-[calc(100vw-1.5rem)] sm:px-5"
         >
           <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700">
             <Bot className="size-4.5" />
           </span>
           <span className="min-w-0">
-            <span className="block text-sm font-semibold sm:text-[15px]">{launcherText}</span>
-            <span className="block text-xs text-slate-500">Decime barrio, presupuesto o tipo de propiedad.</span>
+            <span className="block text-sm font-semibold sm:text-[15px]">
+              {isMobileViewport ? "Te ayudo a buscar" : launcherText}
+            </span>
+            <span className="block text-xs text-slate-500">
+              {isMobileViewport
+                ? "Abrí el chat"
+                : "Decime barrio, presupuesto o tipo de propiedad."}
+            </span>
           </span>
         </button>
       </div>
@@ -364,12 +455,14 @@ function AssistantComposer({
   loading,
   onQuickPrompt,
   onSubmit,
+  compact = false,
 }: {
   input: string;
   onInputChange: (value: string) => void;
   loading: boolean;
   onQuickPrompt: (prompt: string) => void;
   onSubmit: () => void;
+  compact?: boolean;
 }) {
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -385,7 +478,10 @@ function AssistantComposer({
         onChange={(event) => onInputChange(event.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Ej: busco alquiler de 2 ambientes en Palermo con balcon."
-        className="min-h-24 rounded-[24px] border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 placeholder:text-slate-400"
+        className={cn(
+          "rounded-[24px] border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 placeholder:text-slate-400",
+          compact ? "min-h-20" : "min-h-24"
+        )}
       />
       <div className="flex flex-wrap gap-2">
         {quickPrompts.map((prompt) => (
@@ -393,7 +489,10 @@ function AssistantComposer({
             key={prompt}
             type="button"
             onClick={() => onQuickPrompt(prompt)}
-            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:border-blue-200 hover:text-blue-700"
+            className={cn(
+              "rounded-full border border-slate-200 bg-white text-xs font-medium text-slate-600 transition-colors hover:border-blue-200 hover:text-blue-700",
+              compact ? "px-2.5 py-2" : "px-3 py-2"
+            )}
           >
             {prompt}
           </button>
