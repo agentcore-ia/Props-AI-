@@ -9,10 +9,12 @@ export function MetricCard({ metric }: { metric: Metric }) {
       <CardContent className="space-y-5 p-6">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-muted-foreground">{metric.label}</p>
-          <div className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-            <ArrowUpRight className="size-3.5" />
-            {metric.delta}
-          </div>
+          {metric.delta ? (
+            <div className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+              <ArrowUpRight className="size-3.5" />
+              {metric.delta}
+            </div>
+          ) : null}
         </div>
         <div>
           <p className="text-3xl font-semibold tracking-tight">{metric.value}</p>

@@ -48,14 +48,14 @@ export function PropertiesWorkspace({
     <div className="space-y-8">
       <PageHeader
         title="Propiedades"
-        description="Inventario multi-tenant. Cada propiedad queda asociada a una inmobiliaria y se publica automaticamente en su catalogo."
+        description="Gestiona publicaciones, contratos y datos clave del portfolio desde una sola vista."
         action={<PropertyFormDialog agencies={visibleAgencies} currentUser={currentUser} />}
       />
 
       <RentAutomationPanel summary={rentalSummary} recentAdjustments={recentAdjustments} />
 
-      <div className="flex flex-wrap gap-2">
-        {currentUser.profile.role !== "agency_admin" ? (
+      {currentUser.profile.role !== "agency_admin" ? (
+        <div className="flex flex-wrap gap-2">
           <Button
             variant={filter === "all" ? "default" : "outline"}
             className="rounded-2xl"
@@ -63,18 +63,18 @@ export function PropertiesWorkspace({
           >
             Todas
           </Button>
-        ) : null}
-        {visibleAgencies.map((agency) => (
-          <Button
-            key={agency.id}
-            variant={filter === agency.slug ? "default" : "outline"}
-            className="rounded-2xl"
-            onClick={() => setFilter(agency.slug)}
-          >
-            {agency.name}
-          </Button>
-        ))}
-      </div>
+          {visibleAgencies.map((agency) => (
+            <Button
+              key={agency.id}
+              variant={filter === agency.slug ? "default" : "outline"}
+              className="rounded-2xl"
+              onClick={() => setFilter(agency.slug)}
+            >
+              {agency.name}
+            </Button>
+          ))}
+        </div>
+      ) : null}
 
       {filteredProperties.length > 0 ? (
         <section className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
@@ -84,8 +84,8 @@ export function PropertiesWorkspace({
         </section>
       ) : (
         <EmptyState
-          title="No hay propiedades para este cliente"
-          description="Cuando cargues una propiedad y la vincules a una inmobiliaria, aparecera en el dashboard y en su subpagina publica."
+          title="Todavía no hay propiedades cargadas"
+          description="Cuando publiques una propiedad, la vas a ver acá junto con su seguimiento comercial y contractual."
         />
       )}
     </div>

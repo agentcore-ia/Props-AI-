@@ -14,7 +14,6 @@ import {
   Phone,
   Search,
   Settings,
-  ShieldCheck,
   Users,
 } from "lucide-react";
 
@@ -35,7 +34,6 @@ import { cn } from "@/lib/utils";
 
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/inmobiliarias", label: "Inmobiliarias", icon: ShieldCheck },
   { href: "/propiedades", label: "Propiedades", icon: Building2 },
   { href: "/alquileres", label: "Alquileres", icon: KeyRound },
   { href: "/leads", label: "Leads", icon: Users },
@@ -85,13 +83,6 @@ function SidebarContent() {
           })}
         </nav>
       </ScrollArea>
-
-      <div className="m-3 rounded-3xl border bg-sidebar-muted p-4">
-        <p className="text-sm font-semibold">Automatizaciones activas</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          3 flujos IA respondiendo mensajes y calificando leads.
-        </p>
-      </div>
     </div>
   );
 }

@@ -286,7 +286,7 @@ export function AgencySettingsWorkspace({
     <div className="space-y-8">
       <PageHeader
         title="Configuracion"
-        description="Ajusta los datos operativos de la inmobiliaria y deja conectado su WhatsApp para que Props y n8n puedan automatizar respuestas y avisos."
+        description="Ajusta los datos operativos de la inmobiliaria y deja conectado su WhatsApp para responder consultas y enviar avisos."
       />
 
       {currentUser.profile.role === "superadmin" && agencies.length > 1 ? (
@@ -366,7 +366,7 @@ export function AgencySettingsWorkspace({
                 placeholder="props-mi-inmobiliaria"
               />
               <p className="text-xs text-muted-foreground">
-                Esta instancia se usa tanto para vincular WhatsApp por QR como para disparar mensajes automáticos desde n8n.
+                Esta instancia se usa para vincular WhatsApp por QR y mantener activo el envio de mensajes desde Props.
               </p>
             </div>
 
@@ -395,7 +395,7 @@ export function AgencySettingsWorkspace({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageCircle className="size-5 text-primary" />
-              WhatsApp y automatizaciones
+              WhatsApp
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -417,7 +417,7 @@ export function AgencySettingsWorkspace({
                 </div>
                 <p className="mt-3 text-sm text-muted-foreground">
                   {connectionState === "open"
-                    ? "El número está conectado y listo para que n8n y Props envíen automatizaciones."
+                    ? "El numero esta conectado y listo para enviar mensajes y avisos desde Props."
                     : "Si está desconectado, abre el QR y escanealo desde WhatsApp > Dispositivos vinculados."}
                 </p>
                 {connectionMeta?.profileName ? (
@@ -433,10 +433,10 @@ export function AgencySettingsWorkspace({
               <div className="rounded-[24px] border bg-muted/25 p-4">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Webhook className="size-4 text-primary" />
-                  n8n conectado
+                  Mensajeria lista
                 </div>
                 <p className="mt-3 text-sm text-muted-foreground">
-                  Al crear o verificar la instancia, Props intenta dejar listo el webhook de Evolution hacia n8n para que entren eventos y salgan mensajes automáticos.
+                  Al crear o verificar la instancia, Props deja listo este numero para recibir y enviar mensajes automaticos.
                 </p>
               </div>
             </div>
@@ -477,7 +477,7 @@ export function AgencySettingsWorkspace({
             <DialogHeader>
               <DialogTitle>Vincular WhatsApp</DialogTitle>
               <DialogDescription>
-                Escanea el QR desde WhatsApp en el teléfono de la inmobiliaria. Cuando conecte, Props usará esta misma instancia para automatizaciones y avisos por n8n.
+                Escanea el QR desde WhatsApp en el telefono de la inmobiliaria. Cuando conecte, Props usara esta misma instancia para mensajes y avisos automaticos.
               </DialogDescription>
             </DialogHeader>
 
@@ -495,7 +495,7 @@ export function AgencySettingsWorkspace({
                   <div className="flex flex-col items-center gap-3 text-center">
                     <CheckCircle2 className="size-12 text-emerald-500" />
                     <p className="text-lg font-semibold">WhatsApp conectado</p>
-                    <p className="text-sm text-muted-foreground">La instancia ya quedó lista para enviar y recibir automatizaciones.</p>
+                    <p className="text-sm text-muted-foreground">La instancia ya quedo lista para enviar y recibir mensajes.</p>
                   </div>
                 ) : (
                   <div className="text-center text-sm text-muted-foreground">

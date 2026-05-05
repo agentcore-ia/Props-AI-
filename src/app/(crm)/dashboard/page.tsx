@@ -2,18 +2,34 @@ import { MetricCard } from "@/components/dashboard/metric-card";
 import { PipelineChart } from "@/components/dashboard/pipeline-chart";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { metrics, recentActivity } from "@/lib/mock-data";
+import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { getDashboardSnapshot } from "@/lib/props-data";
 
-export default function DashboardPage() {
+export const dynamic = "force-dynamic";
+
+export default async function DashboardPage() {
+  const currentUser = await getCurrentUserContext();
+
+  if (!currentUser) {
+    return null;
+  }
+
+  const scope =
+    currentUser.profile.role === "agency_admin"
+      ? { agencySlug: currentUser.profile.agency_slug ?? undefined }
+      : undefined;
+
+  const snapshot = await getDashboardSnapshot(scope);
+
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Dashboard principal"
-        description="Una vista operativa para seguir ventas, velocidad de respuesta y actividad comercial de toda la inmobiliaria."
+        title="Dashboard"
+        description="Una vista rápida para seguir publicaciones, consultas y contratos desde la operación diaria."
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => (
+        {snapshot.metrics.map((metric) => (
           <MetricCard key={metric.label} metric={metric} />
         ))}
       </section>
@@ -23,7 +39,7 @@ export default function DashboardPage() {
           <CardHeader className="pb-0">
             <CardTitle className="text-xl">Ritmo comercial semanal</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Leads capturados y cierres estimados en una vista rapida.
+              Una vista simple para seguir consultas y cierres del equipo.
             </p>
           </CardHeader>
           <CardContent className="pt-2">
@@ -36,8 +52,11 @@ export default function DashboardPage() {
             <CardTitle className="text-xl">Actividad reciente</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {recentActivity.map((activity) => (
-              <div key={activity} className="rounded-2xl border bg-background p-4 text-sm leading-6 text-muted-foreground">
+            {snapshot.recentActivity.map((activity) => (
+              <div
+                key={activity}
+                className="rounded-2xl border bg-background p-4 text-sm leading-6 text-muted-foreground"
+              >
                 {activity}
               </div>
             ))}

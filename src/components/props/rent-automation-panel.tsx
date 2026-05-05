@@ -67,7 +67,8 @@ export function RentAutomationPanel({
           <div>
             <h3 className="text-lg font-semibold">Aumentos automáticos de alquiler</h3>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Props calcula los aumentos por IPC o ICL, actualiza el contrato y dispara el aviso por WhatsApp a través de n8n.
+              Props calcula los aumentos por IPC o ICL, actualiza el contrato y deja listo el aviso
+              al inquilino por WhatsApp.
             </p>
           </div>
           <Button className="rounded-2xl" onClick={handleRunNow} disabled={running}>

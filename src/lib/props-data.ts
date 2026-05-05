@@ -1,4 +1,4 @@
-import type { Agency, Property } from "@/lib/mock-data";
+import type { Agency, Metric, Property } from "@/lib/mock-data";
 import type { PropertyCurrency, PropertyType } from "@/lib/mock-data";
 import type {
   RentalAdjustmentSummary,
@@ -130,6 +130,11 @@ export type LeaseRosterItem = {
   status: "Activo" | "Pausado" | "Finalizado";
   autoNotify: boolean;
   requirements: string;
+};
+
+export type DashboardSnapshot = {
+  metrics: Metric[];
+  recentActivity: string[];
 };
 
 type MarketplaceConversationRow = {
@@ -658,6 +663,142 @@ export async function getRentalDashboardSummary(options?: { agencySlug?: string 
     failedNotifications: adjustments.filter(
       (adjustment) => adjustment.notificationStatus === "Fallido"
     ).length,
+  };
+}
+
+export async function getDashboardSnapshot(options?: { agencySlug?: string }): Promise<DashboardSnapshot> {
+  const admin = createAdminClient();
+  let recentPropertiesQuery = admin
+    .from("properties")
+    .select("id, title, location, created_at, agencies!inner(slug)")
+    .order("created_at", { ascending: false })
+    .limit(6);
+
+  if (options?.agencySlug) {
+    recentPropertiesQuery = recentPropertiesQuery.eq("agencies.slug", options.agencySlug);
+  }
+
+  const [properties, contracts, rentalSummary, recentAdjustments, recentPropertiesResult] = await Promise.all([
+    listProperties(options?.agencySlug ? { tenantSlug: options.agencySlug } : undefined),
+    listRentalContracts(options),
+    getRentalDashboardSummary(options),
+    listRecentRentalAdjustments({ agencySlug: options?.agencySlug, limit: 4 }),
+    recentPropertiesQuery,
+  ]);
+
+  if (recentPropertiesResult.error) {
+    throw recentPropertiesResult.error;
+  }
+
+  const recentPropertyRows = (recentPropertiesResult.data ?? []) as Array<{
+    id: string;
+    title: string;
+    location: string;
+    created_at: string;
+  }>;
+
+  let agencyIds: string[] | null = null;
+
+  if (options?.agencySlug) {
+    const agencyResult = await admin.from("agencies").select("id").eq("slug", options.agencySlug);
+    if (agencyResult.error) {
+      throw agencyResult.error;
+    }
+    agencyIds = (agencyResult.data ?? []).map((agency) => agency.id);
+  }
+
+  let conversationQuery = admin
+    .from("marketplace_conversations")
+    .select("id, title, status, created_at, updated_at, property_id, properties(title)")
+    .order("updated_at", { ascending: false })
+    .limit(6);
+
+  if (agencyIds?.length) {
+    conversationQuery = conversationQuery.in("agency_id", agencyIds);
+  }
+
+  const { data: conversationRows, error: conversationsError } = await conversationQuery;
+
+  if (conversationsError) {
+    throw conversationsError;
+  }
+
+  const conversations = (conversationRows ?? []) as Array<{
+    id: string;
+    title: string;
+    status: "Abierta" | "Cerrada";
+    created_at: string;
+    updated_at: string;
+    property_id: string | null;
+    properties: { title: string } | { title: string }[] | null;
+  }>;
+
+  const activeProperties = properties.filter((property) =>
+    property.status === "Disponible" || property.status === "Reservada"
+  ).length;
+  const openConversations = conversations.filter((conversation) => conversation.status === "Abierta").length;
+  const recentPropertyCount = recentPropertyRows.filter((property) => {
+    const createdAt = new Date(property.created_at).getTime();
+    return createdAt >= Date.now() - 7 * 24 * 60 * 60 * 1000;
+  }).length;
+  const pausedContracts = contracts.filter((contract) => contract.status === "Pausado").length;
+
+  const activityItems = [
+    ...recentPropertyRows.slice(0, 3).map((property) => ({
+      at: property.created_at,
+      text: `Se cargó la propiedad ${property.title} en ${property.location}.`,
+    })),
+    ...conversations.map((conversation) => {
+      const property = Array.isArray(conversation.properties)
+        ? conversation.properties[0]
+        : conversation.properties;
+      return {
+        at: conversation.updated_at,
+        text: property?.title
+          ? `Nueva conversación en ${property.title}.`
+          : `Nueva conversación recibida en la bandeja comercial.`,
+      };
+    }),
+    ...recentAdjustments.map((adjustment) => ({
+      at: adjustment.createdAt,
+      text: `Se registró un ajuste ${adjustment.indexType}: ${adjustment.previousRent} → ${adjustment.newRent}.`,
+    })),
+  ]
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+    .slice(0, 5)
+    .map((item) => item.text);
+
+  return {
+    metrics: [
+      {
+        label: "Propiedades activas",
+        value: String(activeProperties),
+        delta: recentPropertyCount > 0 ? `${recentPropertyCount} nuevas` : undefined,
+        hint: "publicadas y disponibles para operar",
+      },
+      {
+        label: "Consultas abiertas",
+        value: String(openConversations),
+        delta: openConversations > 0 ? "requieren seguimiento" : undefined,
+        hint: "conversaciones activas del portal",
+      },
+      {
+        label: "Alquileres activos",
+        value: String(rentalSummary.totalActiveContracts),
+        delta: rentalSummary.dueThisWeek > 0 ? `${rentalSummary.dueThisWeek} por ajustar` : undefined,
+        hint: "contratos vigentes en seguimiento",
+      },
+      {
+        label: "Contratos en revisión",
+        value: String(pausedContracts),
+        delta: pausedContracts > 0 ? "revisar datos" : undefined,
+        hint: "pendientes de validación antes de automatizar",
+      },
+    ],
+    recentActivity:
+      activityItems.length > 0
+        ? activityItems
+        : ["Todavía no hay movimientos recientes para esta cuenta."],
   };
 }
 

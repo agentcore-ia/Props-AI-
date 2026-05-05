@@ -13,7 +13,7 @@ export type PropertyType =
 export type Metric = {
   label: string;
   value: string;
-  delta: string;
+  delta?: string;
   hint: string;
 };
 

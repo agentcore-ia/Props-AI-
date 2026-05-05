@@ -587,7 +587,7 @@ export function PropertyFormDialog({
                             Aviso automático al inquilino
                           </div>
                           <p className="mt-2 text-sm text-muted-foreground">
-                            Cuando llegue la fecha, Props calculará el aumento por {form.indexType} y enviará el nuevo valor por WhatsApp usando n8n.
+                            Cuando llegue la fecha, Props calculara el aumento por {form.indexType} y enviara el nuevo valor por WhatsApp automaticamente.
                           </p>
                         </div>
 
@@ -634,7 +634,7 @@ export function PropertyFormDialog({
                 <SectionTitle
                   eyebrow="Visual"
                   title="Galería de publicación"
-                  description="Sube fotos reales con preview para web, marketplace y subdominio de la inmobiliaria."
+                  description="Sube fotos reales con preview para la web de la inmobiliaria y su publicaci?n p?blica."
                 />
 
                 <div className="mt-5 space-y-4">
@@ -698,7 +698,7 @@ export function PropertyFormDialog({
                 <SectionTitle
                   eyebrow="Publicación"
                   title="Salida automática"
-                  description="Al guardar, la propiedad se vincula al CRM, al marketplace general y al subdominio de la inmobiliaria."
+                  description="Al guardar, la propiedad se vincula al CRM y al sitio p?blico de la inmobiliaria."
                 />
 
                 <div className="mt-5 rounded-[24px] border border-dashed bg-muted/30 p-5">

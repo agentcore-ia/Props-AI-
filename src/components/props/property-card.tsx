@@ -49,10 +49,10 @@ export function PropertyCard({ property }: { property: Property }) {
               <span>{property.location}</span>
             </div>
           </div>
-          <Badge className={cn("rounded-full border-0", statusStyles[property.status])}>{property.status}</Badge>
+          <Badge className={cn("rounded-full border-0", statusStyles[property.status])}>
+            {property.status}
+          </Badge>
         </div>
-
-        <p className="text-sm leading-6 text-muted-foreground">{property.description}</p>
 
         <div className="rounded-[24px] border bg-muted/20 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -103,8 +103,8 @@ export function PropertyCard({ property }: { property: Property }) {
                           property.rentalContract.status === "Activo"
                             ? "bg-emerald-500/10 text-emerald-700"
                             : property.rentalContract.status === "Pausado"
-                            ? "bg-amber-500/10 text-amber-700"
-                            : "bg-slate-900/10 text-slate-700"
+                              ? "bg-amber-500/10 text-amber-700"
+                              : "bg-slate-900/10 text-slate-700"
                         )}
                       >
                         {property.rentalContract.status}
@@ -113,13 +113,17 @@ export function PropertyCard({ property }: { property: Property }) {
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="rounded-2xl border px-3 py-3">
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Alquiler actual</p>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                        Alquiler actual
+                      </p>
                       <p className="mt-1 text-lg font-semibold">
                         {formatArsCurrency(property.rentalContract.currentRent)}
                       </p>
                     </div>
                     <div className="rounded-2xl border px-3 py-3">
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Próximo aumento</p>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                        Próximo aumento
+                      </p>
                       <p className="mt-1 flex items-center gap-2 text-lg font-semibold">
                         <CalendarDays className="size-4 text-primary" />
                         {formatShortDate(property.rentalContract.nextAdjustmentDate)}
@@ -163,7 +167,9 @@ export function PropertyCard({ property }: { property: Property }) {
                   </div>
                   {property.rentalContract.contractFileName ? (
                     <div className="rounded-2xl border px-3 py-3">
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Contrato adjunto</p>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                        Contrato adjunto
+                      </p>
                       <div className="mt-2 flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate font-medium">{property.rentalContract.contractFileName}</p>
@@ -174,7 +180,11 @@ export function PropertyCard({ property }: { property: Property }) {
                         <Link
                           href={`/api/admin/rental-contracts/${property.rentalContract.id}/document`}
                           target="_blank"
-                          className={buttonVariants({ size: "sm", variant: "outline", className: "rounded-2xl" })}
+                          className={buttonVariants({
+                            size: "sm",
+                            variant: "outline",
+                            className: "rounded-2xl",
+                          })}
                         >
                           Ver
                         </Link>
@@ -186,8 +196,8 @@ export function PropertyCard({ property }: { property: Property }) {
                 <div className="flex items-start gap-3 text-sm text-muted-foreground">
                   <MessageCircleWarning className="mt-0.5 size-4 text-primary" />
                   <p>
-                    Esta propiedad todavía no tiene contrato activo. Adjunta el contrato para que Props detecte
-                    fechas, monto y automatice IPC/ICL con avisos al inquilino.
+                    Esta propiedad todavía no tiene contrato activo. Adjunta el contrato para que Props
+                    detecte fechas, monto y deje listo el seguimiento del alquiler.
                   </p>
                 </div>
               )}
