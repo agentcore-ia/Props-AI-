@@ -5,6 +5,8 @@ import { randomUUID } from "node:crypto";
 const DEFAULT_INTEGRATION = "WHATSAPP-BAILEYS";
 const EVOLUTION_API_URL_FALLBACK = "https://agentcore-evolution-api.8zp1cp.easypanel.host";
 const EVOLUTION_API_KEY_FALLBACK = "429683C4C977415CAAFCCE10F7D57E11";
+const N8N_EVOLUTION_WEBHOOK_URL_FALLBACK =
+  "https://agentcore-n8n.8zp1cp.easypanel.host/webhook/props-evolution-webhook";
 const DEFAULT_WEBHOOK_EVENTS = [
   "QRCODE_UPDATED",
   "CONNECTION_UPDATE",
@@ -52,7 +54,9 @@ function getEvolutionEnv() {
     apiUrl: apiUrl.replace(/\/+$/, ""),
     apiKey,
     integration: process.env.EVOLUTION_API_INTEGRATION ?? DEFAULT_INTEGRATION,
-    webhookUrl: process.env.N8N_EVOLUTION_WEBHOOK_URL?.trim() || "",
+    webhookUrl:
+      process.env.N8N_EVOLUTION_WEBHOOK_URL?.trim() ||
+      N8N_EVOLUTION_WEBHOOK_URL_FALLBACK,
     webhookEvents:
       process.env.EVOLUTION_WEBHOOK_EVENTS?.split(",")
         .map((event) => event.trim())

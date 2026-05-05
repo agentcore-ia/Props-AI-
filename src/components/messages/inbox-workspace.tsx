@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bot, Loader2, SendHorizonal } from "lucide-react";
 
-import type { CrmLeadSummary } from "@/lib/crm-types";
+import type { CrmLeadMessageSummary, CrmLeadSummary } from "@/lib/crm-types";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -13,17 +13,38 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
-export function InboxWorkspace({ leads }: { leads: CrmLeadSummary[] }) {
+export function InboxWorkspace({
+  leads,
+  messages,
+}: {
+  leads: CrmLeadSummary[];
+  messages: CrmLeadMessageSummary[];
+}) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState(leads[0]?.id ?? "");
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
+  const messagesByLead = useMemo(() => {
+    const grouped = new Map<string, CrmLeadMessageSummary[]>();
+
+    for (const message of messages) {
+      const current = grouped.get(message.leadId) ?? [];
+      current.push(message);
+      grouped.set(message.leadId, current);
+    }
+
+    return grouped;
+  }, [messages]);
+
   const selectedLead = useMemo(
     () => leads.find((lead) => lead.id === selectedId) ?? leads[0] ?? null,
     [leads, selectedId]
   );
+  const selectedMessages = selectedLead
+    ? messagesByLead.get(selectedLead.id) ?? []
+    : [];
 
   if (!selectedLead) {
     return (
@@ -67,7 +88,7 @@ export function InboxWorkspace({ leads }: { leads: CrmLeadSummary[] }) {
     <div className="space-y-8">
       <PageHeader
         title="Mensajes"
-        description="Responde consultas con contexto de propiedad, borrador sugerido y proximo paso comercial."
+        description="Responde consultas con contexto de propiedad, historial real y proximo paso comercial."
       />
 
       {feedback ? (
@@ -81,36 +102,46 @@ export function InboxWorkspace({ leads }: { leads: CrmLeadSummary[] }) {
           <div className="border-b px-5 py-4">
             <h3 className="font-semibold">Bandeja</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Leads abiertos con respuesta pendiente o seguimiento cercano.
+              Conversaciones abiertas por WhatsApp con seguimiento pendiente.
             </p>
           </div>
           <ScrollArea className="h-[640px]">
             <div className="space-y-2 p-3">
-              {leads.map((lead) => (
-                <button
-                  key={lead.id}
-                  className={cn(
-                    "w-full rounded-2xl border p-4 text-left transition-all",
-                    selectedLead.id === lead.id ? "border-primary bg-primary/5" : "bg-background hover:bg-muted/40"
-                  )}
-                  onClick={() => setSelectedId(lead.id)}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium">{lead.fullName}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        {lead.propertyTitle || "Consulta general"}
-                      </p>
+              {leads.map((lead) => {
+                const thread = messagesByLead.get(lead.id) ?? [];
+                const lastMessage = thread[thread.length - 1];
+                const preview = lastMessage?.content || lead.lastCustomerMessage;
+
+                return (
+                  <button
+                    key={lead.id}
+                    className={cn(
+                      "w-full rounded-2xl border p-4 text-left transition-all",
+                      selectedLead.id === lead.id
+                        ? "border-primary bg-primary/5"
+                        : "bg-background hover:bg-muted/40"
+                    )}
+                    onClick={() => setSelectedId(lead.id)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium">{lead.fullName}</p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                          {lead.propertyTitle || "Consulta general"}
+                        </p>
+                      </div>
+                      {lead.needsResponse ? (
+                        <span className="rounded-full bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground">
+                          Nuevo
+                        </span>
+                      ) : null}
                     </div>
-                    {lead.needsResponse ? (
-                      <span className="rounded-full bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground">
-                        Nuevo
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-3 text-sm text-muted-foreground">{lead.lastCustomerMessage}</p>
-                </button>
-              ))}
+                    <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">
+                      {preview}
+                    </p>
+                  </button>
+                );
+              })}
             </div>
           </ScrollArea>
         </div>
@@ -126,7 +157,8 @@ export function InboxWorkspace({ leads }: { leads: CrmLeadSummary[] }) {
               <div>
                 <p className="font-semibold">{selectedLead.fullName}</p>
                 <p className="text-sm text-muted-foreground">
-                  {selectedLead.propertyTitle || "Consulta general"} · {selectedLead.phone || "Sin telefono"}
+                  {selectedLead.propertyTitle || "Consulta general"} ·{" "}
+                  {selectedLead.phone || "Sin telefono"}
                 </p>
               </div>
             </div>
@@ -137,14 +169,34 @@ export function InboxWorkspace({ leads }: { leads: CrmLeadSummary[] }) {
 
           <ScrollArea className="flex-1 px-6 py-5">
             <div className="space-y-4">
-              <MessageBubble role="customer" title="Ultimo mensaje del cliente" content={selectedLead.lastCustomerMessage} />
-              <MessageBubble
-                role="assistant"
-                title="Borrador sugerido"
-                content={selectedLead.aiReplyDraft || "Todavia no hay un borrador sugerido para este lead."}
-              />
+              {selectedMessages.length > 0 ? (
+                selectedMessages.map((message) => (
+                  <MessageBubble
+                    key={message.id}
+                    role={message.senderRole === "customer" ? "customer" : "assistant"}
+                    title={message.senderRole === "customer" ? "Cliente" : "Props AI / equipo"}
+                    content={message.content}
+                  />
+                ))
+              ) : (
+                <MessageBubble
+                  role="customer"
+                  title="Ultimo mensaje del cliente"
+                  content={selectedLead.lastCustomerMessage}
+                />
+              )}
+
               <div className="rounded-[24px] border bg-background p-4 text-sm leading-6 text-muted-foreground">
-                <p className="mb-2 text-xs uppercase tracking-[0.2em] text-primary/75">Contexto</p>
+                <p className="mb-2 text-xs uppercase tracking-[0.2em] text-primary/75">
+                  Sugerencia de respuesta
+                </p>
+                <p className="mb-4">
+                  {selectedLead.aiReplyDraft ||
+                    "Todavia no hay un borrador sugerido para este lead."}
+                </p>
+                <p className="mb-2 text-xs uppercase tracking-[0.2em] text-primary/75">
+                  Contexto
+                </p>
                 {selectedLead.qualificationSummary}
               </div>
             </div>
@@ -160,11 +212,15 @@ export function InboxWorkspace({ leads }: { leads: CrmLeadSummary[] }) {
                 <Input
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
-                  placeholder="Ej. proponé visita para mañana y aclarale los requisitos..."
+                  placeholder="Ej. propone visita para manana y aclara requisitos..."
                   className="border-0 shadow-none focus-visible:ring-0"
                 />
                 <Button className="rounded-2xl" disabled={busy} onClick={() => void sendMessage()}>
-                  {busy ? <Loader2 className="size-4 animate-spin" /> : <SendHorizonal className="size-4" />}
+                  {busy ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <SendHorizonal className="size-4" />
+                  )}
                   Enviar
                 </Button>
               </div>
@@ -190,7 +246,9 @@ function MessageBubble({
       <div
         className={cn(
           "max-w-[82%] rounded-[24px] px-4 py-3 text-sm leading-6 shadow-sm",
-          role === "assistant" ? "bg-primary text-primary-foreground" : "border bg-background"
+          role === "assistant"
+            ? "bg-primary text-primary-foreground"
+            : "border bg-background"
         )}
       >
         <p className="mb-2 text-[11px] uppercase tracking-[0.2em] opacity-80">{title}</p>

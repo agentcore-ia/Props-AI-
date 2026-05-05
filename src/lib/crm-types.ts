@@ -65,6 +65,20 @@ export type CrmLeadSummary = {
   updatedAt: string;
 };
 
+export type CrmLeadMessageSummary = {
+  id: string;
+  leadId: string;
+  agencyId: string;
+  propertyId: string | null;
+  channel: "whatsapp";
+  direction: "incoming" | "outgoing";
+  senderRole: "customer" | "assistant" | "agent" | "system";
+  content: string;
+  waMessageId: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
 export type VisitAppointmentSummary = {
   id: string;
   leadId: string;

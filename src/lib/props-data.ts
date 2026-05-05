@@ -1,6 +1,7 @@
 import type { Agency, Metric, Property } from "@/lib/mock-data";
 import type { PropertyCurrency, PropertyType } from "@/lib/mock-data";
 import type {
+  CrmLeadMessageSummary,
   CrmLeadSummary,
   EmployeeTaskSummary,
   TodayWorkspaceSnapshot,
@@ -247,6 +248,20 @@ type EmployeeTaskRow = {
   updated_at: string;
 };
 
+type CrmLeadMessageRow = {
+  id: string;
+  lead_id: string;
+  agency_id: string;
+  property_id: string | null;
+  channel: "whatsapp";
+  direction: "incoming" | "outgoing";
+  sender_role: "customer" | "assistant" | "agent" | "system";
+  content: string;
+  wa_message_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
 const PROPERTY_SELECT = `
   id,
   agency_id,
@@ -397,6 +412,22 @@ function mapEmployeeTask(row: EmployeeTaskRow): EmployeeTaskSummary {
     completedAt: row.completed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapCrmLeadMessage(row: CrmLeadMessageRow): CrmLeadMessageSummary {
+  return {
+    id: row.id,
+    leadId: row.lead_id,
+    agencyId: row.agency_id,
+    propertyId: row.property_id,
+    channel: row.channel,
+    direction: row.direction,
+    senderRole: row.sender_role,
+    content: row.content,
+    waMessageId: row.wa_message_id,
+    metadata: row.metadata ?? {},
+    createdAt: row.created_at,
   };
 }
 
@@ -1108,6 +1139,49 @@ export async function listCrmLeads(options?: { agencySlug?: string }) {
   const { data, error } = await query;
   if (error) throw error;
   return ((data ?? []) as unknown as CrmLeadRow[]).map(mapCrmLead);
+}
+
+export async function listCrmLeadMessages(options?: {
+  agencySlug?: string;
+  leadIds?: string[];
+}) {
+  const admin = createAdminClient();
+  let agencyIds: string[] | null = null;
+
+  if (options?.agencySlug) {
+    const { data: agencies, error: agencyError } = await admin
+      .from("agencies")
+      .select("id")
+      .eq("slug", options.agencySlug);
+
+    if (agencyError) {
+      throw agencyError;
+    }
+
+    agencyIds = (agencies ?? []).map((agency) => agency.id);
+
+    if (agencyIds.length === 0) {
+      return [];
+    }
+  }
+
+  let query = admin
+    .from("crm_lead_messages")
+    .select("id, lead_id, agency_id, property_id, channel, direction, sender_role, content, wa_message_id, metadata, created_at")
+    .order("created_at", { ascending: true });
+
+  if (agencyIds?.length) {
+    query = query.in("agency_id", agencyIds);
+  }
+
+  if (options?.leadIds?.length) {
+    query = query.in("lead_id", options.leadIds);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return ((data ?? []) as unknown as CrmLeadMessageRow[]).map(mapCrmLeadMessage);
 }
 
 export async function getCrmLeadById(leadId: string) {

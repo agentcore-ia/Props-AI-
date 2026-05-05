@@ -86,6 +86,12 @@ function normalizePhone(phone: string | null | undefined) {
   return digits.startsWith("54") ? digits : `54${digits}`;
 }
 
+export function normalizeWhatsAppJid(phone: string | null | undefined) {
+  const raw = String(phone ?? "").trim();
+  if (!raw) return "";
+  return normalizePhone(raw.replace(/@s\.whatsapp\.net$/i, ""));
+}
+
 function addHoursIso(hours: number) {
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 }
@@ -291,6 +297,58 @@ export async function ensureLeadTask(input: {
   return data.id as string;
 }
 
+export async function recordCrmLeadMessage(input: {
+  leadId: string;
+  agencyId: string;
+  propertyId?: string | null;
+  content: string;
+  direction: "incoming" | "outgoing";
+  senderRole: "customer" | "assistant" | "agent" | "system";
+  waMessageId?: string | null;
+  metadata?: Record<string, unknown>;
+}) {
+  const admin = createAdminClient();
+  const content = String(input.content ?? "").trim();
+
+  if (!content) {
+    return null;
+  }
+
+  if (input.waMessageId) {
+    const { data: existing } = await admin
+      .from("crm_lead_messages")
+      .select("id")
+      .eq("wa_message_id", input.waMessageId)
+      .maybeSingle();
+
+    if (existing?.id) {
+      return existing.id as string;
+    }
+  }
+
+  const { data, error } = await admin
+    .from("crm_lead_messages")
+    .insert({
+      lead_id: input.leadId,
+      agency_id: input.agencyId,
+      property_id: input.propertyId ?? null,
+      channel: "whatsapp",
+      direction: input.direction,
+      sender_role: input.senderRole,
+      content,
+      wa_message_id: input.waMessageId ?? null,
+      metadata: input.metadata ?? {},
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data.id as string;
+}
+
 export async function upsertLeadFromSignal(input: {
   agency: LeadAutomationInput["agency"];
   property?: Property | null;
@@ -325,7 +383,7 @@ export async function upsertLeadFromSignal(input: {
 
   const payload = {
     agency_id: input.agency.id,
-    property_id: input.property?.id ?? null,
+    property_id: input.property?.id ?? existing?.property_id ?? null,
     conversation_id: input.conversationId ?? existing?.conversation_id ?? null,
     inquiry_id: input.inquiryId ?? existing?.inquiry_id ?? null,
     customer_id: input.customerId ?? existing?.customer_id ?? null,
@@ -550,6 +608,19 @@ export async function sendLeadWhatsApp(input: {
       last_activity_at: new Date().toISOString(),
     })
     .eq("id", input.lead.id);
+
+  await recordCrmLeadMessage({
+    leadId: input.lead.id,
+    agencyId: input.lead.agencyId,
+    propertyId: input.lead.propertyId,
+    content: text,
+    direction: "outgoing",
+    senderRole: "agent",
+    metadata: {
+      source: "crm_manual",
+      propertyTitle: input.property?.title ?? input.lead.propertyTitle,
+    },
+  });
 
   await ensureLeadTask({
     agencyId: input.lead.agencyId,
