@@ -11,8 +11,6 @@ import {
   Bath,
   BedDouble,
   Building2,
-  CalendarDays,
-  CarFront,
   ChartColumnIncreasing,
   Filter,
   Heart,
@@ -20,7 +18,6 @@ import {
   LayoutGrid,
   Map,
   MapPin,
-  PawPrint,
   Radar,
   Search,
   Sparkles,
@@ -87,6 +84,7 @@ export function PublicMarketplace({
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [comparisonIds, setComparisonIds] = useState<string[]>([]);
   const [selectedMapListingId, setSelectedMapListingId] = useState<string | null>(null);
+  const [mobileMapMode, setMobileMapMode] = useState<"lista" | "mapa">("lista");
   const deferredQuery = useDeferredValue(query);
 
   const listings = useMemo(() => buildPublicListings(properties, agencies), [agencies, properties]);
@@ -135,6 +133,12 @@ export function PublicMarketplace({
       setSelectedMapListingId(filteredListings[0].id);
     }
   }, [filteredListings, selectedMapListingId]);
+
+  useEffect(() => {
+    if (section !== "mapa") {
+      setMobileMapMode("lista");
+    }
+  }, [section]);
 
   const selectedMapListing =
     filteredListings.find((listing) => listing.id === selectedMapListingId) ?? filteredListings[0] ?? null;
@@ -251,7 +255,7 @@ export function PublicMarketplace({
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 xl:px-8">
+      <main className="mx-auto max-w-[1480px] overflow-x-hidden px-4 py-6 sm:px-6 xl:px-8">
         <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_28px_90px_-55px_rgba(15,23,42,0.32)] sm:rounded-[34px]">
           <div className="grid gap-0 xl:grid-cols-[1.08fr_0.92fr]">
             <div className="px-4 py-6 sm:px-8 sm:py-10">
@@ -400,93 +404,157 @@ export function PublicMarketplace({
         ) : null}
 
         {section === "mapa" ? (
-          <section className="mt-8 grid gap-6 xl:grid-cols-[380px_1fr]">
-            <div className="space-y-4">
-              <SectionHeading
-                eyebrow="Vista mapa"
-                title={`${filteredListings.length} propiedades en contexto`}
-                description="Explora todas las publicaciones sobre el mapa y selecciona una para ver su direccion exacta y abrir la ficha."
-              />
-              <div className="max-h-[640px] space-y-3 overflow-y-auto pr-1">
-                {filteredListings.map((listing) => (
-                  <CompactMapListing
-                    key={listing.id}
-                    listing={listing}
-                    isFavorite={favoriteIds.includes(listing.id)}
-                    isSelected={selectedMapListing?.id === listing.id}
-                    onToggleFavorite={toggleFavorite}
-                    onSelect={() => setSelectedMapListingId(listing.id)}
-                  />
-                ))}
+          <section className="mt-8 space-y-5">
+            <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.22)] sm:p-5">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                <SectionHeading
+                  eyebrow="Vista mapa"
+                  title={`${filteredListings.length} propiedades en contexto`}
+                  description="Explora publicaciones con una experiencia tipo marketplace: lista compacta a un lado y mapa protagonista para elegir mejor."
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1 xl:hidden">
+                    <button
+                      type="button"
+                      onClick={() => setMobileMapMode("lista")}
+                      className={cn(
+                        "rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                        mobileMapMode === "lista"
+                          ? "bg-slate-950 text-white"
+                          : "text-slate-500"
+                      )}
+                    >
+                      Lista
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMobileMapMode("mapa")}
+                      className={cn(
+                        "rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                        mobileMapMode === "mapa"
+                          ? "bg-slate-950 text-white"
+                          : "text-slate-500"
+                      )}
+                    >
+                      Mapa
+                    </button>
+                  </div>
+                  <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-600">
+                    {filteredListings.length} publicaciones
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,rgba(222,246,247,0.9)_0%,rgba(228,236,247,0.96)_100%)] p-4 shadow-[0_32px_90px_-60px_rgba(15,23,42,0.32)] sm:rounded-[34px] sm:p-6">
-              <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
-                <PublicMarketplaceMap
-                  listings={filteredListings}
-                  selectedListingId={selectedMapListing?.id ?? null}
-                  onSelect={setSelectedMapListingId}
-                />
+            <div className="grid gap-5 xl:grid-cols-[420px_minmax(0,1fr)] xl:items-start">
+              <div
+                className={cn(
+                  "space-y-3",
+                  mobileMapMode === "mapa" ? "hidden xl:block" : "block"
+                )}
+              >
+                <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.18)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-500">Resultados en la zona</p>
+                      <h3 className="mt-1 text-xl font-semibold text-slate-950">
+                        Lista rapida para explorar
+                      </h3>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                      {operationFilter === "all" ? "Todo" : operationFilter}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-3 xl:max-h-[72vh] xl:overflow-y-auto xl:pr-1">
+                  {filteredListings.map((listing) => (
+                    <CompactMapListing
+                      key={listing.id}
+                      listing={listing}
+                      isFavorite={favoriteIds.includes(listing.id)}
+                      isSelected={selectedMapListing?.id === listing.id}
+                      onToggleFavorite={toggleFavorite}
+                      onSelect={() => setSelectedMapListingId(listing.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div
+                className={cn(
+                  "space-y-4 xl:sticky xl:top-24",
+                  mobileMapMode === "lista" ? "hidden xl:block" : "block"
+                )}
+              >
+                <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,rgba(222,246,247,0.9)_0%,rgba(228,236,247,0.96)_100%)] p-3 shadow-[0_32px_90px_-60px_rgba(15,23,42,0.32)] sm:rounded-[34px] sm:p-4">
+                  <PublicMarketplaceMap
+                    listings={filteredListings}
+                    selectedListingId={selectedMapListing?.id ?? null}
+                    onSelect={setSelectedMapListingId}
+                  />
+                </div>
 
                 {selectedMapListing ? (
-                  <aside className="rounded-[24px] border border-white/70 bg-white/92 p-4 shadow-lg backdrop-blur sm:rounded-[28px] sm:p-5">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">
-                        Ubicacion exacta
-                      </p>
-                      <h3 className="mt-2 text-2xl font-semibold text-slate-950">
-                        {selectedMapListing.title}
-                      </h3>
-                      <p className="mt-2 text-sm leading-7 text-slate-600">
-                        {selectedMapListing.exactAddress || selectedMapListing.location}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Precio</p>
-                      <p className="mt-2 text-2xl font-semibold text-slate-950">
-                        {formatMoney(selectedMapListing.price, selectedMapListing.currency)}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {selectedMapListing.operation} · {selectedMapListing.propertyType}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 text-sm text-slate-600">
-                      <div className="inline-flex items-center gap-2">
-                        <CalendarDays className="size-4 text-slate-400" />
-                        Disponible desde: {selectedMapListing.availableFrom || "Inmediata"}
-                      </div>
-                      <div className="inline-flex items-center gap-2">
-                        <PawPrint className="size-4 text-slate-400" />
-                        Mascotas: {selectedMapListing.petsPolicy || "Consultar"}
-                      </div>
-                      <div className="inline-flex items-center gap-2">
-                        <CarFront className="size-4 text-slate-400" />
-                        Cocheras: {selectedMapListing.parkingSpots}
-                      </div>
-                    </div>
-
-                    {selectedMapListing.requirements ? (
-                      <div className="mt-4 rounded-[22px] border border-slate-200 bg-white p-4">
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Requisitos</p>
+                  <aside className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.2)] sm:p-5">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">
+                          Ubicacion exacta
+                        </p>
+                        <h3 className="mt-2 break-words text-xl font-semibold text-slate-950 sm:text-2xl">
+                          {selectedMapListing.title}
+                        </h3>
                         <p className="mt-2 text-sm leading-7 text-slate-600">
-                          {selectedMapListing.requirements}
+                          {selectedMapListing.exactAddress || selectedMapListing.location}
                         </p>
                       </div>
-                    ) : null}
+                      <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 sm:min-w-[200px]">
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Precio</p>
+                        <p className="mt-2 text-xl font-semibold text-slate-950 sm:text-2xl">
+                          {formatMoney(selectedMapListing.price, selectedMapListing.currency)}
+                        </p>
+                      </div>
+                    </div>
 
-                    <a
-                      href={buildGoogleMapsExternalUrl(
-                        selectedMapListing.exactAddress || selectedMapListing.location
-                      )}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
-                    >
-                      Abrir en Google Maps
-                    </a>
+                    <div className="mt-4 grid grid-cols-3 gap-3">
+                      <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Dorm.</p>
+                        <p className="mt-1 text-base font-semibold text-slate-950">
+                          {selectedMapListing.bedrooms}
+                        </p>
+                      </div>
+                      <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Banos</p>
+                        <p className="mt-1 text-base font-semibold text-slate-950">
+                          {selectedMapListing.bathrooms}
+                        </p>
+                      </div>
+                      <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">m2</p>
+                        <p className="mt-1 text-base font-semibold text-slate-950">
+                          {selectedMapListing.area}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                      <Link
+                        href={selectedMapListing.routeHref}
+                        className="inline-flex flex-1 items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+                      >
+                        Ver ficha completa
+                      </Link>
+                      <a
+                        href={buildGoogleMapsExternalUrl(
+                          selectedMapListing.exactAddress || selectedMapListing.location
+                        )}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex flex-1 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                      >
+                        Abrir en Google Maps
+                      </a>
+                    </div>
                   </aside>
                 ) : null}
               </div>
@@ -720,8 +788,8 @@ function MarketplacePropertyCard({
   onToggleComparison: (id: string) => void;
 }) {
   return (
-    <article className="overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_28px_80px_-52px_rgba(15,23,42,0.28)] transition-transform duration-300 hover:-translate-y-1 sm:rounded-[24px]">
-      <div className="relative h-48 overflow-hidden sm:h-64">
+    <article className="overflow-hidden rounded-[18px] border border-slate-200 bg-white shadow-[0_24px_60px_-50px_rgba(15,23,42,0.24)] transition-transform duration-300 hover:-translate-y-1 sm:rounded-[24px]">
+      <div className="relative h-32 overflow-hidden sm:h-64">
         <Link href={listing.routeHref} className="block h-full">
           <Image
             src={listing.image}
@@ -770,13 +838,13 @@ function MarketplacePropertyCard({
                 <span className="line-clamp-2 text-xs sm:text-sm">{listing.location}</span>
               </div>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-2 py-2 text-right">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">m2</p>
-              <p className="mt-1 text-xs font-semibold text-slate-950 sm:text-sm">{listing.area}</p>
-            </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-2 py-2 text-right">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">m2</p>
+            <p className="mt-1 text-xs font-semibold text-slate-950 sm:text-sm">{listing.area}</p>
           </div>
+        </div>
 
-          <div className="flex flex-wrap gap-2 border-y border-slate-100 py-2 text-xs text-slate-600 sm:text-sm">
+          <div className="flex flex-wrap gap-2 border-y border-slate-100 py-2 text-[11px] text-slate-600 sm:text-sm">
           <div className="inline-flex items-center gap-2">
             <BedDouble className="size-4" />
             {listing.bedrooms}
@@ -792,14 +860,14 @@ function MarketplacePropertyCard({
         </div>
 
           <div className="flex flex-wrap gap-2">
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600">
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 sm:px-3 sm:py-1.5 sm:text-xs">
             {listing.agencyName}
           </span>
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600">
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 sm:px-3 sm:py-1.5 sm:text-xs">
             {listing.petsPolicy || "Mascotas a consultar"}
           </span>
           {listing.availableFrom ? (
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600">
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 sm:px-3 sm:py-1.5 sm:text-xs">
               Disponible {listing.availableFrom}
             </span>
           ) : null}
@@ -847,7 +915,7 @@ function CompactMapListing({
   return (
     <article
       className={cn(
-        "rounded-[22px] border bg-white p-3 shadow-[0_20px_55px_-42px_rgba(15,23,42,0.22)] transition-colors sm:rounded-[28px] sm:p-4",
+        "rounded-[22px] border bg-white p-3 shadow-[0_20px_55px_-42px_rgba(15,23,42,0.18)] transition-colors sm:rounded-[28px] sm:p-4",
         isSelected ? "border-slate-950 ring-2 ring-slate-950/10" : "border-slate-200"
       )}
     >
@@ -858,11 +926,11 @@ function CompactMapListing({
           </div>
           <div className="min-w-0">
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-lg font-semibold text-slate-950 sm:text-xl">
+              <div className="min-w-0">
+                <p className="text-base font-semibold text-slate-950 sm:text-xl">
                   {formatMoney(listing.price, listing.currency)}
                 </p>
-                <h3 className="mt-1 line-clamp-2 font-semibold text-slate-900">{listing.title}</h3>
+                <h3 className="mt-1 line-clamp-2 text-sm font-semibold text-slate-900 sm:text-base">{listing.title}</h3>
               </div>
               <button
                 type="button"
@@ -880,8 +948,8 @@ function CompactMapListing({
                 <Heart className={cn("size-4", isFavorite ? "fill-current" : "")} />
               </button>
             </div>
-            <p className="mt-2 line-clamp-2 text-sm text-slate-500">{listing.location}</p>
-            <div className="mt-3 flex flex-wrap gap-3 text-sm text-slate-600">
+            <p className="mt-2 line-clamp-2 text-xs text-slate-500 sm:text-sm">{listing.location}</p>
+            <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-600 sm:text-sm">
               <span>{listing.bedrooms} dorm.</span>
               <span>{listing.bathrooms} banos</span>
               <span>{listing.area} m2</span>

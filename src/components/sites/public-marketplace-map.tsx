@@ -99,7 +99,7 @@ export function PublicMarketplaceMap({
   }, [points]);
 
   return (
-    <div className="relative h-[540px] overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)]">
+    <div className="relative h-[58vh] min-h-[420px] overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)] sm:h-[64vh] xl:h-[calc(100vh-220px)] xl:min-h-[640px]">
       <MapContainer
         center={selectedPoint ? [selectedPoint.latitude, selectedPoint.longitude] : buenosAiresCenter}
         zoom={selectedPoint ? 13 : 11}

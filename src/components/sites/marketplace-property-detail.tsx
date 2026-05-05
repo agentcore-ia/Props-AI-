@@ -70,7 +70,7 @@ export function MarketplacePropertyDetail({
   return (
     <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,rgba(237,242,255,0.88)_0%,rgba(247,249,252,1)_24%,rgba(255,255,255,1)_100%)]">
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/88 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1480px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 xl:px-8">
+        <div className="mx-auto flex max-w-[1480px] flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6 xl:px-8">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <Link
               href="/"
@@ -86,7 +86,7 @@ export function MarketplacePropertyDetail({
             </Link>
           </div>
 
-          <div className="flex max-w-full items-center gap-2 sm:gap-3">
+          <div className="flex min-w-0 max-w-full justify-end gap-2 self-end sm:self-auto">
             <Link
               href={listing.catalogHref}
               className="hidden rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-950 sm:inline-flex"
@@ -98,9 +98,9 @@ export function MarketplacePropertyDetail({
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1480px] space-y-8 px-4 py-6 sm:px-6 xl:px-8">
-        <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="space-y-5">
+      <main className="mx-auto max-w-[1480px] overflow-x-hidden space-y-8 px-4 py-6 sm:px-6 xl:px-8">
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] xl:items-start">
+          <div className="min-w-0 space-y-5">
             <div className="flex flex-wrap items-center gap-3">
               <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
                 {listing.featuredLabel ?? "Disponible"}
@@ -117,7 +117,7 @@ export function MarketplacePropertyDetail({
             </div>
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-4xl">
+              <div className="min-w-0 max-w-4xl">
                 <h1 className="break-words text-3xl font-semibold leading-tight tracking-tight text-slate-950 sm:text-5xl">
                   {listing.title}
                 </h1>
@@ -133,7 +133,7 @@ export function MarketplacePropertyDetail({
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.25)]">
+              <div className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.25)] sm:w-auto">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Precio</p>
                 <p className="mt-2 text-3xl font-semibold text-slate-950">
                   {formatMoney(listing.price, listing.currency)}
@@ -146,7 +146,7 @@ export function MarketplacePropertyDetail({
 
             <PropertyGallery title={listing.title} images={listing.images} />
 
-            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">
               <SpecCard icon={<BedDouble className="size-4" />} label="Dormitorios" value={`${listing.bedrooms}`} hint={`${listing.suites} en suite`} />
               <SpecCard icon={<Bath className="size-4" />} label="Banos" value={`${listing.bathrooms}`} hint="configuracion actual" />
               <SpecCard icon={<Ruler className="size-4" />} label="Construccion" value={`${listing.area} m2`} hint={`${listing.lotArea} m2 totales`} />
@@ -154,7 +154,7 @@ export function MarketplacePropertyDetail({
             </div>
           </div>
 
-          <div className="space-y-5 xl:sticky xl:top-24 xl:h-fit">
+          <div className="min-w-0 space-y-5 xl:sticky xl:top-24 xl:h-fit">
             <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.25)] sm:p-6">
               <div className="flex items-start gap-4">
                 <div className="flex size-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
@@ -357,13 +357,13 @@ function SpecCard({
   hint: string;
 }) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-[0_20px_50px_-40px_rgba(15,23,42,0.2)]">
+    <div className="min-w-0 overflow-hidden rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-[0_20px_50px_-40px_rgba(15,23,42,0.2)]">
       <div className="flex size-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
         {icon}
       </div>
       <p className="mt-4 text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
-      <p className="mt-2 text-xl font-semibold text-slate-950">{value}</p>
-      <p className="mt-1 text-sm text-slate-500">{hint}</p>
+      <p className="mt-2 break-words text-xl font-semibold text-slate-950">{value}</p>
+      <p className="mt-1 break-words text-sm text-slate-500">{hint}</p>
     </div>
   );
 }

@@ -36,11 +36,11 @@ export function PropertyGallery({
   return (
     <>
       <div className={cn("min-w-0 space-y-3", className)}>
-        <div className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-white">
+        <div className="relative overflow-hidden rounded-[24px] border border-slate-200 bg-white sm:rounded-[28px]">
           <button
             type="button"
             onClick={() => setLightboxOpen(true)}
-            className="group relative block h-[260px] w-full bg-slate-100 sm:h-[420px] xl:h-[540px]"
+            className="group relative block h-[240px] w-full bg-slate-100 sm:h-[420px] xl:h-[540px]"
           >
             <Image
               src={activeImage}
@@ -71,14 +71,14 @@ export function PropertyGallery({
               <button
                 type="button"
                 onClick={goPrev}
-                className="absolute left-3 top-1/2 z-10 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/90 text-slate-900 shadow-lg backdrop-blur transition-colors hover:bg-white"
+                className="absolute left-3 top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/50 bg-white/95 text-slate-900 shadow-lg backdrop-blur transition-colors hover:bg-white"
               >
                 <ChevronLeft className="size-4" />
               </button>
               <button
                 type="button"
                 onClick={goNext}
-                className="absolute right-3 top-1/2 z-10 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/90 text-slate-900 shadow-lg backdrop-blur transition-colors hover:bg-white"
+                className="absolute right-3 top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/50 bg-white/95 text-slate-900 shadow-lg backdrop-blur transition-colors hover:bg-white"
               >
                 <ChevronRight className="size-4" />
               </button>
@@ -123,20 +123,41 @@ export function PropertyGallery({
               <button
                 type="button"
                 onClick={() => setLightboxOpen(false)}
-                className="flex size-10 items-center justify-center rounded-full border border-white/20 bg-white/10"
+                className="flex size-11 shrink-0 items-center justify-center rounded-full border border-white/60 bg-white text-slate-950 shadow-lg"
+                aria-label="Cerrar galeria"
               >
                 <X className="size-4" />
               </button>
             </div>
 
             <div className="mx-auto mt-4 flex w-full max-w-6xl flex-1 items-center justify-center">
-              <div className="relative h-full min-h-[280px] w-full overflow-hidden rounded-[28px] bg-slate-900">
+              <div className="relative h-full min-h-[280px] w-full overflow-hidden rounded-[24px] bg-slate-900 sm:rounded-[28px]">
                 <Image
                   src={activeImage}
                   alt={`${title} - ampliada ${activeIndex + 1}`}
                   fill
                   className="object-contain"
                 />
+                {gallery.length > 1 ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={goPrev}
+                      className="absolute left-3 top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/60 bg-white/95 text-slate-950 shadow-lg"
+                      aria-label="Imagen anterior"
+                    >
+                      <ChevronLeft className="size-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={goNext}
+                      className="absolute right-3 top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/60 bg-white/95 text-slate-950 shadow-lg"
+                      aria-label="Imagen siguiente"
+                    >
+                      <ChevronRight className="size-5" />
+                    </button>
+                  </>
+                ) : null}
               </div>
             </div>
 
@@ -145,15 +166,15 @@ export function PropertyGallery({
                 <button
                   type="button"
                   onClick={goPrev}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-3 text-sm font-semibold text-white sm:hidden"
                 >
                   <ChevronLeft className="size-4" />
-                  <span className="hidden sm:inline">Anterior</span>
+                  Anterior
                 </button>
                 <button
                   type="button"
                   onClick={() => setLightboxOpen(false)}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white sm:hidden"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/50 bg-white px-4 py-3 text-sm font-semibold text-slate-950 sm:hidden"
                 >
                   <X className="size-4" />
                   Cerrar
@@ -161,10 +182,10 @@ export function PropertyGallery({
                 <button
                   type="button"
                   onClick={goNext}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-3 text-sm font-semibold text-white sm:hidden"
                 >
-                  <span className="hidden sm:inline">Siguiente</span>
                   <ChevronRight className="size-4" />
+                  Siguiente
                 </button>
               </div>
             ) : null}

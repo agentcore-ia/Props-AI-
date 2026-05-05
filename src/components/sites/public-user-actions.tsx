@@ -13,7 +13,7 @@ export function PublicUserActions({
 }) {
   if (currentUser?.role === "customer") {
     return (
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <Link
           href="/cuenta"
           className="hidden rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:text-slate-950 sm:inline-flex"
@@ -23,10 +23,10 @@ export function PublicUserActions({
         <form method="post" action="/cuenta/logout">
           <button
             type="submit"
-            className="inline-flex h-10 items-center rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800 sm:h-11 sm:px-5"
+            className="inline-flex h-10 shrink-0 items-center rounded-2xl bg-slate-950 px-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 sm:h-11 sm:px-5"
           >
-            <span className="hidden sm:inline">Cerrar sesion</span>
             <span className="sm:hidden">Salir</span>
+            <span className="hidden sm:inline">Cerrar sesion</span>
           </button>
         </form>
       </div>
@@ -34,7 +34,7 @@ export function PublicUserActions({
   }
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex shrink-0 items-center gap-2 sm:gap-3">
       <Link
         href="/cuenta/login"
         className="hidden rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:text-slate-950 sm:inline-flex"
@@ -43,9 +43,10 @@ export function PublicUserActions({
       </Link>
       <Link
         href="/cuenta/registro"
-        className="inline-flex h-10 items-center rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800 sm:h-11 sm:px-5"
+        className="inline-flex h-10 shrink-0 items-center rounded-2xl bg-slate-950 px-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 sm:h-11 sm:px-5"
       >
-        Crear cuenta
+        <span className="sm:hidden">Cuenta</span>
+        <span className="hidden sm:inline">Crear cuenta</span>
       </Link>
     </div>
   );

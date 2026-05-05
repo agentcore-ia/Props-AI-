@@ -55,7 +55,7 @@ export function TenantPropertyDetail({
   return (
     <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,rgba(241,245,249,0.95)_0%,rgba(255,255,255,1)_28%,rgba(255,255,255,1)_100%)]">
       <header className="border-b border-slate-200 bg-white/85 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-5 sm:px-6 xl:px-8">
+        <div className="mx-auto flex max-w-[1440px] min-w-0 flex-col gap-4 px-4 py-5 sm:px-6 xl:px-8">
           <Link
             href="/"
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
@@ -64,8 +64,8 @@ export function TenantPropertyDetail({
             Volver al catalogo
           </Link>
 
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
+          <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0 max-w-3xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">
                 <Building2 className="size-3.5" />
                 {agency.name}
@@ -87,7 +87,7 @@ export function TenantPropertyDetail({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-white px-5 py-4 shadow-[0_18px_45px_-32px_rgba(15,23,42,0.25)]">
+            <div className="w-full rounded-[28px] border border-slate-200 bg-white px-5 py-4 shadow-[0_18px_45px_-32px_rgba(15,23,42,0.25)] sm:w-auto">
               <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Valor publicado</p>
               <p className="mt-2 text-3xl font-semibold text-slate-950">
                 {formatMoney(property.price, property.currency)}
@@ -97,13 +97,13 @@ export function TenantPropertyDetail({
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1440px] space-y-8 px-4 py-6 sm:px-6 xl:px-8">
-        <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-          <div className="space-y-4">
+      <main className="mx-auto max-w-[1440px] overflow-x-hidden space-y-8 px-4 py-6 sm:px-6 xl:px-8">
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] xl:items-start">
+          <div className="min-w-0 space-y-4">
             <PropertyGallery title={property.title} images={property.images} />
           </div>
 
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.3)] sm:p-6">
               <h2 className="text-2xl font-semibold text-slate-950">Resumen comercial</h2>
               <p className="mt-4 text-sm leading-7 text-slate-600">{property.description}</p>
