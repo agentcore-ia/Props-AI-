@@ -83,8 +83,6 @@ export function PublicMarketplace({
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [comparisonIds, setComparisonIds] = useState<string[]>([]);
   const [selectedMapListingId, setSelectedMapListingId] = useState<string | null>(null);
-  const [mobileMapMode, setMobileMapMode] = useState<"lista" | "mapa">("lista");
-  const [isDesktopMap, setIsDesktopMap] = useState(false);
   const deferredQuery = useDeferredValue(query);
 
   const listings = useMemo(() => buildPublicListings(properties, agencies), [agencies, properties]);
@@ -134,30 +132,6 @@ export function PublicMarketplace({
     }
   }, [filteredListings, selectedMapListingId]);
 
-  useEffect(() => {
-    if (section === "mapa") {
-      setMobileMapMode("mapa");
-    } else {
-      setMobileMapMode("lista");
-    }
-  }, [section]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const media = window.matchMedia("(min-width: 1280px)");
-    const update = () => setIsDesktopMap(media.matches);
-
-    update();
-    media.addEventListener("change", update);
-
-    return () => {
-      media.removeEventListener("change", update);
-    };
-  }, []);
-
   const selectedMapListing =
     filteredListings.find((listing) => listing.id === selectedMapListingId) ?? filteredListings[0] ?? null;
 
@@ -183,19 +157,19 @@ export function PublicMarketplace({
     [filteredListings]
   );
 
-  const aggregated = useMemo(() => {
-    const total = filteredListings.length;
-    const sales = filteredListings.filter((listing) => listing.operation === "Venta").length;
-    const rentals = filteredListings.filter((listing) => listing.operation === "Alquiler").length;
-    const avgYield =
-      total > 0
-        ? (
-            filteredListings.reduce((acc, listing) => acc + listing.yieldPercent, 0) / total
-          ).toFixed(1)
-        : "0.0";
-
-    return { total, sales, rentals, avgYield };
-  }, [filteredListings]);
+  const aggregated = useMemo(
+    () => ({
+      total: filteredListings.length,
+      avgYield:
+        filteredListings.length > 0
+          ? (
+              filteredListings.reduce((acc, listing) => acc + listing.yieldPercent, 0) /
+              filteredListings.length
+            ).toFixed(1)
+          : "0.0",
+    }),
+    [filteredListings]
+  );
 
   function toggleFavorite(id: string) {
     setFavoriteIds((current) =>
@@ -279,18 +253,7 @@ export function PublicMarketplace({
             <div className="min-w-0">
               <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
                 <Building2 className="size-3.5" />
-                {aggregated.total} publicaciones activas
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-sm text-slate-500">
-                <span className="rounded-full bg-slate-50 px-3 py-1.5 font-medium text-slate-700">
-                  {aggregated.sales} en venta
-                </span>
-                <span className="rounded-full bg-slate-50 px-3 py-1.5 font-medium text-slate-700">
-                  {aggregated.rentals} en alquiler
-                </span>
-                <span className="rounded-full bg-slate-50 px-3 py-1.5 font-medium text-slate-700">
-                  Yield medio {aggregated.avgYield}% anual
-                </span>
+                {aggregated.total} propiedades publicadas
               </div>
             </div>
 
@@ -385,84 +348,34 @@ export function PublicMarketplace({
 
         {section === "mapa" ? (
           <section className="mt-8 space-y-5">
-            <div className="flex items-center justify-between gap-3 xl:hidden">
-              <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
-                <button
-                  type="button"
-                  onClick={() => setMobileMapMode("lista")}
-                  className={cn(
-                    "rounded-full px-4 py-2 text-sm font-medium transition-colors",
-                    mobileMapMode === "lista"
-                      ? "bg-slate-950 text-white"
-                      : "text-slate-500"
-                  )}
-                >
-                  Lista
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMobileMapMode("mapa")}
-                  className={cn(
-                    "rounded-full px-4 py-2 text-sm font-medium transition-colors",
-                    mobileMapMode === "mapa"
-                      ? "bg-slate-950 text-white"
-                      : "text-slate-500"
-                  )}
-                >
-                  Mapa
-                </button>
-              </div>
-              <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-600">
-                {filteredListings.length} publicaciones
-              </div>
-            </div>
-
             <div className="grid gap-5 xl:grid-cols-[420px_minmax(0,1fr)] xl:items-start">
-              <div
-                className={cn(
-                  "space-y-3",
-                  !isDesktopMap && mobileMapMode === "mapa" ? "hidden" : "block"
-                )}
-              >
+              <div className="space-y-3 xl:max-h-[calc(100vh-220px)] xl:overflow-y-auto xl:pr-1">
                 <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.18)]">
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-slate-500">Resultados en la zona</p>
-                        <h3 className="mt-1 text-xl font-semibold text-slate-950">
-                          Lista rapida para explorar
-                        </h3>
-                      </div>
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                        {operationFilter === "all" ? "Todo" : operationFilter}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setOperationFilter("all")}
-                        className={pillClass(operationFilter === "all")}
-                      >
-                        Todo
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setOperationFilter("Venta")}
-                        className={pillClass(operationFilter === "Venta")}
-                      >
-                        Venta
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setOperationFilter("Alquiler")}
-                        className={pillClass(operationFilter === "Alquiler")}
-                      >
-                        Alquiler
-                      </button>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setOperationFilter("all")}
+                      className={pillClass(operationFilter === "all")}
+                    >
+                      Todo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOperationFilter("Venta")}
+                      className={pillClass(operationFilter === "Venta")}
+                    >
+                      Venta
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOperationFilter("Alquiler")}
+                      className={pillClass(operationFilter === "Alquiler")}
+                    >
+                      Alquiler
+                    </button>
                   </div>
                 </div>
-                <div className="space-y-3 xl:max-h-[72vh] xl:overflow-y-auto xl:pr-1">
+                <div className="space-y-3">
                   {filteredListings.map((listing) => (
                     <CompactMapListing
                       key={listing.id}
@@ -476,21 +389,14 @@ export function PublicMarketplace({
                 </div>
               </div>
 
-              <div
-                className={cn(
-                  "space-y-4 xl:sticky xl:top-24",
-                  !isDesktopMap && mobileMapMode === "lista" ? "hidden" : "block"
-                )}
-              >
-                {isDesktopMap || mobileMapMode === "mapa" ? (
-                  <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,rgba(222,246,247,0.9)_0%,rgba(228,236,247,0.96)_100%)] p-3 shadow-[0_32px_90px_-60px_rgba(15,23,42,0.32)] sm:rounded-[34px] sm:p-4">
-                    <PublicMarketplaceMap
-                      listings={filteredListings}
-                      selectedListingId={selectedMapListing?.id ?? null}
-                      onSelect={setSelectedMapListingId}
-                    />
-                  </div>
-                ) : null}
+              <div className="space-y-4 xl:sticky xl:top-24">
+                <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,rgba(222,246,247,0.9)_0%,rgba(228,236,247,0.96)_100%)] p-3 shadow-[0_32px_90px_-60px_rgba(15,23,42,0.32)] sm:rounded-[34px] sm:p-4">
+                  <PublicMarketplaceMap
+                    listings={filteredListings}
+                    selectedListingId={selectedMapListing?.id ?? null}
+                    onSelect={setSelectedMapListingId}
+                  />
+                </div>
 
                 {selectedMapListing ? (
                   <aside className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.2)] sm:p-5">
@@ -555,32 +461,6 @@ export function PublicMarketplace({
                     </div>
                   </aside>
                 ) : null}
-
-                <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_20px_55px_-42px_rgba(15,23,42,0.14)] xl:hidden">
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setOperationFilter("all")}
-                      className={pillClass(operationFilter === "all")}
-                    >
-                      Todo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOperationFilter("Venta")}
-                      className={pillClass(operationFilter === "Venta")}
-                    >
-                      Venta
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOperationFilter("Alquiler")}
-                      className={pillClass(operationFilter === "Alquiler")}
-                    >
-                      Alquiler
-                    </button>
-                  </div>
-                </div>
               </div>
             </div>
           </section>
