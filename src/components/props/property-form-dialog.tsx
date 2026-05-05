@@ -9,6 +9,7 @@ import {
   FileText,
   ImagePlus,
   Loader2,
+  MapPin,
   MapPinned,
   Plus,
   Sparkles,
@@ -67,35 +68,10 @@ const initialState = {
 };
 
 type GoogleAutocompleteInstance = {
-  addListener: (eventName: string, handler: () => void) => void;
-  getPlace: () => {
-    formatted_address?: string;
-    address_components?: Array<{
-      long_name: string;
-      short_name: string;
-      types: string[];
-    }>;
-  };
+  label: string;
+  exactAddress: string;
+  location: string;
 };
-
-declare global {
-  interface Window {
-    google?: {
-      maps?: {
-        places?: {
-          Autocomplete: new (
-            input: HTMLInputElement,
-            options?: {
-              fields?: string[];
-              componentRestrictions?: { country: string | string[] };
-            }
-          ) => GoogleAutocompleteInstance;
-        };
-      };
-    };
-    __propsGooglePlacesReady?: () => void;
-  }
-}
 
 function SectionTitle({
   eyebrow,
@@ -113,32 +89,6 @@ function SectionTitle({
       <p className="mt-1 text-sm text-muted-foreground">{description}</p>
     </div>
   );
-}
-
-function buildLocationFromAddressComponents(
-  addressComponents:
-    | Array<{
-        long_name: string;
-        short_name: string;
-        types: string[];
-      }>
-    | undefined
-) {
-  if (!addressComponents?.length) {
-    return "";
-  }
-
-  const findComponent = (...types: string[]) =>
-    addressComponents.find((component) => types.some((type) => component.types.includes(type)));
-
-  const neighborhood =
-    findComponent("sublocality_level_1", "neighborhood", "administrative_area_level_3")?.long_name ??
-    "";
-  const city =
-    findComponent("locality", "administrative_area_level_2", "administrative_area_level_1")?.long_name ??
-    "";
-
-  return [neighborhood, city].filter(Boolean).join(", ");
 }
 
 function resetRentalFields() {
@@ -184,9 +134,10 @@ export function PropertyFormDialog({
   });
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [contractFile, setContractFile] = useState<File | null>(null);
-  const [placesLoaded, setPlacesLoaded] = useState(false);
+  const [addressSuggestions, setAddressSuggestions] = useState<GoogleAutocompleteInstance[]>([]);
+  const [addressLoading, setAddressLoading] = useState(false);
   const addressInputRef = useRef<HTMLInputElement | null>(null);
-  const autocompleteRef = useRef<GoogleAutocompleteInstance | null>(null);
+  const addressRequestRef = useRef(0);
 
   const previews = useMemo(
     () => imageFiles.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })),
@@ -205,84 +156,61 @@ export function PropertyFormDialog({
   const exactAddressMapUrl = form.exactAddress.trim()
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(form.exactAddress.trim())}`
     : null;
-  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
   useEffect(() => {
-    if (!open || !googleMapsApiKey) {
+    if (!open) {
       return;
     }
 
-    if (window.google?.maps?.places?.Autocomplete) {
-      setPlacesLoaded(true);
+    const query = form.exactAddress.trim();
+
+    if (query.length < 5) {
+      setAddressSuggestions([]);
+      setAddressLoading(false);
       return;
     }
 
-    const existingScript = document.querySelector<HTMLScriptElement>(
-      'script[data-props-google-places="true"]'
-    );
+    const currentRequest = addressRequestRef.current + 1;
+    addressRequestRef.current = currentRequest;
 
-    if (existingScript) {
-      const onLoad = () => setPlacesLoaded(true);
-      existingScript.addEventListener("load", onLoad);
-      return () => existingScript.removeEventListener("load", onLoad);
-    }
+    const timeout = window.setTimeout(async () => {
+      setAddressLoading(true);
 
-    const callbackName = "__propsGooglePlacesReady";
-    window.__propsGooglePlacesReady = () => setPlacesLoaded(true);
+      try {
+        const response = await fetch(`/api/public/address-autocomplete?q=${encodeURIComponent(query)}`);
+        const payload = (await response.json()) as {
+          suggestions?: GoogleAutocompleteInstance[];
+        };
 
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places&callback=${callbackName}`;
-    script.async = true;
-    script.defer = true;
-    script.dataset.propsGooglePlaces = "true";
-    script.addEventListener("load", () => setPlacesLoaded(true));
-    document.head.appendChild(script);
+        if (addressRequestRef.current === currentRequest) {
+          setAddressSuggestions(Array.isArray(payload.suggestions) ? payload.suggestions : []);
+        }
+      } catch {
+        if (addressRequestRef.current === currentRequest) {
+          setAddressSuggestions([]);
+        }
+      } finally {
+        if (addressRequestRef.current === currentRequest) {
+          setAddressLoading(false);
+        }
+      }
+    }, 260);
 
     return () => {
-      if (window.__propsGooglePlacesReady) {
-        delete window.__propsGooglePlacesReady;
-      }
+      window.clearTimeout(timeout);
     };
-  }, [googleMapsApiKey, open]);
-
-  useEffect(() => {
-    if (!open || !placesLoaded || autocompleteRef.current || !addressInputRef.current) {
-      return;
-    }
-
-    if (!window.google?.maps?.places?.Autocomplete) {
-      return;
-    }
-
-    const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current, {
-      fields: ["formatted_address", "address_components"],
-      componentRestrictions: { country: "ar" },
-    });
-
-    autocomplete.addListener("place_changed", () => {
-      const place = autocomplete.getPlace();
-      const formattedAddress = place.formatted_address ?? addressInputRef.current?.value ?? "";
-      const derivedLocation = buildLocationFromAddressComponents(place.address_components);
-
-      setForm((prev) => ({
-        ...prev,
-        exactAddress: formattedAddress,
-        location: derivedLocation || prev.location || formattedAddress,
-      }));
-    });
-
-    autocompleteRef.current = autocomplete;
-  }, [open, placesLoaded]);
+  }, [form.exactAddress, open]);
 
   function resetDialogState() {
     setError(null);
     setImageFiles([]);
     setContractFile(null);
+    setAddressSuggestions([]);
+    setAddressLoading(false);
     setForm({
       ...initialState,
       tenantSlug: defaultSlug,
     });
-    autocompleteRef.current = null;
   }
 
   function handleOperationChange(nextOperation: Property["operation"]) {
@@ -371,6 +299,15 @@ export function PropertyFormDialog({
     setSubmitting(false);
     setOpen(false);
     router.refresh();
+  }
+
+  function applyAddressSuggestion(suggestion: GoogleAutocompleteInstance) {
+    setForm((prev) => ({
+      ...prev,
+      exactAddress: suggestion.exactAddress,
+      location: suggestion.location || prev.location,
+    }));
+    setAddressSuggestions([]);
   }
 
   return (
@@ -494,23 +431,56 @@ export function PropertyFormDialog({
 
                   <div className="space-y-2 xl:col-span-12">
                     <label className="text-sm font-medium">Direccion exacta</label>
-                    <Input
-                      ref={addressInputRef}
-                      placeholder="Av. del Libertador 2450, Belgrano, Ciudad Autonoma de Buenos Aires, Argentina"
-                      value={form.exactAddress}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, exactAddress: event.target.value }))
-                      }
-                    />
+                    <div className="relative">
+                      <Input
+                        ref={addressInputRef}
+                        placeholder="Av. del Libertador 2450, Belgrano, Ciudad Autonoma de Buenos Aires, Argentina"
+                        value={form.exactAddress}
+                        onChange={(event) =>
+                          setForm((prev) => ({ ...prev, exactAddress: event.target.value }))
+                        }
+                        onBlur={() => {
+                          window.setTimeout(() => {
+                            setAddressSuggestions([]);
+                          }, 140);
+                        }}
+                      />
+                      {addressLoading ? (
+                        <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-slate-400" />
+                      ) : null}
+                      {addressSuggestions.length ? (
+                        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 overflow-hidden rounded-2xl border bg-white shadow-2xl">
+                          <div className="max-h-64 overflow-y-auto p-2">
+                            {addressSuggestions.map((suggestion) => (
+                              <button
+                                key={`${suggestion.exactAddress}-${suggestion.location}`}
+                                type="button"
+                                onMouseDown={(event) => {
+                                  event.preventDefault();
+                                  applyAddressSuggestion(suggestion);
+                                }}
+                                className="flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-50"
+                              >
+                                <MapPin className="mt-0.5 size-4 shrink-0 text-primary" />
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-medium text-slate-900">
+                                    {suggestion.location || suggestion.label}
+                                  </span>
+                                  <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                                    {suggestion.exactAddress}
+                                  </span>
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                       <span>
-                        Escribela completa para que Google Maps la interprete bien y podamos mostrar la propiedad en el mapa.
+                        Escribela completa o elige una sugerencia para ubicar bien la propiedad en el mapa.
                       </span>
-                      {googleMapsApiKey ? (
-                        <span>Autocomplete activo con Google Places.</span>
-                      ) : (
-                        <span>Carga manual por ahora. Si agregas la key, se autocompleta.</span>
-                      )}
+                      <span>Autocomplete activo con OpenStreetMap.</span>
                     </div>
                     {exactAddressMapUrl ? (
                       <a
