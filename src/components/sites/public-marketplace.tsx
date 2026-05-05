@@ -83,6 +83,7 @@ export function PublicMarketplace({
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [comparisonIds, setComparisonIds] = useState<string[]>([]);
   const [selectedMapListingId, setSelectedMapListingId] = useState<string | null>(null);
+  const [isDesktopViewport, setIsDesktopViewport] = useState(false);
   const deferredQuery = useDeferredValue(query);
 
   const listings = useMemo(() => buildPublicListings(properties, agencies), [agencies, properties]);
@@ -120,6 +121,19 @@ export function PublicMarketplace({
       return searchable.includes(normalized);
     });
   }, [deferredQuery, listings, operationFilter]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1280px)");
+
+    const syncViewport = () => setIsDesktopViewport(media.matches);
+
+    syncViewport();
+    media.addEventListener("change", syncViewport);
+
+    return () => {
+      media.removeEventListener("change", syncViewport);
+    };
+  }, []);
 
   useEffect(() => {
     if (!filteredListings.length) {
@@ -380,99 +394,101 @@ export function PublicMarketplace({
               </div>
             </div>
 
-            <div className="space-y-4 xl:hidden">
+            {!isDesktopViewport ? (
               <div className="space-y-4">
-                <div className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,rgba(222,246,247,0.9)_0%,rgba(228,236,247,0.96)_100%)] p-3 shadow-[0_32px_90px_-60px_rgba(15,23,42,0.32)] sm:rounded-[34px] sm:p-4">
-                  <div className="pointer-events-none absolute left-6 top-6 z-[500] hidden rounded-full border border-slate-200 bg-white/92 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-lg backdrop-blur sm:inline-flex">
-                    {operationFilter === "all" ? "Todas las propiedades" : operationFilter}
+                <div className="space-y-4">
+                  <div className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,rgba(222,246,247,0.9)_0%,rgba(228,236,247,0.96)_100%)] p-3 shadow-[0_32px_90px_-60px_rgba(15,23,42,0.32)] sm:rounded-[34px] sm:p-4">
+                    <div className="pointer-events-none absolute left-6 top-6 z-[500] hidden rounded-full border border-slate-200 bg-white/92 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-lg backdrop-blur sm:inline-flex">
+                      {operationFilter === "all" ? "Todas las propiedades" : operationFilter}
+                    </div>
+                    <PublicMarketplaceMap
+                      listings={filteredListings}
+                      selectedListingId={selectedMapListing?.id ?? null}
+                      onSelect={setSelectedMapListingId}
+                    />
                   </div>
-                  <PublicMarketplaceMap
-                    listings={filteredListings}
-                    selectedListingId={selectedMapListing?.id ?? null}
-                    onSelect={setSelectedMapListingId}
-                  />
+
+                  {selectedMapListing ? (
+                    <aside className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.2)] sm:p-5">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">
+                            Ubicacion exacta
+                          </p>
+                          <h3 className="mt-2 break-words text-xl font-semibold text-slate-950 sm:text-2xl">
+                            {selectedMapListing.title}
+                          </h3>
+                          <p className="mt-2 text-sm leading-7 text-slate-600">
+                            {selectedMapListing.exactAddress || selectedMapListing.location}
+                          </p>
+                        </div>
+                        <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 sm:min-w-[200px]">
+                          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Precio</p>
+                          <p className="mt-2 text-xl font-semibold text-slate-950 sm:text-2xl">
+                            {formatMoney(selectedMapListing.price, selectedMapListing.currency)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-3 gap-3">
+                        <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
+                          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Dorm.</p>
+                          <p className="mt-1 text-base font-semibold text-slate-950">
+                            {selectedMapListing.bedrooms}
+                          </p>
+                        </div>
+                        <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
+                          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Banos</p>
+                          <p className="mt-1 text-base font-semibold text-slate-950">
+                            {selectedMapListing.bathrooms}
+                          </p>
+                        </div>
+                        <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
+                          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">m2</p>
+                          <p className="mt-1 text-base font-semibold text-slate-950">
+                            {selectedMapListing.area}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                        <Link
+                          href={selectedMapListing.routeHref}
+                          className="inline-flex flex-1 items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+                        >
+                          Ver ficha completa
+                        </Link>
+                        <a
+                          href={buildGoogleMapsExternalUrl(
+                            selectedMapListing.exactAddress || selectedMapListing.location
+                          )}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex flex-1 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                        >
+                          Abrir en Google Maps
+                        </a>
+                      </div>
+                    </aside>
+                  ) : null}
                 </div>
 
-                {selectedMapListing ? (
-                  <aside className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.2)] sm:p-5">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">
-                          Ubicacion exacta
-                        </p>
-                        <h3 className="mt-2 break-words text-xl font-semibold text-slate-950 sm:text-2xl">
-                          {selectedMapListing.title}
-                        </h3>
-                        <p className="mt-2 text-sm leading-7 text-slate-600">
-                          {selectedMapListing.exactAddress || selectedMapListing.location}
-                        </p>
-                      </div>
-                      <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 sm:min-w-[200px]">
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Precio</p>
-                        <p className="mt-2 text-xl font-semibold text-slate-950 sm:text-2xl">
-                          {formatMoney(selectedMapListing.price, selectedMapListing.currency)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-3 gap-3">
-                      <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Dorm.</p>
-                        <p className="mt-1 text-base font-semibold text-slate-950">
-                          {selectedMapListing.bedrooms}
-                        </p>
-                      </div>
-                      <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Banos</p>
-                        <p className="mt-1 text-base font-semibold text-slate-950">
-                          {selectedMapListing.bathrooms}
-                        </p>
-                      </div>
-                      <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">m2</p>
-                        <p className="mt-1 text-base font-semibold text-slate-950">
-                          {selectedMapListing.area}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                      <Link
-                        href={selectedMapListing.routeHref}
-                        className="inline-flex flex-1 items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
-                      >
-                        Ver ficha completa
-                      </Link>
-                      <a
-                        href={buildGoogleMapsExternalUrl(
-                          selectedMapListing.exactAddress || selectedMapListing.location
-                        )}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex flex-1 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-                      >
-                        Abrir en Google Maps
-                      </a>
-                    </div>
-                  </aside>
-                ) : null}
+                <div className="space-y-3">
+                  {filteredListings.map((listing) => (
+                    <CompactMapListing
+                      key={listing.id}
+                      listing={listing}
+                      isFavorite={favoriteIds.includes(listing.id)}
+                      isSelected={selectedMapListing?.id === listing.id}
+                      onToggleFavorite={toggleFavorite}
+                      onSelect={() => setSelectedMapListingId(listing.id)}
+                    />
+                  ))}
+                </div>
               </div>
-
-              <div className="space-y-3">
-                {filteredListings.map((listing) => (
-                  <CompactMapListing
-                    key={listing.id}
-                    listing={listing}
-                    isFavorite={favoriteIds.includes(listing.id)}
-                    isSelected={selectedMapListing?.id === listing.id}
-                    onToggleFavorite={toggleFavorite}
-                    onSelect={() => setSelectedMapListingId(listing.id)}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="hidden xl:grid xl:grid-cols-[360px_minmax(0,1fr)] xl:items-start xl:gap-4">
+            ) : null}
+            {isDesktopViewport ? (
+              <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)] xl:items-start">
               <div className="space-y-3 xl:max-h-[calc(100vh-210px)] xl:overflow-y-auto xl:pr-1">
                 <div className="space-y-3">
                   {filteredListings.map((listing) => (
@@ -565,6 +581,7 @@ export function PublicMarketplace({
                 ) : null}
               </div>
             </div>
+            ) : null}
           </section>
         ) : null}
 
