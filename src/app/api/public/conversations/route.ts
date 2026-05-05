@@ -124,7 +124,11 @@ export async function POST(request: Request) {
     .join("\n");
 
   let reply =
-    "Recibi tu consulta. Puedo ayudarte a precisar presupuesto, zona, tipo de propiedad o tiempos para que la inmobiliaria responda con una propuesta mejor armada.";
+    buildPropertyChatFallback({
+      property,
+      agencyName: agency.name,
+      message,
+    });
 
   if (openAI.configured) {
     const aiResponse = await fetch("https://api.openai.com/v1/responses", {
@@ -142,7 +146,7 @@ export async function POST(request: Request) {
               {
                 type: "input_text",
                 text:
-                  "Sos la IA de captacion de Props para compradores e inquilinos. Responde en espanol rioplatense, breve, amable y comercial. Ayuda a clarificar necesidades del cliente y prepara el contacto con la inmobiliaria. Usa direccion, moneda, expensas, requisitos, politica de mascotas y disponibilidad cuando aparezcan en la ficha. No prometas visitas ni disponibilidades exactas si no estan confirmadas.",
+                  "Sos la IA de captacion de Props para compradores e inquilinos. Responde en espanol rioplatense, breve, amable y comercial. Debes responder la pregunta concreta del usuario usando primero la propiedad consultada y luego, si ayuda, el catalogo adicional. Si te preguntan por precio, expensas, mascotas, ubicacion, disponibilidad, requisitos o ambientes, responde con esos datos. No repitas un mensaje generico si ya hay informacion suficiente. Cierra con una sola pregunta de avance o siguiente paso.",
               },
             ],
           },
@@ -162,7 +166,7 @@ export async function POST(request: Request) {
     if (aiResponse.ok) {
       const payload = (await aiResponse.json()) as { output_text?: string };
       if (payload.output_text) {
-        reply = payload.output_text;
+        reply = payload.output_text.trim();
       }
     }
   }
@@ -208,4 +212,86 @@ export async function POST(request: Request) {
     conversationId,
     reply,
   });
+}
+
+function buildPropertyChatFallback({
+  property,
+  agencyName,
+  message,
+}: {
+  property: {
+    title: string;
+    operation: string;
+    location: string;
+    exact_address: string | null;
+    description: string;
+    price: number;
+    currency: string;
+    property_type: string | null;
+    bedrooms: number | null;
+    bathrooms: number | null;
+    area: number | null;
+    expenses: number | null;
+    expenses_currency: string | null;
+    available_from: string | null;
+    pets_policy: string | null;
+    requirements: string | null;
+  };
+  agencyName: string;
+  message: string;
+}) {
+  const normalized = message.toLowerCase();
+  const address = property.exact_address || property.location;
+  const details = [
+    `${property.title} es una ${property.property_type?.toLowerCase() || "propiedad"} en ${property.location}.`,
+    `El valor publicado es ${property.price} ${property.currency}.`,
+  ];
+
+  if (
+    normalized.includes("precio") ||
+    normalized.includes("vale") ||
+    normalized.includes("cuanto") ||
+    normalized.includes("valor")
+  ) {
+    return `${details.join(" ")} Si querés, también te cuento expensas, requisitos o coordinamos una visita con ${agencyName}.`;
+  }
+
+  if (normalized.includes("expensa")) {
+    return property.expenses && property.expenses_currency
+      ? `Las expensas informadas son ${property.expenses} ${property.expenses_currency}. Si querés, también te paso disponibilidad y requisitos.`
+      : `En esta publicación no hay expensas cargadas. Si querés, dejo la consulta para que ${agencyName} te lo confirme.`;
+  }
+
+  if (normalized.includes("mascota")) {
+    return property.pets_policy
+      ? `Sobre mascotas, la publicación indica: ${property.pets_policy}. Si querés, también te puedo contar requisitos y disponibilidad.`
+      : `En esta propiedad no hay política de mascotas cargada. Si querés, le consulto a ${agencyName}.`;
+  }
+
+  if (normalized.includes("requis")) {
+    return property.requirements
+      ? `Los requisitos cargados son: ${property.requirements}`
+      : `Esta publicación no tiene requisitos cargados todavía. Si querés, le dejo la consulta a ${agencyName}.`;
+  }
+
+  if (normalized.includes("donde") || normalized.includes("ubic") || normalized.includes("direccion")) {
+    return `La propiedad está en ${address}. Si querés, también te paso precio, disponibilidad o coordinamos una visita.`;
+  }
+
+  if (normalized.includes("dispon")) {
+    return `La disponibilidad cargada es ${property.available_from || "inmediata"}. Si querés, también te cuento requisitos y próximos pasos para avanzar.`;
+  }
+
+  if (
+    normalized.includes("ambiente") ||
+    normalized.includes("dorm") ||
+    normalized.includes("baño") ||
+    normalized.includes("bano") ||
+    normalized.includes("metro") ||
+    normalized.includes("m2")
+  ) {
+    return `${property.title} tiene ${property.bedrooms ?? "n/d"} dormitorio(s), ${property.bathrooms ?? "n/d"} baño(s) y ${property.area ?? "n/d"} m2. Si querés, también te paso ubicación y precio.`;
+  }
+
+  return `Puedo ayudarte con el precio, la ubicación, la disponibilidad, las expensas o los requisitos de ${property.title}. Decime qué querés saber y te respondo puntual.`;
 }

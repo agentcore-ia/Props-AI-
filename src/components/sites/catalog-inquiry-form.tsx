@@ -13,16 +13,23 @@ export function CatalogInquiryForm({
   title = "Quiero que me contacten",
   description = "Deja tus datos y el equipo comercial te responde con opciones ajustadas a tu necesidad.",
   compact = false,
+  currentUser,
 }: {
   tenantSlug: string;
   propertyId?: null | string;
   title?: string;
   description?: string;
   compact?: boolean;
+  currentUser?: {
+    fullName: string | null;
+    email: string | null;
+    role: "superadmin" | "agency_admin" | "agent" | "customer";
+  } | null;
 }) {
+  const isLoggedCustomer = currentUser?.role === "customer";
   const [form, setForm] = useState({
-    name: "",
-    email: "",
+    name: currentUser?.fullName ?? "",
+    email: currentUser?.email ?? "",
     phone: "",
     budget: "",
     message: "",
@@ -59,8 +66,8 @@ export function CatalogInquiryForm({
       }
 
       setForm({
-        name: "",
-        email: "",
+        name: currentUser?.fullName ?? "",
+        email: currentUser?.email ?? "",
         phone: "",
         budget: "",
         message: "",
@@ -93,25 +100,29 @@ export function CatalogInquiryForm({
 
       <form onSubmit={handleSubmit} className="mt-5 space-y-3">
         <div className="grid gap-3 sm:grid-cols-2">
-          <Input
-            placeholder="Nombre"
-            value={form.name}
-            onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-            className="h-11 rounded-2xl border-slate-200 bg-slate-50 px-4"
-          />
-          <Input
-            type="email"
-            placeholder="Email"
-            value={form.email}
-            onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-            className="h-11 rounded-2xl border-slate-200 bg-slate-50 px-4"
-          />
-          <Input
-            placeholder="Telefono"
-            value={form.phone}
-            onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-            className="h-11 rounded-2xl border-slate-200 bg-slate-50 px-4"
-          />
+          {!isLoggedCustomer ? (
+            <>
+              <Input
+                placeholder="Nombre"
+                value={form.name}
+                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                className="h-11 rounded-2xl border-slate-200 bg-slate-50 px-4"
+              />
+              <Input
+                type="email"
+                placeholder="Email"
+                value={form.email}
+                onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+                className="h-11 rounded-2xl border-slate-200 bg-slate-50 px-4"
+              />
+              <Input
+                placeholder="Telefono"
+                value={form.phone}
+                onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+                className="h-11 rounded-2xl border-slate-200 bg-slate-50 px-4"
+              />
+            </>
+          ) : null}
           <Input
             placeholder="Presupuesto estimado"
             value={form.budget}

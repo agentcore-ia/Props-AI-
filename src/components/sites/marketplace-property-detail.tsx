@@ -210,8 +210,10 @@ export function MarketplacePropertyDetail({
               </div>
 
               <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Resumen de la propiedad</p>
-                <p className="mt-2 text-sm leading-7 text-slate-600">{listing.summary}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Contacto directo</p>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  Consulta disponibilidad, coordina una visita o pide propiedades similares con el equipo de {agency.name}.
+                </p>
               </div>
             </section>
 
@@ -225,6 +227,7 @@ export function MarketplacePropertyDetail({
             <CatalogInquiryForm
               tenantSlug={agency.slug}
               propertyId={property.id}
+              currentUser={currentUser}
               compact
               title="Solicitar mas informacion"
               description="Deja tus datos para coordinar visita, resolver dudas o recibir propiedades similares."

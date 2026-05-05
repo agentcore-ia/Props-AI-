@@ -1,24 +1,26 @@
 import { NextResponse } from "next/server";
 
+import { getCurrentUserContext } from "@/lib/auth/current-user";
 import { upsertLeadFromSignal } from "@/lib/crm-automation";
 import { listProperties } from "@/lib/props-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
+  const current = await getCurrentUserContext();
   const body = await request.json();
 
   const tenantSlug = String(body.tenantSlug ?? "").trim().toLowerCase();
   const propertyId = String(body.propertyId ?? "").trim() || null;
-  const name = String(body.name ?? "").trim();
-  const email = String(body.email ?? "").trim().toLowerCase();
+  const name = String(body.name ?? "").trim() || current?.profile.full_name || current?.user.email || "";
+  const email = String(body.email ?? "").trim().toLowerCase() || current?.user.email || "";
   const phone = String(body.phone ?? "").trim();
   const message = String(body.message ?? "").trim();
   const budget = String(body.budget ?? "").trim() || null;
   const operation = String(body.operation ?? "").trim() || null;
 
-  if (!tenantSlug || !name || !email || !phone || !message) {
+  if (!tenantSlug || !name || !email || !message) {
     return NextResponse.json(
-      { error: "Completa nombre, email, telefono y consulta." },
+      { error: "Completa al menos nombre, email y consulta." },
       { status: 400 }
     );
   }
