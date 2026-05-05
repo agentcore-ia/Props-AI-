@@ -70,7 +70,7 @@ export function MarketplacePropertyDetail({
   return (
     <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,rgba(237,242,255,0.88)_0%,rgba(247,249,252,1)_24%,rgba(255,255,255,1)_100%)]">
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/88 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1480px] flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6 xl:px-8">
+        <div className="mx-auto flex max-w-[1480px] flex-col gap-2 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6 xl:px-8">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <Link
               href="/"
@@ -86,20 +86,21 @@ export function MarketplacePropertyDetail({
             </Link>
           </div>
 
-          <div className="flex min-w-0 max-w-full justify-end gap-2 self-end sm:self-auto">
+          <div className="flex min-w-0 max-w-full flex-wrap justify-end gap-2 self-end sm:self-auto">
             <Link
               href={listing.catalogHref}
-              className="hidden rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-950 sm:inline-flex"
+              className="inline-flex h-10 items-center rounded-2xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:text-slate-950 sm:h-auto sm:px-4 sm:py-2"
             >
-              Ver catalogo de {agency.name}
+              <span className="sm:hidden">Catalogo</span>
+              <span className="hidden sm:inline">Ver catalogo de {agency.name}</span>
             </Link>
             <PublicUserActions currentUser={currentUser} />
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1480px] overflow-x-hidden space-y-8 px-4 py-6 sm:px-6 xl:px-8">
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] xl:items-start">
+      <main className="mx-auto max-w-[1480px] overflow-x-hidden space-y-6 px-4 py-5 sm:space-y-8 sm:px-6 sm:py-6 xl:px-8">
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] xl:items-start xl:gap-6">
           <div className="min-w-0 space-y-5">
             <div className="flex flex-wrap items-center gap-3">
               <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
@@ -118,7 +119,7 @@ export function MarketplacePropertyDetail({
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div className="min-w-0 max-w-4xl">
-                <h1 className="break-words text-3xl font-semibold leading-tight tracking-tight text-slate-950 sm:text-5xl">
+                <h1 className="break-words text-[2rem] font-semibold leading-[1.05] tracking-tight text-slate-950 sm:text-5xl">
                   {listing.title}
                 </h1>
                 <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-500">
@@ -133,7 +134,7 @@ export function MarketplacePropertyDetail({
                 </div>
               </div>
 
-              <div className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.25)] sm:w-auto">
+              <div className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.25)] sm:w-auto sm:min-w-[260px]">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Precio</p>
                 <p className="mt-2 text-3xl font-semibold text-slate-950">
                   {formatMoney(listing.price, listing.currency)}
@@ -154,7 +155,7 @@ export function MarketplacePropertyDetail({
             </div>
           </div>
 
-          <div className="min-w-0 space-y-5 xl:sticky xl:top-24 xl:h-fit">
+          <div className="min-w-0 space-y-4 xl:sticky xl:top-24 xl:h-fit xl:space-y-5">
             <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.25)] sm:p-6">
               <div className="flex items-start gap-4">
                 <div className="flex size-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
@@ -200,7 +201,7 @@ export function MarketplacePropertyDetail({
           <div className="space-y-6">
             <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)] sm:p-6">
               <p className="text-sm font-medium text-slate-500">Acerca de esta propiedad</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+              <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
                 Una ficha clara para acelerar la decision
               </h2>
               <div className="mt-5 space-y-4 text-sm leading-8 text-slate-600 sm:text-base">
@@ -211,7 +212,7 @@ export function MarketplacePropertyDetail({
 
             <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)] sm:p-6">
               <p className="text-sm font-medium text-slate-500">Condiciones y requisitos</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+              <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
                 Informacion clave antes de consultar
               </h2>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -243,7 +244,7 @@ export function MarketplacePropertyDetail({
 
             <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)] sm:p-6">
               <p className="text-sm font-medium text-slate-500">Amenities y ventajas</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+              <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
                 Lo mas importante en una sola vista
               </h2>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -264,7 +265,7 @@ export function MarketplacePropertyDetail({
               <p className="text-sm font-medium uppercase tracking-[0.18em] text-blue-100">
                 Lectura de inversion
               </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+              <h2 className="mt-2 text-xl font-semibold tracking-tight sm:text-3xl">
                 Indicadores para comparar rapido
               </h2>
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -285,7 +286,7 @@ export function MarketplacePropertyDetail({
 
             <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)] sm:p-6">
               <p className="text-sm font-medium text-slate-500">Ubicacion</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+              <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
                 Direccion cargada para mapa y visita
               </h2>
               <div className="mt-6 overflow-hidden rounded-[28px] border border-slate-200 bg-white">
@@ -318,22 +319,22 @@ export function MarketplacePropertyDetail({
                 Propiedades relacionadas
               </h2>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-2 xl:grid-cols-3 xl:gap-4">
               {relatedListings.map((item) => (
                 <Link
                   key={item.id}
                   href={item.routeHref}
                   className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_24px_70px_-52px_rgba(15,23,42,0.24)] transition-transform hover:-translate-y-1"
                 >
-                  <div className="relative h-44 overflow-hidden sm:h-52">
+                  <div className="relative h-32 overflow-hidden sm:h-52">
                     <Image src={item.image} alt={item.title} fill className="object-cover" />
                   </div>
-                  <div className="space-y-2 p-4 sm:p-5">
-                    <p className="text-lg font-semibold text-slate-950 sm:text-xl">
+                  <div className="space-y-2 p-3 sm:p-5">
+                    <p className="text-base font-semibold text-slate-950 sm:text-xl">
                       {formatMoney(item.price, item.currency)}
                     </p>
-                    <h3 className="line-clamp-2 text-base font-semibold text-slate-900 sm:text-lg">{item.title}</h3>
-                    <p className="line-clamp-2 text-sm text-slate-500">{item.location}</p>
+                    <h3 className="line-clamp-2 text-sm font-semibold text-slate-900 sm:text-lg">{item.title}</h3>
+                    <p className="line-clamp-2 text-xs text-slate-500 sm:text-sm">{item.location}</p>
                   </div>
                 </Link>
               ))}

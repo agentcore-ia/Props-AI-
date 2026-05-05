@@ -40,7 +40,7 @@ export function PropertyGallery({
           <button
             type="button"
             onClick={() => setLightboxOpen(true)}
-            className="group relative block h-[240px] w-full bg-slate-100 sm:h-[420px] xl:h-[540px]"
+            className="group relative block h-[220px] w-full bg-slate-100 sm:h-[420px] xl:h-[540px]"
           >
             <Image
               src={activeImage}
@@ -87,14 +87,14 @@ export function PropertyGallery({
         </div>
 
         {gallery.length > 1 ? (
-          <div className="flex gap-2 overflow-x-auto pb-1 sm:gap-3">
+          <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 sm:gap-3">
             {gallery.map((image, index) => (
               <button
                 key={`${image}-${index}`}
                 type="button"
                 onClick={() => setActiveIndex(index)}
                 className={cn(
-                  "relative h-16 w-20 shrink-0 overflow-hidden rounded-[16px] border bg-white sm:h-24 sm:w-32 sm:rounded-[18px]",
+                  "relative h-16 w-20 shrink-0 snap-start overflow-hidden rounded-[16px] border bg-white sm:h-24 sm:w-32 sm:rounded-[18px]",
                   index === activeIndex ? "border-slate-950 ring-2 ring-slate-950/10" : "border-slate-200"
                 )}
               >

@@ -40,6 +40,10 @@ body {
   overflow-x: hidden;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 * {
   border-color: hsl(var(--border));
 }
@@ -93,5 +97,13 @@ body {
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+}
+
+@media (max-width: 640px) {
+  .leaflet-control-container .leaflet-top,
+  .leaflet-control-container .leaflet-bottom {
+    transform: scale(0.92);
+    transform-origin: top right;
   }
 }
