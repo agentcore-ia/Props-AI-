@@ -18,11 +18,47 @@ function normalizeWhitespace(text: string) {
   return text.replace(/\s+/g, " ").trim();
 }
 
+const SPANISH_MONTHS: Record<string, string> = {
+  enero: "01",
+  febrero: "02",
+  marzo: "03",
+  abril: "04",
+  mayo: "05",
+  junio: "06",
+  julio: "07",
+  agosto: "08",
+  septiembre: "09",
+  setiembre: "09",
+  octubre: "10",
+  noviembre: "11",
+  diciembre: "12",
+};
+
+function normalizeTextForMatching(text: string) {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function toIsoDate(day: string, month: string, year: string) {
   const normalizedYear = year.length === 2 ? `20${year}` : year;
   const dd = day.padStart(2, "0");
   const mm = month.padStart(2, "0");
   return `${normalizedYear}-${mm}-${dd}`;
+}
+
+function toIsoDateFromMonthName(day: string, monthName: string, year: string) {
+  const month = SPANISH_MONTHS[monthName.toLowerCase()];
+  if (!month) return null;
+  return toIsoDate(day, month, year);
+}
+
+function toIsoDateWithFallbackDay(day: string | null, monthName: string, year: string) {
+  const month = SPANISH_MONTHS[monthName.toLowerCase()];
+  if (!month) return null;
+  return `${year}-${month}-${(day ?? "01").padStart(2, "0")}`;
 }
 
 function parseAmount(raw: string) {
@@ -107,28 +143,52 @@ function inferIndexType(text: string) {
 }
 
 function inferContractStartDate(text: string) {
+  const normalized = normalizeTextForMatching(text);
   const candidates = [
     /(?:inicio|vigencia|comienza|comenzara|inicia|fecha de inicio)[^0-9]{0,25}(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/i,
     /(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/i,
   ];
 
   for (const pattern of candidates) {
-    const match = text.match(pattern);
+    const match = normalized.match(pattern);
     if (match) {
       return toIsoDate(match[1], match[2], match[3]);
+    }
+  }
+
+  const textualCandidates = [
+    /(?:a partir del|inicio|vigencia|comienza|comenzara|inicia|fecha de inicio)[^a-z0-9]{0,20}(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\s+del?\s+ano)?\s+(\d{4})/i,
+    /(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\s+del?\s+ano)?\s+(\d{4})/i,
+  ];
+
+  for (const pattern of textualCandidates) {
+    const match = normalized.match(pattern);
+    if (match) {
+      return toIsoDateFromMonthName(match[1], match[2], match[3]);
     }
   }
 
   return null;
 }
 
-function inferNextAdjustmentDate(text: string) {
-  const match = text.match(
+function inferNextAdjustmentDate(text: string, contractStartDate: string | null) {
+  const normalized = normalizeTextForMatching(text);
+  const numericMatch = normalized.match(
     /(?:proximo|primer|siguiente)\s+(?:ajuste|aumento|actualizacion)[^0-9]{0,25}(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/i
   );
 
-  if (!match) return null;
-  return toIsoDate(match[1], match[2], match[3]);
+  if (numericMatch) {
+    return toIsoDate(numericMatch[1], numericMatch[2], numericMatch[3]);
+  }
+
+  const textualMatch = normalized.match(
+    /(?:proximo|primer|siguiente)\s+(?:ajuste|aumento|actualizacion)[^a-z0-9]{0,30}(?:correspondera\s+en\s+el\s+)?mes\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\s+del?\s+ano)?\s+(\d{4})/i
+  );
+
+  if (!textualMatch) return null;
+
+  const referenceDay = contractStartDate?.split("-")[2] ?? "01";
+  return toIsoDateWithFallbackDay(referenceDay, textualMatch[1], textualMatch[2]);
 }
 
 function inferTenantName(text: string) {
@@ -221,7 +281,10 @@ export async function analyzeRentalContractText({
   const detectedIndexType = inferIndexType(normalizedText);
   const detectedAdjustmentFrequencyMonths = inferFrequencyMonths(normalizedText);
   const detectedContractStartDate = inferContractStartDate(normalizedText);
-  const detectedNextAdjustmentDate = inferNextAdjustmentDate(normalizedText);
+  const detectedNextAdjustmentDate = inferNextAdjustmentDate(
+    normalizedText,
+    detectedContractStartDate
+  );
 
   const currentRent = detectedCurrentRent ?? fallbackRent;
   const indexType = detectedIndexType ?? null;
