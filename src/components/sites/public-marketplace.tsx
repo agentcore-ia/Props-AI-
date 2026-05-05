@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 
 import type { Agency, Property } from "@/lib/mock-data";
+import { CatalogAssistant } from "@/components/sites/catalog-assistant";
 import { PublicUserActions } from "@/components/sites/public-user-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -766,6 +767,14 @@ export function PublicMarketplace({
           </section>
         ) : null}
       </main>
+
+      <CatalogAssistant
+        properties={properties}
+        mode="floating"
+        launcherText="Te ayudo a encontrar tu proxima propiedad"
+        heading="Decime que buscas"
+        welcomeMessage="Puedo ayudarte a filtrar por barrio, precio, operacion o tipo de propiedad."
+      />
     </div>
   );
 }

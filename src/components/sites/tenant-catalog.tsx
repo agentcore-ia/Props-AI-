@@ -283,15 +283,18 @@ export function TenantCatalog({
         </section>
 
         <div className="space-y-6 xl:sticky xl:top-6 xl:h-fit">
-          <div className="xl:hidden">
-            <CatalogAssistant tenantSlug={agency.slug} properties={properties} />
-          </div>
           <CatalogInquiryForm tenantSlug={agency.slug} />
-          <div className="hidden xl:block">
-            <CatalogAssistant tenantSlug={agency.slug} properties={properties} />
-          </div>
         </div>
       </main>
+
+      <CatalogAssistant
+        tenantSlug={agency.slug}
+        properties={properties}
+        mode="floating"
+        launcherText={`Te ayudo a encontrar tu proxima propiedad en ${agency.city}`}
+        heading={`Busquemos dentro de ${agency.name}`}
+        welcomeMessage={`Decime zona, presupuesto o tipo de propiedad y te sugiero opciones reales de ${agency.name}.`}
+      />
     </div>
   );
 }

@@ -9,19 +9,21 @@ export async function POST(request: Request) {
   const tenantSlug = String(body.tenantSlug ?? "").trim().toLowerCase();
   const prompt = String(body.prompt ?? "").trim();
 
-  if (!tenantSlug || !prompt) {
+  if (!prompt) {
     return NextResponse.json(
-      { error: "Falta el tenant o la consulta." },
+      { error: "Falta la consulta." },
       { status: 400 }
     );
   }
 
-  const properties = await listProperties({ tenantSlug });
+  const properties = await listProperties(tenantSlug ? { tenantSlug } : undefined);
 
   if (properties.length === 0) {
     return NextResponse.json({
       reply:
-      "Todavia no hay propiedades publicadas para este portafolio. Proba de nuevo mas tarde o dejanos tu consulta.",
+        tenantSlug
+          ? "Todavia no hay propiedades publicadas para este portafolio. Proba de nuevo mas tarde o dejanos tu consulta."
+          : "Todavia no hay propiedades publicadas en este momento. Proba de nuevo mas tarde o dejanos tu consulta.",
     });
   }
 
@@ -43,7 +45,8 @@ export async function POST(request: Request) {
       )
     .join("\n");
 
-  const localReply = buildMarketplaceAssistantFallback(properties, prompt);
+  const assistantHints = buildAssistantHints(properties, prompt);
+  const localReply = buildMarketplaceAssistantFallback(properties, prompt, assistantHints);
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -60,7 +63,7 @@ export async function POST(request: Request) {
             {
               type: "input_text",
               text:
-      "Sos un asesor inmobiliario digital de Props. Responde en espanol claro, breve y comercial. Solo podes recomendar propiedades del portafolio provisto. Usa direccion, moneda, requisitos, politica de mascotas, expensas, disponibilidad y amenities cuando existan. Si faltan datos, pedi presupuesto, zona y cantidad de ambientes. No inventes propiedades ni disponibilidad.",
+                "Sos un asesor inmobiliario digital de Props. Responde en espanol rioplatense, con tono humano y comercial. Responde siempre corto: 2 a 4 frases o hasta 3 bullets. Solo podes recomendar propiedades del inventario provisto. Si el pedido no tiene coincidencia exacta, ofrece 2 o 3 alternativas cercanas y pide solo el dato minimo que falta, como barrio, presupuesto o ambientes. Nunca inventes disponibilidad, fotos ni propiedades.",
             },
           ],
         },
@@ -69,11 +72,12 @@ export async function POST(request: Request) {
           content: [
             {
               type: "input_text",
-        text: `Portafolio disponible:\n${catalogContext}\n\nConsulta del cliente:\n${prompt}`,
+              text: `Inventario disponible:\n${catalogContext}\n\nSugerencias internas del buscador:\n${assistantHints.debugSummary}\n\nConsulta del cliente:\n${prompt}`,
             },
           ],
         },
       ],
+      max_output_tokens: 220,
     }),
   });
 
@@ -132,50 +136,224 @@ function extractResponseText(payload: Record<string, unknown>) {
   return "";
 }
 
-function buildMarketplaceAssistantFallback(properties: Property[], prompt: string) {
-  const normalized = prompt.toLowerCase();
-  const desiredOperation =
-    normalized.includes("alquiler") || normalized.includes("alquilar")
-      ? "Alquiler"
-      : normalized.includes("venta") || normalized.includes("comprar") || normalized.includes("compra")
-        ? "Venta"
-        : null;
+type PropertyMatch = {
+  property: Property;
+  score: number;
+};
 
-  const matches = properties.filter((property) => {
-    if (desiredOperation && property.operation !== desiredOperation) {
-      return false;
-    }
+type AssistantHints = {
+  desiredOperation: Property["operation"] | null;
+  inferredPlaces: string[];
+  exactMatches: PropertyMatch[];
+  suggestedMatches: PropertyMatch[];
+  debugSummary: string;
+};
 
-    const searchable =
-      `${property.title} ${property.location} ${property.exactAddress} ${property.propertyType} ${property.description}`.toLowerCase();
+function buildAssistantHints(properties: Property[], prompt: string): AssistantHints {
+  const normalizedPrompt = normalizeText(prompt);
+  const desiredOperation = inferOperation(normalizedPrompt);
+  const promptTokens = extractMeaningfulTokens(normalizedPrompt);
+  const inferredPlaces = Array.from(
+    new Set(
+      properties
+        .flatMap((property) => buildLocationTokens(property))
+        .filter((token) => normalizedPrompt.includes(token))
+    )
+  );
 
-    const locationWords = normalized
-      .split(/\s+/)
-      .filter((word) => word.length > 3)
-      .filter((word) => !["busco", "quiero", "alquiler", "venta", "comprar", "depto", "departamento", "casa", "ph"].includes(word));
+  const scoredMatches = properties
+    .map((property) => ({
+      property,
+      score: scorePropertyMatch(property, promptTokens, desiredOperation, inferredPlaces),
+    }))
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score);
 
-    if (locationWords.length === 0) {
-      return true;
-    }
+  const exactMatches = scoredMatches.filter((item) => item.score >= 8).slice(0, 3);
+  const fallbackPool = (exactMatches.length > 0 ? scoredMatches : scoredMatches.filter((item) => item.score >= 3)).slice(0, 3);
+  const suggestedMatches =
+    fallbackPool.length > 0
+      ? fallbackPool
+      : properties
+          .filter((property) => !desiredOperation || property.operation === desiredOperation)
+          .slice(0, 3)
+          .map((property) => ({ property, score: 1 }));
 
-    return locationWords.some((word) => searchable.includes(word));
-  });
+  return {
+    desiredOperation,
+    inferredPlaces,
+    exactMatches,
+    suggestedMatches,
+    debugSummary: [
+      `operacion inferida: ${desiredOperation ?? "sin definir"}`,
+      inferredPlaces.length > 0 ? `zonas detectadas: ${inferredPlaces.join(", ")}` : "zonas detectadas: ninguna",
+      exactMatches.length > 0
+        ? `coincidencias fuertes: ${exactMatches.map((item) => `${item.property.title} (${item.property.location})`).join(" | ")}`
+        : "coincidencias fuertes: ninguna",
+      suggestedMatches.length > 0
+        ? `alternativas sugeridas: ${suggestedMatches.map((item) => `${item.property.title} (${item.property.location})`).join(" | ")}`
+        : "alternativas sugeridas: ninguna",
+    ].join("\n"),
+  };
+}
 
-  if (matches.length === 0) {
-    const operations = desiredOperation ? ` de ${desiredOperation.toLowerCase()}` : "";
-    return `No encontre propiedades${operations} que coincidan claramente con esa zona o busqueda. Si queres, decime barrio, presupuesto y cantidad de ambientes y te ayudo a afinar mejor.`;
+function buildMarketplaceAssistantFallback(
+  properties: Property[],
+  prompt: string,
+  hints: AssistantHints
+) {
+  const source = hints.exactMatches.length > 0 ? hints.exactMatches : hints.suggestedMatches;
+
+  if (source.length === 0) {
+    const operations = hints.desiredOperation ? ` de ${hints.desiredOperation.toLowerCase()}` : "";
+    return `No vi opciones${operations} que coincidan bien con eso. Decime barrio, presupuesto o ambientes y te propongo alternativas concretas.`;
   }
 
-  const topMatches = matches.slice(0, 3);
   const intro =
-    topMatches.length === 1
-      ? "Encontre esta opcion que encaja bien con lo que buscas:"
-      : "Encontre estas opciones que encajan bastante bien con lo que buscas:";
+    hints.exactMatches.length > 0
+      ? "Te recomiendo estas opciones:"
+      : hints.inferredPlaces.length > 0
+        ? `No encontre una coincidencia exacta en ${hints.inferredPlaces[0]}, pero mira estas alternativas cercanas:`
+        : "No encontre una coincidencia exacta, pero estas opciones te pueden servir:";
 
-  const lines = topMatches.map((property) => {
-    const price = `${property.currency === "USD" ? "US$" : "$"} ${Number(property.price).toLocaleString("es-AR")}`;
-    return `- ${property.title} en ${property.location}: ${price}, ${property.bedrooms} dorm., ${property.area} m2.`;
-  });
+  const lines = source.slice(0, 3).map((item) => summarizeProperty(item.property));
+  const closing =
+    hints.exactMatches.length > 0
+      ? "Si queres, te filtro por presupuesto o cantidad de ambientes."
+      : "Si queres, te ajusto la busqueda por barrio, presupuesto o tipo de propiedad.";
 
-  return `${intro}\n${lines.join("\n")}\nSi queres, te recomiendo una segun presupuesto, ubicacion o tipo de operacion.`;
+  return `${intro}\n${lines.join("\n")}\n${closing}`;
+}
+
+function summarizeProperty(property: Property) {
+  const price = `${property.currency === "USD" ? "US$" : "$"} ${Number(property.price).toLocaleString("es-AR")}`;
+  const bedroomLabel = property.bedrooms > 0 ? `${property.bedrooms} amb.` : property.propertyType;
+  return `- ${property.title} · ${property.location} · ${price} · ${bedroomLabel}`;
+}
+
+function inferOperation(normalizedPrompt: string): Property["operation"] | null {
+  if (/(alquiler|alquilar|renta|rentar|alquilo)/.test(normalizedPrompt)) {
+    return "Alquiler";
+  }
+
+  if (/(venta|comprar|compra|inversion|invertir)/.test(normalizedPrompt)) {
+    return "Venta";
+  }
+
+  return null;
+}
+
+function scorePropertyMatch(
+  property: Property,
+  promptTokens: string[],
+  desiredOperation: Property["operation"] | null,
+  inferredPlaces: string[]
+) {
+  let score = 0;
+  const searchable = buildSearchableText(property);
+  const locationTokens = buildLocationTokens(property);
+
+  if (desiredOperation && property.operation === desiredOperation) {
+    score += 4;
+  }
+
+  for (const place of inferredPlaces) {
+    if (locationTokens.includes(place)) {
+      score += 6;
+    }
+  }
+
+  for (const token of promptTokens) {
+    if (locationTokens.includes(token)) {
+      score += 4;
+      continue;
+    }
+
+    if (searchable.includes(token)) {
+      score += 2;
+    }
+  }
+
+  if (promptTokens.some((token) => isPropertyTypeToken(token, property.propertyType))) {
+    score += 2;
+  }
+
+  return score;
+}
+
+function buildSearchableText(property: Property) {
+  return normalizeText(
+    [
+      property.title,
+      property.location,
+      property.exactAddress,
+      property.propertyType,
+      property.description,
+      property.requirements,
+      property.petsPolicy,
+      property.operation,
+      property.status,
+      ...property.amenities,
+    ].join(" ")
+  );
+}
+
+function buildLocationTokens(property: Property) {
+  const base = normalizeText(`${property.location} ${property.exactAddress}`);
+  const tokens = extractMeaningfulTokens(base);
+  const aliases: string[] = [];
+
+  if (base.includes("caba") || base.includes("ciudad autonoma") || base.includes("buenos aires")) {
+    aliases.push("caba", "capital", "capital federal", "buenos aires");
+  }
+
+  return Array.from(new Set([...tokens, ...aliases]));
+}
+
+function extractMeaningfulTokens(normalizedText: string) {
+  const stopWords = new Set([
+    "busco",
+    "quiero",
+    "necesito",
+    "alquiler",
+    "alquilar",
+    "venta",
+    "comprar",
+    "compra",
+    "depto",
+    "departamento",
+    "casa",
+    "ph",
+    "con",
+    "para",
+    "por",
+    "del",
+    "las",
+    "los",
+    "una",
+    "uno",
+    "que",
+    "zona",
+    "propiedad",
+    "propiedades",
+  ]);
+
+  return normalizedText
+    .split(/[^a-z0-9]+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3 && !stopWords.has(token));
+}
+
+function normalizeText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isPropertyTypeToken(token: string, propertyType: Property["propertyType"]) {
+  const normalizedType = normalizeText(propertyType);
+  return normalizedType.includes(token) || token.includes(normalizedType);
 }
