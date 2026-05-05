@@ -473,16 +473,41 @@ export function PublicMarketplace({
                 )}
               >
                 <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.18)]">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-slate-500">Resultados en la zona</p>
-                      <h3 className="mt-1 text-xl font-semibold text-slate-950">
-                        Lista rapida para explorar
-                      </h3>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-slate-500">Resultados en la zona</p>
+                        <h3 className="mt-1 text-xl font-semibold text-slate-950">
+                          Lista rapida para explorar
+                        </h3>
+                      </div>
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                        {operationFilter === "all" ? "Todo" : operationFilter}
+                      </span>
                     </div>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                      {operationFilter === "all" ? "Todo" : operationFilter}
-                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setOperationFilter("all")}
+                        className={pillClass(operationFilter === "all")}
+                      >
+                        Todo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOperationFilter("Venta")}
+                        className={pillClass(operationFilter === "Venta")}
+                      >
+                        Venta
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOperationFilter("Alquiler")}
+                        className={pillClass(operationFilter === "Alquiler")}
+                      >
+                        Alquiler
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-3 xl:max-h-[72vh] xl:overflow-y-auto xl:pr-1">
@@ -578,6 +603,32 @@ export function PublicMarketplace({
                     </div>
                   </aside>
                 ) : null}
+
+                <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_20px_55px_-42px_rgba(15,23,42,0.14)] xl:hidden">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setOperationFilter("all")}
+                      className={pillClass(operationFilter === "all")}
+                    >
+                      Todo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOperationFilter("Venta")}
+                      className={pillClass(operationFilter === "Venta")}
+                    >
+                      Venta
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOperationFilter("Alquiler")}
+                      className={pillClass(operationFilter === "Alquiler")}
+                    >
+                      Alquiler
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
