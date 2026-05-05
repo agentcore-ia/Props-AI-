@@ -262,6 +262,7 @@ export function PublicMarketplace({
       </header>
 
       <main className="mx-auto max-w-[1480px] overflow-x-hidden px-4 py-6 sm:px-6 xl:px-8">
+        {section !== "mapa" ? (
         <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.24)] sm:p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0">
@@ -304,8 +305,12 @@ export function PublicMarketplace({
             </div>
           </div>
         </section>
+        ) : null}
 
-        <section className="mt-6 flex flex-col gap-4 rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.25)] sm:rounded-[30px] lg:flex-row lg:items-center lg:justify-between">
+        <section className={cn(
+          "flex flex-col gap-4 rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.25)] sm:rounded-[30px] lg:flex-row lg:items-center lg:justify-between",
+          section === "mapa" ? "mt-4" : "mt-6"
+        )}>
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => setOperationFilter("all")} className={pillClass(operationFilter === "all")}>
               Todo
@@ -362,38 +367,6 @@ export function PublicMarketplace({
 
         {section === "mapa" ? (
           <section className="mt-8 space-y-4">
-            <div className="rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.2)] sm:rounded-[28px] sm:px-5">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
-                  <Map className="size-3.5" />
-                  {filteredListings.length} propiedades
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setOperationFilter("all")}
-                    className={pillClass(operationFilter === "all")}
-                  >
-                    Todo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOperationFilter("Venta")}
-                    className={pillClass(operationFilter === "Venta")}
-                  >
-                    Venta
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOperationFilter("Alquiler")}
-                    className={pillClass(operationFilter === "Alquiler")}
-                  >
-                    Alquiler
-                  </button>
-                </div>
-              </div>
-            </div>
-
             {!isDesktopViewport ? (
               <div className="space-y-4">
                 <div className="space-y-4">
