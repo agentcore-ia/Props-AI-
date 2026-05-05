@@ -20,7 +20,6 @@ import {
   MapPin,
   Radar,
   Search,
-  Sparkles,
   Star,
 } from "lucide-react";
 
@@ -275,22 +274,28 @@ export function PublicMarketplace({
       </header>
 
       <main className="mx-auto max-w-[1480px] overflow-x-hidden px-4 py-6 sm:px-6 xl:px-8">
-        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_28px_90px_-55px_rgba(15,23,42,0.32)] sm:rounded-[34px]">
-          <div className="grid gap-0 xl:grid-cols-[1.08fr_0.92fr]">
-            <div className="px-4 py-6 sm:px-8 sm:py-10">
-              <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">
+        <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.24)] sm:p-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
                 <Building2 className="size-3.5" />
-                Marketplace para comprar y alquilar
+                {aggregated.total} publicaciones activas
               </div>
-              <h1 className="mt-4 max-w-4xl text-3xl font-semibold tracking-tight text-slate-950 sm:text-5xl xl:text-6xl">
-                Busca mejor, compara mejor y pregunta antes de contactar
-              </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-lg">
-                Props reune publicaciones de distintas inmobiliarias para ayudarte a descubrir,
-                entender condiciones reales y tomar una decision con mas contexto.
-              </p>
+              <div className="mt-3 flex flex-wrap gap-2 text-sm text-slate-500">
+                <span className="rounded-full bg-slate-50 px-3 py-1.5 font-medium text-slate-700">
+                  {aggregated.sales} en venta
+                </span>
+                <span className="rounded-full bg-slate-50 px-3 py-1.5 font-medium text-slate-700">
+                  {aggregated.rentals} en alquiler
+                </span>
+                <span className="rounded-full bg-slate-50 px-3 py-1.5 font-medium text-slate-700">
+                  Yield medio {aggregated.avgYield}% anual
+                </span>
+              </div>
+            </div>
 
-              <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-3 sm:rounded-[28px]">
+            <div className="w-full xl:max-w-[760px]">
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-3 sm:rounded-[28px]">
                 <div className="flex flex-col gap-3 lg:flex-row">
                   <div className="relative flex-1">
                     <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -317,50 +322,6 @@ export function PublicMarketplace({
                       {item}
                     </button>
                   ))}
-                </div>
-              </div>
-
-              <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <StatCard label="Propiedades activas" value={String(aggregated.total)} />
-                <StatCard label="En venta" value={String(aggregated.sales)} />
-                <StatCard label="En alquiler" value={String(aggregated.rentals)} />
-                <StatCard label="Yield medio" value={`${aggregated.avgYield}% anual`} />
-              </div>
-            </div>
-
-            <div className="relative min-h-[240px] overflow-hidden bg-slate-950 sm:min-h-[320px]">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(96,165,250,0.24),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.18),transparent_30%)]" />
-              <div className="absolute inset-0 opacity-70">
-                <Image
-                  src={
-                    filteredListings[0]?.image ??
-                    listings[0]?.image ??
-                    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80"
-                  }
-                  alt="Marketplace Props"
-                  fill
-                  className="object-cover opacity-40"
-                />
-              </div>
-              <div className="relative flex h-full flex-col justify-between p-5 text-white sm:p-8">
-                <div className="flex flex-wrap gap-3">
-                  <InfoPill icon={<LayoutGrid className="size-4" />} text="Explorador" />
-                  <InfoPill icon={<Map className="size-4" />} text="Mapa con direccion" />
-                  <InfoPill icon={<Heart className="size-4" />} text="Favoritos y comparacion" />
-                </div>
-
-                <div className="space-y-4">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] backdrop-blur-md">
-                    <Sparkles className="size-3.5" />
-                    Experiencia guiada para compradores e inquilinos
-                  </div>
-                  <h2 className="max-w-xl text-2xl font-semibold leading-tight sm:text-4xl">
-                    La IA te ayuda a entender requisitos, costos y disponibilidad desde la ficha
-                  </h2>
-                  <p className="max-w-lg text-sm leading-6 text-white/78 sm:text-base sm:leading-7">
-                    Guarda favoritos, retoma conversaciones y llega mejor preparado al contacto con
-                    cada inmobiliaria.
-                  </p>
                 </div>
               </div>
             </div>
@@ -1062,24 +1023,6 @@ function SectionHeading({
       <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
         {description}
       </p>
-    </div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4">
-      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
-      <p className="mt-2 text-lg font-semibold text-slate-950">{value}</p>
-    </div>
-  );
-}
-
-function InfoPill({ icon, text }: { icon: ReactNode; text: string }) {
-  return (
-    <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md">
-      {icon}
-      {text}
     </div>
   );
 }
