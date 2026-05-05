@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import {
@@ -15,6 +14,7 @@ import {
 
 import type { Agency, Property } from "@/lib/mock-data";
 import { CatalogInquiryForm } from "@/components/sites/catalog-inquiry-form";
+import { PropertyGallery } from "@/components/sites/property-gallery";
 import { TenantPropertyCard } from "@/components/sites/tenant-property-card";
 import {
   buildGoogleMapsEmbedUrl,
@@ -97,27 +97,14 @@ export function TenantPropertyDetail({
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1440px] space-y-10 px-4 py-8 sm:px-6 xl:px-8">
-        <section className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
+      <main className="mx-auto max-w-[1440px] space-y-8 px-4 py-6 sm:px-6 xl:px-8">
+        <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-4">
-            <div className="relative h-[340px] overflow-hidden rounded-[30px] border border-slate-200 bg-white sm:h-[440px] xl:h-[560px]">
-              <Image src={property.images[0]} alt={property.title} fill className="object-cover" />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              {property.images.slice(1, 4).map((image) => (
-                <div
-                  key={image}
-                  className="relative h-28 overflow-hidden rounded-[24px] border border-slate-200 bg-white sm:h-36"
-                >
-                  <Image src={image} alt={property.title} fill className="object-cover" />
-                </div>
-              ))}
-            </div>
+            <PropertyGallery title={property.title} images={property.images} />
           </div>
 
           <div className="space-y-6">
-            <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.3)]">
+            <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.3)] sm:p-6">
               <h2 className="text-2xl font-semibold text-slate-950">Resumen comercial</h2>
               <p className="mt-4 text-sm leading-7 text-slate-600">{property.description}</p>
 
@@ -190,7 +177,7 @@ export function TenantPropertyDetail({
           </div>
         </section>
 
-        <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.22)]">
+        <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.22)] sm:p-6">
           <p className="text-sm font-medium text-slate-500">Ubicacion</p>
           <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
             Direccion cargada para llegar mejor a la visita
@@ -199,7 +186,7 @@ export function TenantPropertyDetail({
             <iframe
               title={`Mapa de ${property.title}`}
               src={buildGoogleMapsEmbedUrl(address)}
-              className="h-[360px] w-full border-0"
+              className="h-[280px] w-full border-0 sm:h-[360px]"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
             />
@@ -224,7 +211,7 @@ export function TenantPropertyDetail({
               </h2>
             </div>
 
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {relatedProperties.map((item) => (
                 <TenantPropertyCard key={item.id} property={item} />
               ))}

@@ -17,6 +17,7 @@ import {
 
 import type { Agency, Property } from "@/lib/mock-data";
 import { CatalogInquiryForm } from "@/components/sites/catalog-inquiry-form";
+import { PropertyGallery } from "@/components/sites/property-gallery";
 import { PublicCustomerChat } from "@/components/sites/public-customer-chat";
 import { PublicUserActions } from "@/components/sites/public-user-actions";
 import { buildPublicListings } from "@/lib/public-marketplace";
@@ -69,14 +70,15 @@ export function MarketplacePropertyDetail({
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,rgba(237,242,255,0.88)_0%,rgba(247,249,252,1)_24%,rgba(255,255,255,1)_100%)]">
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/88 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1480px] items-center justify-between gap-4 px-4 py-4 sm:px-6 xl:px-8">
-          <div className="flex items-center gap-4">
+        <div className="mx-auto flex max-w-[1480px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 xl:px-8">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-950"
+              className="inline-flex shrink-0 items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-950"
             >
               <ArrowLeft className="size-4" />
-              Volver a explorar
+              <span className="hidden sm:inline">Volver a explorar</span>
+              <span className="sm:hidden">Volver</span>
             </Link>
             <div className="hidden h-6 w-px bg-slate-200 sm:block" />
             <Link href="/" className="hidden text-xl font-semibold tracking-tight text-slate-950 sm:block">
@@ -96,9 +98,9 @@ export function MarketplacePropertyDetail({
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1480px] space-y-10 px-4 py-8 sm:px-6 xl:px-8">
-        <section className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="space-y-6">
+      <main className="mx-auto max-w-[1480px] space-y-8 px-4 py-6 sm:px-6 xl:px-8">
+        <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-3">
               <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
                 {listing.featuredLabel ?? "Disponible"}
@@ -116,7 +118,7 @@ export function MarketplacePropertyDetail({
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-4xl">
-                <h1 className="text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
+                <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
                   {listing.title}
                 </h1>
                 <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-500">
@@ -131,7 +133,7 @@ export function MarketplacePropertyDetail({
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-slate-200 bg-white px-5 py-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.25)]">
+              <div className="rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.25)]">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Precio</p>
                 <p className="mt-2 text-3xl font-semibold text-slate-950">
                   {formatMoney(listing.price, listing.currency)}
@@ -142,30 +144,7 @@ export function MarketplacePropertyDetail({
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="relative h-[320px] overflow-hidden rounded-[32px] border border-slate-200 bg-white sm:h-[460px] xl:h-[560px]">
-                <Image src={listing.images[0]} alt={listing.title} fill className="object-cover" />
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-4">
-                {listing.images.slice(1, 4).map((image, index) => (
-                  <div
-                    key={`${image}-${index}`}
-                    className="relative h-28 overflow-hidden rounded-[24px] border border-slate-200 bg-white sm:h-36"
-                  >
-                    <Image src={image} alt={listing.title} fill className="object-cover" />
-                  </div>
-                ))}
-                <div className="flex items-center justify-center rounded-[24px] border border-dashed border-slate-300 bg-slate-50 text-center">
-                  <div>
-                    <p className="text-2xl font-semibold text-slate-900">
-                      +{Math.max(0, listing.images.length - 3)}
-                    </p>
-                    <p className="text-sm text-slate-500">Mas vistas</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <PropertyGallery title={listing.title} images={listing.images} />
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <SpecCard icon={<BedDouble className="size-4" />} label="Dormitorios" value={`${listing.bedrooms}`} hint={`${listing.suites} en suite`} />
@@ -175,8 +154,8 @@ export function MarketplacePropertyDetail({
             </div>
           </div>
 
-          <div className="space-y-6 xl:sticky xl:top-24 xl:h-fit">
-            <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.25)]">
+          <div className="space-y-5 xl:sticky xl:top-24 xl:h-fit">
+            <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.25)] sm:p-6">
               <div className="flex items-start gap-4">
                 <div className="flex size-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
                   <Sparkles className="size-6" />
@@ -217,9 +196,9 @@ export function MarketplacePropertyDetail({
           </div>
         </section>
 
-        <section className="grid gap-8 xl:grid-cols-[1.05fr_0.95fr]">
-          <div className="space-y-8">
-            <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)]">
+        <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="space-y-6">
+            <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)] sm:p-6">
               <p className="text-sm font-medium text-slate-500">Acerca de esta propiedad</p>
               <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
                 Una ficha clara para acelerar la decision
@@ -230,7 +209,7 @@ export function MarketplacePropertyDetail({
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)]">
+            <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)] sm:p-6">
               <p className="text-sm font-medium text-slate-500">Condiciones y requisitos</p>
               <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
                 Informacion clave antes de consultar
@@ -262,7 +241,7 @@ export function MarketplacePropertyDetail({
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)]">
+            <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)] sm:p-6">
               <p className="text-sm font-medium text-slate-500">Amenities y ventajas</p>
               <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
                 Lo mas importante en una sola vista
@@ -280,8 +259,8 @@ export function MarketplacePropertyDetail({
             </section>
           </div>
 
-          <div className="space-y-8">
-            <section className="rounded-[30px] border border-slate-200 bg-slate-950 p-6 text-white shadow-[0_28px_90px_-58px_rgba(15,23,42,0.34)]">
+          <div className="space-y-6">
+            <section className="rounded-[26px] border border-slate-200 bg-slate-950 p-5 text-white shadow-[0_28px_90px_-58px_rgba(15,23,42,0.34)] sm:p-6">
               <p className="text-sm font-medium uppercase tracking-[0.18em] text-blue-100">
                 Lectura de inversion
               </p>
@@ -304,7 +283,7 @@ export function MarketplacePropertyDetail({
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)]">
+            <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)] sm:p-6">
               <p className="text-sm font-medium text-slate-500">Ubicacion</p>
               <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
                 Direccion cargada para mapa y visita
@@ -313,7 +292,7 @@ export function MarketplacePropertyDetail({
                 <iframe
                   title={`Mapa de ${listing.title}`}
                   src={buildGoogleMapsEmbedUrl(address)}
-                  className="h-[340px] w-full border-0"
+                  className="h-[280px] w-full border-0 sm:h-[340px]"
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
                 />
@@ -339,22 +318,22 @@ export function MarketplacePropertyDetail({
                 Propiedades relacionadas
               </h2>
             </div>
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {relatedListings.map((item) => (
                 <Link
                   key={item.id}
                   href={item.routeHref}
-                  className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_24px_70px_-52px_rgba(15,23,42,0.24)] transition-transform hover:-translate-y-1"
+                  className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_24px_70px_-52px_rgba(15,23,42,0.24)] transition-transform hover:-translate-y-1"
                 >
-                  <div className="relative h-56 overflow-hidden">
+                  <div className="relative h-44 overflow-hidden sm:h-52">
                     <Image src={item.image} alt={item.title} fill className="object-cover" />
                   </div>
-                  <div className="space-y-3 p-5">
-                    <p className="text-xl font-semibold text-slate-950">
+                  <div className="space-y-2 p-4 sm:p-5">
+                    <p className="text-lg font-semibold text-slate-950 sm:text-xl">
                       {formatMoney(item.price, item.currency)}
                     </p>
-                    <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
-                    <p className="text-sm text-slate-500">{item.location}</p>
+                    <h3 className="line-clamp-2 text-base font-semibold text-slate-900 sm:text-lg">{item.title}</h3>
+                    <p className="line-clamp-2 text-sm text-slate-500">{item.location}</p>
                   </div>
                 </Link>
               ))}

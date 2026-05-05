@@ -198,9 +198,9 @@ export function PublicMarketplace({
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,rgba(237,242,255,0.9)_0%,rgba(246,248,252,1)_24%,rgba(255,255,255,1)_100%)]">
       <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1480px] items-center justify-between gap-4 px-4 py-4 sm:px-6 xl:px-8">
-          <div className="flex items-center gap-8">
-            <Link href="/" className="text-2xl font-semibold tracking-tight text-slate-950">
+        <div className="mx-auto flex max-w-[1480px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 xl:px-8">
+          <div className="flex min-w-0 items-center gap-4 sm:gap-8">
+            <Link href="/" className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
               Props
             </Link>
 
@@ -230,25 +230,44 @@ export function PublicMarketplace({
             <PublicUserActions currentUser={currentUser} />
           </div>
         </div>
+        <div className="px-4 pb-3 md:hidden sm:px-6">
+          <nav className="-mx-1 flex gap-2 overflow-x-auto px-1">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setSection(item.id)}
+                className={cn(
+                  "shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition-colors",
+                  section === item.id
+                    ? "border-slate-950 bg-slate-950 text-white"
+                    : "border-slate-200 bg-white text-slate-600"
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
       </header>
 
       <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 xl:px-8">
-        <section className="overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-[0_28px_90px_-55px_rgba(15,23,42,0.32)]">
+        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_28px_90px_-55px_rgba(15,23,42,0.32)] sm:rounded-[34px]">
           <div className="grid gap-0 xl:grid-cols-[1.08fr_0.92fr]">
-            <div className="px-5 py-7 sm:px-8 sm:py-10">
+            <div className="px-4 py-6 sm:px-8 sm:py-10">
               <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">
                 <Building2 className="size-3.5" />
                 Marketplace para comprar y alquilar
               </div>
-              <h1 className="mt-5 max-w-4xl text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl xl:text-6xl">
+              <h1 className="mt-4 max-w-4xl text-3xl font-semibold tracking-tight text-slate-950 sm:text-5xl xl:text-6xl">
                 Busca mejor, compara mejor y pregunta antes de contactar
               </h1>
-              <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600 sm:text-lg">
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-lg">
                 Props reune publicaciones de distintas inmobiliarias para ayudarte a descubrir,
                 entender condiciones reales y tomar una decision con mas contexto.
               </p>
 
-              <div className="mt-8 rounded-[28px] border border-slate-200 bg-slate-50 p-3">
+              <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-3 sm:rounded-[28px]">
                 <div className="flex flex-col gap-3 lg:flex-row">
                   <div className="relative flex-1">
                     <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -259,7 +278,7 @@ export function PublicMarketplace({
                       className="h-12 rounded-2xl border-0 bg-white pl-11 shadow-none ring-1 ring-slate-200"
                     />
                   </div>
-                  <Button className="h-12 rounded-2xl px-6" onClick={() => setSection("explorar")}>
+                  <Button className="h-12 rounded-2xl px-5 sm:px-6" onClick={() => setSection("explorar")}>
                     Buscar
                   </Button>
                 </div>
@@ -278,7 +297,7 @@ export function PublicMarketplace({
                 </div>
               </div>
 
-              <div className="mt-8 grid gap-3 sm:grid-cols-4">
+              <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <StatCard label="Propiedades activas" value={String(aggregated.total)} />
                 <StatCard label="En venta" value={String(aggregated.sales)} />
                 <StatCard label="En alquiler" value={String(aggregated.rentals)} />
@@ -286,7 +305,7 @@ export function PublicMarketplace({
               </div>
             </div>
 
-            <div className="relative min-h-[320px] overflow-hidden bg-slate-950">
+            <div className="relative min-h-[240px] overflow-hidden bg-slate-950 sm:min-h-[320px]">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(96,165,250,0.24),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.18),transparent_30%)]" />
               <div className="absolute inset-0 opacity-70">
                 <Image
@@ -300,7 +319,7 @@ export function PublicMarketplace({
                   className="object-cover opacity-40"
                 />
               </div>
-              <div className="relative flex h-full flex-col justify-between p-6 text-white sm:p-8">
+              <div className="relative flex h-full flex-col justify-between p-5 text-white sm:p-8">
                 <div className="flex flex-wrap gap-3">
                   <InfoPill icon={<LayoutGrid className="size-4" />} text="Explorador" />
                   <InfoPill icon={<Map className="size-4" />} text="Mapa con direccion" />
@@ -312,10 +331,10 @@ export function PublicMarketplace({
                     <Sparkles className="size-3.5" />
                     Experiencia guiada para compradores e inquilinos
                   </div>
-                  <h2 className="max-w-xl text-3xl font-semibold leading-tight sm:text-4xl">
+                  <h2 className="max-w-xl text-2xl font-semibold leading-tight sm:text-4xl">
                     La IA te ayuda a entender requisitos, costos y disponibilidad desde la ficha
                   </h2>
-                  <p className="max-w-lg text-sm leading-7 text-white/78 sm:text-base">
+                  <p className="max-w-lg text-sm leading-6 text-white/78 sm:text-base sm:leading-7">
                     Guarda favoritos, retoma conversaciones y llega mejor preparado al contacto con
                     cada inmobiliaria.
                   </p>
@@ -325,7 +344,7 @@ export function PublicMarketplace({
           </div>
         </section>
 
-        <section className="mt-6 flex flex-col gap-4 rounded-[30px] border border-slate-200 bg-white px-4 py-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.25)] lg:flex-row lg:items-center lg:justify-between">
+        <section className="mt-6 flex flex-col gap-4 rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.25)] sm:rounded-[30px] lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => setOperationFilter("all")} className={pillClass(operationFilter === "all")}>
               Todo
@@ -359,13 +378,13 @@ export function PublicMarketplace({
         </section>
 
         {section === "explorar" ? (
-          <section className="mt-10 space-y-6">
+          <section className="mt-8 space-y-5 sm:mt-10 sm:space-y-6">
             <SectionHeading
               eyebrow="Explorador"
               title="Propiedades destacadas"
               description={`${filteredListings.length} resultados para explorar, ordenar y abrir en detalle.`}
             />
-            <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
               {filteredListings.map((listing) => (
                 <MarketplacePropertyCard
                   key={listing.id}
@@ -381,14 +400,14 @@ export function PublicMarketplace({
         ) : null}
 
         {section === "mapa" ? (
-          <section className="mt-10 grid gap-6 xl:grid-cols-[380px_1fr]">
+          <section className="mt-8 grid gap-6 xl:grid-cols-[380px_1fr]">
             <div className="space-y-4">
               <SectionHeading
                 eyebrow="Vista mapa"
                 title={`${filteredListings.length} propiedades en contexto`}
                 description="Explora todas las publicaciones sobre el mapa y selecciona una para ver su direccion exacta y abrir la ficha."
               />
-              <div className="max-h-[640px] space-y-4 overflow-y-auto pr-1">
+              <div className="max-h-[640px] space-y-3 overflow-y-auto pr-1">
                 {filteredListings.map((listing) => (
                   <CompactMapListing
                     key={listing.id}
@@ -402,7 +421,7 @@ export function PublicMarketplace({
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-[34px] border border-slate-200 bg-[linear-gradient(180deg,rgba(222,246,247,0.9)_0%,rgba(228,236,247,0.96)_100%)] p-5 shadow-[0_32px_90px_-60px_rgba(15,23,42,0.32)] sm:p-6">
+            <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,rgba(222,246,247,0.9)_0%,rgba(228,236,247,0.96)_100%)] p-4 shadow-[0_32px_90px_-60px_rgba(15,23,42,0.32)] sm:rounded-[34px] sm:p-6">
               <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
                 <PublicMarketplaceMap
                   listings={filteredListings}
@@ -411,7 +430,7 @@ export function PublicMarketplace({
                 />
 
                 {selectedMapListing ? (
-                  <aside className="rounded-[28px] border border-white/70 bg-white/92 p-5 shadow-lg backdrop-blur">
+                  <aside className="rounded-[24px] border border-white/70 bg-white/92 p-4 shadow-lg backdrop-blur sm:rounded-[28px] sm:p-5">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">
                         Ubicacion exacta
@@ -476,7 +495,7 @@ export function PublicMarketplace({
         ) : null}
 
         {section === "favoritos" ? (
-          <section className="mt-10 space-y-8">
+          <section className="mt-8 space-y-6 sm:mt-10 sm:space-y-8">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <SectionHeading
                 eyebrow="Favoritos y comparacion"
@@ -570,7 +589,7 @@ export function PublicMarketplace({
         ) : null}
 
         {section === "inversiones" ? (
-          <section className="mt-10 space-y-8">
+          <section className="mt-8 space-y-6 sm:mt-10 sm:space-y-8">
             <SectionHeading
               eyebrow="Inversiones"
               title="Oportunidades priorizadas por retorno"
@@ -701,8 +720,8 @@ function MarketplacePropertyCard({
   onToggleComparison: (id: string) => void;
 }) {
   return (
-    <article className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_28px_80px_-52px_rgba(15,23,42,0.28)] transition-transform duration-300 hover:-translate-y-1.5">
-      <div className="relative h-64 overflow-hidden sm:h-72">
+    <article className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_28px_80px_-52px_rgba(15,23,42,0.28)] transition-transform duration-300 hover:-translate-y-1">
+      <div className="relative h-48 overflow-hidden sm:h-64">
         <Link href={listing.routeHref} className="block h-full">
           <Image
             src={listing.image}
@@ -739,16 +758,16 @@ function MarketplacePropertyCard({
         </button>
       </div>
 
-      <div className="space-y-4 p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-4">
+      <div className="space-y-4 p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-3xl font-semibold tracking-tight text-slate-950">
+            <p className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
               {formatMoney(listing.price, listing.currency)}
             </p>
-            <h3 className="mt-2 text-xl font-semibold text-slate-900">{listing.title}</h3>
+            <h3 className="mt-2 line-clamp-2 text-lg font-semibold text-slate-900 sm:text-xl">{listing.title}</h3>
             <div className="mt-2 flex items-start gap-2 text-sm text-slate-500">
               <MapPin className="mt-0.5 size-4 shrink-0" />
-              <span>{listing.location}</span>
+              <span className="line-clamp-2">{listing.location}</span>
             </div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-right">
@@ -757,7 +776,7 @@ function MarketplacePropertyCard({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-4 border-y border-slate-100 py-3 text-sm text-slate-600">
+        <div className="flex flex-wrap gap-3 border-y border-slate-100 py-3 text-sm text-slate-600">
           <div className="inline-flex items-center gap-2">
             <BedDouble className="size-4" />
             {listing.bedrooms}
@@ -772,33 +791,26 @@ function MarketplacePropertyCard({
           </div>
         </div>
 
-        <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
-          <div className="grid gap-2 text-sm text-slate-600">
-            <div>
-              <span className="font-medium text-slate-900">Direccion:</span>{" "}
-              {listing.exactAddress || listing.location}
-            </div>
-            <div>
-              <span className="font-medium text-slate-900">Mascotas:</span>{" "}
-              {listing.petsPolicy || "Consultar"}
-            </div>
-            <div>
-              <span className="font-medium text-slate-900">Requisitos:</span>{" "}
-              {listing.requirements || "Consultar con la inmobiliaria"}
-            </div>
-          </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600">
+            {listing.agencyName}
+          </span>
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600">
+            {listing.petsPolicy || "Mascotas a consultar"}
+          </span>
+          {listing.availableFrom ? (
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600">
+              Disponible {listing.availableFrom}
+            </span>
+          ) : null}
         </div>
 
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Inmobiliaria</p>
-            <p className="mt-1 font-semibold text-slate-950">{listing.agencyName}</p>
-          </div>
           <button
             type="button"
             onClick={() => onToggleComparison(listing.id)}
             className={cn(
-              "rounded-full border px-4 py-2 text-sm font-medium transition-colors",
+              "rounded-full border px-3 py-2 text-sm font-medium transition-colors sm:px-4",
               isInComparison
                 ? "border-slate-950 bg-slate-950 text-white"
                 : "border-slate-200 bg-white text-slate-600 hover:text-slate-950"
@@ -806,21 +818,12 @@ function MarketplacePropertyCard({
           >
             {isInComparison ? "Comparando" : "Comparar"}
           </button>
-        </div>
-
-        <div className="flex items-center justify-between pt-1">
           <Link
             href={listing.routeHref}
             className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 transition-colors hover:text-blue-800"
           >
             Ver detalle
             <ArrowRight className="size-4" />
-          </Link>
-          <Link
-            href={listing.catalogHref}
-            className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
-          >
-            Catalogo de la inmobiliaria
           </Link>
         </div>
       </div>
@@ -844,22 +847,22 @@ function CompactMapListing({
   return (
     <article
       className={cn(
-        "rounded-[28px] border bg-white p-4 shadow-[0_20px_55px_-42px_rgba(15,23,42,0.22)] transition-colors",
+        "rounded-[22px] border bg-white p-3 shadow-[0_20px_55px_-42px_rgba(15,23,42,0.22)] transition-colors sm:rounded-[28px] sm:p-4",
         isSelected ? "border-slate-950 ring-2 ring-slate-950/10" : "border-slate-200"
       )}
     >
       <button type="button" onClick={onSelect} className="block w-full text-left">
-        <div className="grid gap-4 sm:grid-cols-[120px_1fr]">
-          <div className="relative h-28 overflow-hidden rounded-[20px]">
+        <div className="grid gap-3 sm:grid-cols-[108px_1fr]">
+          <div className="relative h-24 overflow-hidden rounded-[16px] sm:h-28 sm:rounded-[20px]">
             <Image src={listing.image} alt={listing.title} fill className="object-cover" />
           </div>
           <div className="min-w-0">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xl font-semibold text-slate-950">
+                <p className="text-lg font-semibold text-slate-950 sm:text-xl">
                   {formatMoney(listing.price, listing.currency)}
                 </p>
-                <h3 className="mt-1 font-semibold text-slate-900">{listing.title}</h3>
+                <h3 className="mt-1 line-clamp-2 font-semibold text-slate-900">{listing.title}</h3>
               </div>
               <button
                 type="button"
@@ -877,7 +880,7 @@ function CompactMapListing({
                 <Heart className={cn("size-4", isFavorite ? "fill-current" : "")} />
               </button>
             </div>
-            <p className="mt-2 text-sm text-slate-500">{listing.location}</p>
+            <p className="mt-2 line-clamp-2 text-sm text-slate-500">{listing.location}</p>
             <div className="mt-3 flex flex-wrap gap-3 text-sm text-slate-600">
               <span>{listing.bedrooms} dorm.</span>
               <span>{listing.bathrooms} banos</span>

@@ -9,9 +9,9 @@ export function TenantPropertyCard({ property }: { property: Property }) {
   return (
     <Link
       href={`/propiedad/${property.id}`}
-      className="group block h-full overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_24px_70px_-44px_rgba(15,23,42,0.32)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_30px_80px_-42px_rgba(37,99,235,0.35)]"
+      className="group block h-full overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_24px_70px_-44px_rgba(15,23,42,0.32)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_30px_80px_-42px_rgba(37,99,235,0.35)]"
     >
-      <div className="relative h-64 overflow-hidden sm:h-72">
+      <div className="relative h-48 overflow-hidden sm:h-60">
         <Image
           src={property.image}
           alt={property.title}
@@ -29,10 +29,10 @@ export function TenantPropertyCard({ property }: { property: Property }) {
         </div>
       </div>
 
-      <div className="flex h-[calc(100%-16rem)] min-h-[250px] flex-col gap-4 p-5 sm:p-6">
+      <div className="flex min-h-[192px] flex-col gap-3 p-4 sm:p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h3 className="text-2xl font-semibold tracking-tight text-slate-950">
+            <h3 className="line-clamp-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
               {property.title}
             </h3>
             <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
@@ -42,15 +42,11 @@ export function TenantPropertyCard({ property }: { property: Property }) {
           </div>
           <div className="shrink-0 text-right">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Precio</p>
-            <p className="mt-1 text-lg font-semibold text-slate-950 sm:text-xl">
+            <p className="mt-1 text-base font-semibold text-slate-950 sm:text-xl">
               {formatMoney(property.price, property.currency)}
             </p>
           </div>
         </div>
-
-        <p className="line-clamp-3 text-sm leading-7 text-slate-600">
-          {property.description}
-        </p>
 
         <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-4">
           <span className="text-sm font-medium text-slate-500">Ver detalle completo</span>

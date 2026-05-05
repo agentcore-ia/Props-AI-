@@ -1,0 +1,168 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import Image from "next/image";
+import { ChevronLeft, ChevronRight, Expand, X } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+export function PropertyGallery({
+  title,
+  images,
+  className,
+}: {
+  title: string;
+  images: string[];
+  className?: string;
+}) {
+  const gallery = useMemo(() => images.filter(Boolean), [images]);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  if (!gallery.length) {
+    return null;
+  }
+
+  const activeImage = gallery[activeIndex] ?? gallery[0];
+
+  function goNext() {
+    setActiveIndex((current) => (current + 1) % gallery.length);
+  }
+
+  function goPrev() {
+    setActiveIndex((current) => (current - 1 + gallery.length) % gallery.length);
+  }
+
+  return (
+    <>
+      <div className={cn("space-y-3", className)}>
+        <div className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-white">
+          <button
+            type="button"
+            onClick={() => setLightboxOpen(true)}
+            className="group relative block h-[280px] w-full bg-slate-100 sm:h-[420px] xl:h-[540px]"
+          >
+            <Image
+              src={activeImage}
+              alt={`${title} - imagen ${activeIndex + 1}`}
+              fill
+              className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+            />
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/55 via-slate-950/10 to-transparent px-4 py-4 text-left text-white">
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/70">
+                    Imagen principal
+                  </p>
+                  <p className="mt-1 text-sm font-medium sm:text-base">
+                    {activeIndex + 1} / {gallery.length}
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-3 py-2 text-xs font-semibold backdrop-blur">
+                  <Expand className="size-3.5" />
+                  Abrir
+                </span>
+              </div>
+            </div>
+          </button>
+
+          {gallery.length > 1 ? (
+            <>
+              <button
+                type="button"
+                onClick={goPrev}
+                className="absolute left-3 top-1/2 z-10 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/90 text-slate-900 shadow-lg backdrop-blur transition-colors hover:bg-white"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={goNext}
+                className="absolute right-3 top-1/2 z-10 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/90 text-slate-900 shadow-lg backdrop-blur transition-colors hover:bg-white"
+              >
+                <ChevronRight className="size-4" />
+              </button>
+            </>
+          ) : null}
+        </div>
+
+        {gallery.length > 1 ? (
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {gallery.map((image, index) => (
+              <button
+                key={`${image}-${index}`}
+                type="button"
+                onClick={() => setActiveIndex(index)}
+                className={cn(
+                  "relative h-20 w-24 shrink-0 overflow-hidden rounded-[18px] border bg-white sm:h-24 sm:w-32",
+                  index === activeIndex ? "border-slate-950 ring-2 ring-slate-950/10" : "border-slate-200"
+                )}
+              >
+                <Image
+                  src={image}
+                  alt={`${title} - miniatura ${index + 1}`}
+                  fill
+                  className="object-cover"
+                />
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      {lightboxOpen ? (
+        <div className="fixed inset-0 z-[90] bg-slate-950/92 backdrop-blur-sm">
+          <div className="flex h-full flex-col px-4 py-4 sm:px-6">
+            <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 text-white">
+              <div>
+                <p className="text-sm font-medium text-white/70">{title}</p>
+                <p className="mt-1 text-sm">
+                  Imagen {activeIndex + 1} de {gallery.length}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLightboxOpen(false)}
+                className="flex size-10 items-center justify-center rounded-full border border-white/20 bg-white/10"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="mx-auto mt-4 flex w-full max-w-6xl flex-1 items-center justify-center">
+              <div className="relative h-full min-h-[280px] w-full overflow-hidden rounded-[28px] bg-slate-900">
+                <Image
+                  src={activeImage}
+                  alt={`${title} - ampliada ${activeIndex + 1}`}
+                  fill
+                  className="object-contain"
+                />
+              </div>
+            </div>
+
+            {gallery.length > 1 ? (
+              <div className="mx-auto mt-4 flex w-full max-w-6xl items-center justify-between gap-4">
+                <button
+                  type="button"
+                  onClick={goPrev}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white"
+                >
+                  <ChevronLeft className="size-4" />
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  onClick={goNext}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white"
+                >
+                  Siguiente
+                  <ChevronRight className="size-4" />
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
