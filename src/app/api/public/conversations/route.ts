@@ -164,10 +164,17 @@ export async function POST(request: Request) {
     });
 
     if (aiResponse.ok) {
-      const payload = (await aiResponse.json()) as { output_text?: string };
-      if (payload.output_text) {
-        reply = payload.output_text.trim();
+      const payload = (await aiResponse.json()) as Record<string, unknown>;
+      const aiReply = extractResponseText(payload);
+      if (aiReply) {
+        reply = aiReply;
       }
+    } else {
+      console.error("[public-conversations] openai error", {
+        tenantSlug,
+        propertyId,
+        status: aiResponse.status,
+      });
     }
   }
 
@@ -212,6 +219,41 @@ export async function POST(request: Request) {
     conversationId,
     reply,
   });
+}
+
+function extractResponseText(payload: Record<string, unknown>) {
+  const direct = typeof payload.output_text === "string" ? payload.output_text.trim() : "";
+
+  if (direct) {
+    return direct;
+  }
+
+  const output = Array.isArray(payload.output) ? payload.output : [];
+
+  for (const item of output) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+
+    const content = Array.isArray((item as { content?: unknown }).content)
+      ? ((item as { content: Array<Record<string, unknown>> }).content)
+      : [];
+
+    for (const chunk of content) {
+      const text =
+        typeof chunk.text === "string"
+          ? chunk.text.trim()
+          : typeof chunk.output_text === "string"
+            ? chunk.output_text.trim()
+            : "";
+
+      if (text) {
+        return text;
+      }
+    }
+  }
+
+  return "";
 }
 
 function buildPropertyChatFallback({
