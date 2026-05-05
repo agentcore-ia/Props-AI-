@@ -23,9 +23,10 @@ export function PublicUserActions({
         <form method="post" action="/cuenta/logout">
           <button
             type="submit"
-            className="inline-flex h-11 items-center rounded-2xl bg-slate-950 px-5 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+            className="inline-flex h-10 items-center rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800 sm:h-11 sm:px-5"
           >
-            Cerrar sesion
+            <span className="hidden sm:inline">Cerrar sesion</span>
+            <span className="sm:hidden">Salir</span>
           </button>
         </form>
       </div>
@@ -42,7 +43,7 @@ export function PublicUserActions({
       </Link>
       <Link
         href="/cuenta/registro"
-        className="inline-flex h-11 items-center rounded-2xl bg-slate-950 px-5 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+        className="inline-flex h-10 items-center rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800 sm:h-11 sm:px-5"
       >
         Crear cuenta
       </Link>

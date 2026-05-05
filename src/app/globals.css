@@ -37,6 +37,7 @@ body {
     radial-gradient(circle at bottom right, hsl(210 40% 85% / 0.45), transparent 22%),
     hsl(var(--background));
   color: hsl(var(--foreground));
+  overflow-x: hidden;
 }
 
 * {

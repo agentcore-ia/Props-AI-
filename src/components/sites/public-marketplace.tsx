@@ -384,7 +384,7 @@ export function PublicMarketplace({
               title="Propiedades destacadas"
               description={`${filteredListings.length} resultados para explorar, ordenar y abrir en detalle.`}
             />
-            <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-2 2xl:grid-cols-3">
               {filteredListings.map((listing) => (
                 <MarketplacePropertyCard
                   key={listing.id}
@@ -508,7 +508,7 @@ export function PublicMarketplace({
             </div>
 
             {favorites.length > 0 ? (
-              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {favorites.map((listing) => (
                   <MarketplacePropertyCard
                     key={listing.id}
@@ -720,7 +720,7 @@ function MarketplacePropertyCard({
   onToggleComparison: (id: string) => void;
 }) {
   return (
-    <article className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_28px_80px_-52px_rgba(15,23,42,0.28)] transition-transform duration-300 hover:-translate-y-1">
+    <article className="overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_28px_80px_-52px_rgba(15,23,42,0.28)] transition-transform duration-300 hover:-translate-y-1 sm:rounded-[24px]">
       <div className="relative h-48 overflow-hidden sm:h-64">
         <Link href={listing.routeHref} className="block h-full">
           <Image
@@ -758,25 +758,25 @@ function MarketplacePropertyCard({
         </button>
       </div>
 
-      <div className="space-y-4 p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-              {formatMoney(listing.price, listing.currency)}
-            </p>
-            <h3 className="mt-2 line-clamp-2 text-lg font-semibold text-slate-900 sm:text-xl">{listing.title}</h3>
-            <div className="mt-2 flex items-start gap-2 text-sm text-slate-500">
-              <MapPin className="mt-0.5 size-4 shrink-0" />
-              <span className="line-clamp-2">{listing.location}</span>
+        <div className="space-y-3 p-3 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-lg font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                {formatMoney(listing.price, listing.currency)}
+              </p>
+              <h3 className="mt-2 line-clamp-2 text-sm font-semibold text-slate-900 sm:text-xl">{listing.title}</h3>
+              <div className="mt-2 flex items-start gap-2 text-sm text-slate-500">
+                <MapPin className="mt-0.5 size-4 shrink-0" />
+                <span className="line-clamp-2 text-xs sm:text-sm">{listing.location}</span>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-2 py-2 text-right">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">m2</p>
+              <p className="mt-1 text-xs font-semibold text-slate-950 sm:text-sm">{listing.area}</p>
             </div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-right">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">m2</p>
-            <p className="mt-1 text-sm font-semibold text-slate-950">{listing.area}</p>
-          </div>
-        </div>
 
-        <div className="flex flex-wrap gap-3 border-y border-slate-100 py-3 text-sm text-slate-600">
+          <div className="flex flex-wrap gap-2 border-y border-slate-100 py-2 text-xs text-slate-600 sm:text-sm">
           <div className="inline-flex items-center gap-2">
             <BedDouble className="size-4" />
             {listing.bedrooms}
@@ -791,7 +791,7 @@ function MarketplacePropertyCard({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
           <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600">
             {listing.agencyName}
           </span>
@@ -805,12 +805,12 @@ function MarketplacePropertyCard({
           ) : null}
         </div>
 
-        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-2 pt-1">
           <button
             type="button"
             onClick={() => onToggleComparison(listing.id)}
             className={cn(
-              "rounded-full border px-3 py-2 text-sm font-medium transition-colors sm:px-4",
+              "rounded-full border px-2.5 py-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm",
               isInComparison
                 ? "border-slate-950 bg-slate-950 text-white"
                 : "border-slate-200 bg-white text-slate-600 hover:text-slate-950"
@@ -820,7 +820,7 @@ function MarketplacePropertyCard({
           </button>
           <Link
             href={listing.routeHref}
-            className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 transition-colors hover:text-blue-800"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 transition-colors hover:text-blue-800 sm:text-sm"
           >
             Ver detalle
             <ArrowRight className="size-4" />

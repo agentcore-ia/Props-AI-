@@ -53,7 +53,7 @@ export function TenantPropertyDetail({
   const address = property.exactAddress || property.location;
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,rgba(241,245,249,0.95)_0%,rgba(255,255,255,1)_28%,rgba(255,255,255,1)_100%)]">
+    <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,rgba(241,245,249,0.95)_0%,rgba(255,255,255,1)_28%,rgba(255,255,255,1)_100%)]">
       <header className="border-b border-slate-200 bg-white/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-5 sm:px-6 xl:px-8">
           <Link
@@ -70,7 +70,7 @@ export function TenantPropertyDetail({
                 <Building2 className="size-3.5" />
                 {agency.name}
               </div>
-              <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-950">
+              <h1 className="mt-4 break-words text-3xl font-semibold leading-tight tracking-tight text-slate-950 sm:text-4xl">
                 {property.title}
               </h1>
               <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-500">
@@ -117,7 +117,7 @@ export function TenantPropertyDetail({
                 ))}
               </div>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <div className="mt-6 grid grid-cols-2 gap-3">
                 <InfoTile label="Mascotas" value={property.petsPolicy || "Consultar"} icon={<PawPrint className="size-4" />} />
                 <InfoTile label="Cocheras" value={String(property.parkingSpots)} icon={<CarFront className="size-4" />} />
                 <InfoTile
@@ -179,7 +179,7 @@ export function TenantPropertyDetail({
 
         <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.22)] sm:p-6">
           <p className="text-sm font-medium text-slate-500">Ubicacion</p>
-          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
             Direccion cargada para llegar mejor a la visita
           </h2>
           <div className="mt-6 overflow-hidden rounded-[28px] border border-slate-200 bg-white">
