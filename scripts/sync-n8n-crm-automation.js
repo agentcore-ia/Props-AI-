@@ -90,13 +90,10 @@ function scheduleDailyNode(name, hour, minute, x, y) {
       rule: {
         interval: [
           {
-            field: "hours",
-            hoursInterval: 24,
+            field: "cronExpression",
+            expression: `${minute} ${hour} * * *`,
           },
         ],
-        hour,
-        minute,
-        timezone: TIMEZONE,
       },
     },
   };
@@ -166,8 +163,10 @@ async function upsertWorkflow(definition) {
   }
 
   const payload = {
-    ...existing,
-    ...definition,
+    name: definition.name,
+    nodes: definition.nodes,
+    connections: definition.connections,
+    settings: definition.settings,
   };
   const updated = await apiCall("PUT", `/workflows/${existing.id}`, payload);
   console.log(`[n8n] actualizado: ${definition.name} (${existing.id})`);
@@ -181,10 +180,7 @@ async function activateWorkflow(id) {
     return workflow;
   }
 
-  const updated = await apiCall("PUT", `/workflows/${id}`, {
-    ...workflow,
-    active: true,
-  });
+  const updated = await apiCall("POST", `/workflows/${id}/activate`, {});
   console.log(`[n8n] activado: ${workflow.name} (${id})`);
   return updated;
 }
