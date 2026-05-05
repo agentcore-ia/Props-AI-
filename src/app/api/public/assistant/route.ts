@@ -47,6 +47,11 @@ export async function POST(request: Request) {
 
   const assistantHints = buildAssistantHints(properties, prompt);
   const localReply = buildMarketplaceAssistantFallback(properties, prompt, assistantHints);
+  const suggestions = buildAssistantSuggestions(
+    assistantHints.exactMatches.length > 0
+      ? assistantHints.exactMatches
+      : assistantHints.suggestedMatches
+  );
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -63,7 +68,7 @@ export async function POST(request: Request) {
             {
               type: "input_text",
               text:
-                "Sos un asesor inmobiliario digital de Props. Responde en espanol rioplatense, con tono humano y comercial. Responde siempre corto: 2 a 4 frases o hasta 3 bullets. Solo podes recomendar propiedades del inventario provisto. Si el pedido no tiene coincidencia exacta, ofrece 2 o 3 alternativas cercanas y pide solo el dato minimo que falta, como barrio, presupuesto o ambientes. Nunca inventes disponibilidad, fotos ni propiedades.",
+                "Sos un asesor inmobiliario digital de Props. Responde en espanol rioplatense, con tono humano y comercial. Responde siempre corto: 1 a 3 frases. No listes propiedades con detalle tecnico ni en bullets largos porque la interfaz ya mostrara fichas visuales. Usa el texto solo para orientar, comparar y pedir el dato minimo que falta. Si no hay coincidencia exacta, ofrece alternativas cercanas y pregunta por barrio, presupuesto o ambientes. Nunca inventes disponibilidad, fotos ni propiedades.",
             },
           ],
         },
@@ -86,6 +91,7 @@ export async function POST(request: Request) {
     console.error("[public-assistant] openai error", { tenantSlug, detail: errorText });
     return NextResponse.json({
       reply: localReply,
+      suggestions,
       configured: true,
       fallback: true,
     });
@@ -95,7 +101,8 @@ export async function POST(request: Request) {
   const aiReply = extractResponseText(payload);
 
   return NextResponse.json({
-    reply: aiReply || localReply,
+    reply: sanitizeAssistantReply(aiReply || localReply),
+    suggestions,
     configured: true,
     fallback: !aiReply,
   });
@@ -147,6 +154,20 @@ type AssistantHints = {
   exactMatches: PropertyMatch[];
   suggestedMatches: PropertyMatch[];
   debugSummary: string;
+};
+
+type AssistantSuggestion = {
+  id: string;
+  title: string;
+  location: string;
+  price: number;
+  currency: Property["currency"];
+  operation: Property["operation"];
+  image: string;
+  routeHref: string;
+  bedrooms: number;
+  bathrooms: number;
+  area: number;
 };
 
 function buildAssistantHints(properties: Property[], prompt: string): AssistantHints {
@@ -209,26 +230,13 @@ function buildMarketplaceAssistantFallback(
     return `No vi opciones${operations} que coincidan bien con eso. Decime barrio, presupuesto o ambientes y te propongo alternativas concretas.`;
   }
 
-  const intro =
+  return (
     hints.exactMatches.length > 0
-      ? "Te recomiendo estas opciones:"
+      ? "Te encontre opciones que pueden servirte."
       : hints.inferredPlaces.length > 0
-        ? `No encontre una coincidencia exacta en ${hints.inferredPlaces[0]}, pero mira estas alternativas cercanas:`
-        : "No encontre una coincidencia exacta, pero estas opciones te pueden servir:";
-
-  const lines = source.slice(0, 3).map((item) => summarizeProperty(item.property));
-  const closing =
-    hints.exactMatches.length > 0
-      ? "Si queres, te filtro por presupuesto o cantidad de ambientes."
-      : "Si queres, te ajusto la busqueda por barrio, presupuesto o tipo de propiedad.";
-
-  return `${intro}\n${lines.join("\n")}\n${closing}`;
-}
-
-function summarizeProperty(property: Property) {
-  const price = `${property.currency === "USD" ? "US$" : "$"} ${Number(property.price).toLocaleString("es-AR")}`;
-  const bedroomLabel = property.bedrooms > 0 ? `${property.bedrooms} amb.` : property.propertyType;
-  return `- ${property.title} · ${property.location} · ${price} · ${bedroomLabel}`;
+        ? `No encontre una coincidencia exacta en ${hints.inferredPlaces[0]}, pero te dejo alternativas cercanas.`
+        : "No encontre una coincidencia exacta, pero te dejo opciones parecidas."
+  );
 }
 
 function inferOperation(normalizedPrompt: string): Property["operation"] | null {
@@ -356,4 +364,29 @@ function normalizeText(value: string) {
 function isPropertyTypeToken(token: string, propertyType: Property["propertyType"]) {
   const normalizedType = normalizeText(propertyType);
   return normalizedType.includes(token) || token.includes(normalizedType);
+}
+
+function buildAssistantSuggestions(matches: PropertyMatch[]): AssistantSuggestion[] {
+  return matches.slice(0, 3).map(({ property }) => ({
+    id: property.id,
+    title: property.title,
+    location: property.location,
+    price: property.price,
+    currency: property.currency,
+    operation: property.operation,
+    image: property.image,
+    routeHref: `/propiedad/${property.tenantSlug}/${property.id}`,
+    bedrooms: property.bedrooms,
+    bathrooms: property.bathrooms,
+    area: property.area,
+  }));
+}
+
+function sanitizeAssistantReply(reply: string) {
+  return reply
+    .replace(/\*\*/g, "")
+    .replace(/__+/g, "")
+    .replace(/^- /gm, "• ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
