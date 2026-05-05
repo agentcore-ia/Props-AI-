@@ -2,6 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -31,7 +32,6 @@ import { PublicUserActions } from "@/components/sites/public-user-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  buildGoogleMapsEmbedUrl,
   buildGoogleMapsExternalUrl,
   cn,
   formatMoney,
@@ -41,6 +41,21 @@ import {
   type MarketplaceSection,
   type PublicListing,
 } from "@/lib/public-marketplace";
+
+const PublicMarketplaceMap = dynamic(
+  () =>
+    import("@/components/sites/public-marketplace-map").then(
+      (module) => module.PublicMarketplaceMap
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-[540px] items-center justify-center rounded-[28px] border border-white/70 bg-white text-sm text-slate-500 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)]">
+        Cargando mapa interactivo...
+      </div>
+    ),
+  }
+);
 
 const navItems: Array<{ id: MarketplaceSection; label: string }> = [
   { id: "explorar", label: "Explorar" },
@@ -371,10 +386,10 @@ export function PublicMarketplace({
               <SectionHeading
                 eyebrow="Vista mapa"
                 title={`${filteredListings.length} propiedades en contexto`}
-                description="Selecciona una propiedad y abre su direccion exacta sobre Google Maps sin salir del marketplace."
+                description="Explora todas las publicaciones sobre el mapa y selecciona una para ver su direccion exacta y abrir la ficha."
               />
-              <div className="space-y-4">
-                {filteredListings.slice(0, 5).map((listing) => (
+              <div className="max-h-[640px] space-y-4 overflow-y-auto pr-1">
+                {filteredListings.map((listing) => (
                   <CompactMapListing
                     key={listing.id}
                     listing={listing}
@@ -389,23 +404,11 @@ export function PublicMarketplace({
 
             <div className="overflow-hidden rounded-[34px] border border-slate-200 bg-[linear-gradient(180deg,rgba(222,246,247,0.9)_0%,rgba(228,236,247,0.96)_100%)] p-5 shadow-[0_32px_90px_-60px_rgba(15,23,42,0.32)] sm:p-6">
               <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
-                <div className="overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)]">
-                  {selectedMapListing ? (
-                    <iframe
-                      title={`Mapa de ${selectedMapListing.title}`}
-                      src={buildGoogleMapsEmbedUrl(
-                        selectedMapListing.exactAddress || selectedMapListing.location
-                      )}
-                      className="h-[520px] w-full border-0"
-                      loading="lazy"
-                      referrerPolicy="no-referrer-when-downgrade"
-                    />
-                  ) : (
-                    <div className="flex h-[520px] items-center justify-center bg-white text-sm text-slate-500">
-                      No hay propiedades para mostrar en el mapa.
-                    </div>
-                  )}
-                </div>
+                <PublicMarketplaceMap
+                  listings={filteredListings}
+                  selectedListingId={selectedMapListing?.id ?? null}
+                  onSelect={setSelectedMapListingId}
+                />
 
                 {selectedMapListing ? (
                   <aside className="rounded-[28px] border border-white/70 bg-white/92 p-5 shadow-lg backdrop-blur">
