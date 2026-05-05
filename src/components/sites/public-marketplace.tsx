@@ -136,7 +136,9 @@ export function PublicMarketplace({
   }, [filteredListings, selectedMapListingId]);
 
   useEffect(() => {
-    if (section !== "mapa") {
+    if (section === "mapa") {
+      setMobileMapMode("mapa");
+    } else {
       setMobileMapMode("lista");
     }
   }, [section]);
