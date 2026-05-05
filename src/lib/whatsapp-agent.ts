@@ -17,6 +17,9 @@ type MessagingAgencyRow = {
   messaging_instance: string;
 };
 
+const PUBLIC_MARKETPLACE_URL =
+  process.env.PUBLIC_MARKETPLACE_URL?.replace(/\/+$/, "") || "https://props.com.ar";
+
 export type MessagingAgency = Pick<
   Agency,
   "id" | "slug" | "name" | "city" | "email" | "phone" | "tagline" | "messagingInstance"
@@ -40,6 +43,12 @@ function normalizeMessageText(value: string) {
 }
 
 function summarizeProperty(property: Property) {
+  const publicUrl = `${PUBLIC_MARKETPLACE_URL}/propiedad/${property.tenantSlug}/${property.id}`;
+  const imageLinks = property.images
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((image) => image.trim())
+    .filter(Boolean);
   const blocks = [
     property.title,
     property.operation,
@@ -56,6 +65,8 @@ function summarizeProperty(property: Property) {
     property.requirements ? `requisitos: ${property.requirements}` : "",
     property.amenities.length ? `amenities: ${property.amenities.join(", ")}` : "",
     property.description ? `descripcion: ${property.description}` : "",
+    `link: ${publicUrl}`,
+    imageLinks.length ? `imagenes: ${imageLinks.join(", ")}` : "",
   ].filter(Boolean);
 
   return `- ${blocks.join(" | ")}`;
@@ -140,6 +151,13 @@ export function buildWhatsappSystemPrompt(input: {
   const selectedPropertySummary = input.selectedProperty
     ? summarizeProperty(input.selectedProperty)
     : "No hay una propiedad puntual asociada todavia; puedes guiarte por el catalogo y por lo que pida el cliente.";
+  const selectedPropertyPublicUrl = input.selectedProperty
+    ? `${PUBLIC_MARKETPLACE_URL}/propiedad/${input.selectedProperty.tenantSlug}/${input.selectedProperty.id}`
+    : "";
+  const selectedPropertyImages = input.selectedProperty?.images
+    .filter(Boolean)
+    .slice(0, 5)
+    .join(", ");
 
   return [
     `Eres el asistente comercial de WhatsApp de ${input.agency.name}, una inmobiliaria de ${input.agency.city}.`,
@@ -147,9 +165,17 @@ export function buildWhatsappSystemPrompt(input: {
     "Tu trabajo es responder consultas de compra o alquiler, aclarar precio, ubicacion, requisitos, mascotas, expensas, disponibilidad, amenities y proximo paso.",
     "Solo puedes afirmar datos que esten en el contexto. Si no aparece algo, dilo con honestidad y ofrece derivarlo al equipo.",
     "Cuando el cliente muestra interes concreto, invita a dejar horario, presupuesto o coordinar visita. Cuando haga falta, pide una sola aclaracion a la vez.",
+    "Si el cliente pide fotos, imagenes, ver mas o recorrer la propiedad, comparte el link publico de la ficha y menciona que puedes enviarle algunas imagenes destacadas.",
+    "Si tienes una propiedad asociada y el cliente pide fotos, usa el link publico exacto en la respuesta. No inventes URLs.",
     "No hables de software interno, n8n, CRM, automatizaciones, APIs ni procesos tecnicos.",
     `Lead actual: ${input.lead.fullName} | etapa ${input.lead.stage} | prioridad ${input.lead.priority} | resumen interno: ${input.lead.qualificationSummary}.`,
     `Propiedad asociada: ${selectedPropertySummary}`,
+    selectedPropertyPublicUrl
+      ? `Link publico de la propiedad asociada: ${selectedPropertyPublicUrl}`
+      : "No hay link publico asociado porque todavia no tenemos una propiedad seleccionada.",
+    selectedPropertyImages
+      ? `Imagenes de la propiedad asociada: ${selectedPropertyImages}`
+      : "No hay imagenes adicionales cargadas para la propiedad asociada.",
     "Catalogo de propiedades disponibles para responder:",
     input.catalogSummary || "Sin propiedades disponibles en este momento.",
     "Historial reciente del hilo:",

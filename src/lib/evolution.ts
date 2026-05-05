@@ -236,3 +236,34 @@ export async function sendEvolutionTextMessage(payload: {
     }
   );
 }
+
+export async function sendEvolutionMediaMessage(payload: {
+  instanceName: string;
+  number: string;
+  mediaUrl: string;
+  caption?: string;
+  mediaType?: "image" | "video" | "document";
+  fileName?: string;
+}) {
+  const number = String(payload.number).replace(/[^\d]/g, "");
+  const media = String(payload.mediaUrl ?? "").trim();
+  const caption = String(payload.caption ?? "").trim();
+
+  if (!number || !media) {
+    throw new Error("Faltan numero o media para enviar por WhatsApp.");
+  }
+
+  return evolutionFetch<Record<string, unknown>>(
+    `/message/sendMedia/${encodeURIComponent(payload.instanceName)}`,
+    {
+      method: "POST",
+      body: {
+        number,
+        mediatype: payload.mediaType ?? "image",
+        media,
+        caption,
+        fileName: payload.fileName,
+      },
+    }
+  );
+}
