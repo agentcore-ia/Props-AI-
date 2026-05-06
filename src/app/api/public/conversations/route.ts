@@ -1,10 +1,37 @@
 import { NextResponse } from "next/server";
 
-import { upsertLeadFromSignal } from "@/lib/crm-automation";
 import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { upsertLeadFromSignal } from "@/lib/crm-automation";
 import { getOpenAIEnv } from "@/lib/openai-env";
 import { listProperties } from "@/lib/props-data";
 import { createAdminClient } from "@/lib/supabase/admin";
+
+type PropertyRecord = {
+  id: string;
+  title: string;
+  operation: string;
+  status: string;
+  location: string;
+  exact_address: string | null;
+  description: string;
+  price: number;
+  currency: string;
+  property_type: string | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  area: number | null;
+  expenses: number | null;
+  expenses_currency: string | null;
+  available_from: string | null;
+  pets_policy: string | null;
+  requirements: string | null;
+  amenities: string[] | null;
+};
+
+type RecentMessage = {
+  senderRole: string;
+  content: string;
+};
 
 export async function POST(request: Request) {
   const current = await getCurrentUserContext();
@@ -44,10 +71,12 @@ export async function POST(request: Request) {
 
   const { data: property, error: propertyError } = await admin
     .from("properties")
-    .select("id, title, operation, status, location, exact_address, description, price, currency, property_type, bedrooms, bathrooms, area, expenses, expenses_currency, available_from, pets_policy, requirements, amenities")
+    .select(
+      "id, title, operation, status, location, exact_address, description, price, currency, property_type, bedrooms, bathrooms, area, expenses, expenses_currency, available_from, pets_policy, requirements, amenities"
+    )
     .eq("id", propertyId)
     .eq("agency_id", agency.id)
-    .maybeSingle();
+    .maybeSingle<PropertyRecord>();
 
   if (propertyError || !property) {
     return NextResponse.json(
@@ -101,34 +130,46 @@ export async function POST(request: Request) {
     },
   });
 
-  const { data: inquiry } = await admin.from("catalog_inquiries").insert({
-    agency_id: agency.id,
-    property_id: property.id,
-    name: current.profile.full_name ?? current.user.email ?? "Cliente Props",
-    email: current.user.email ?? "",
-    phone: "Pendiente",
-    message,
-    operation: property.operation,
-    budget: null,
-    source: "marketplace_chat",
-  }).select("id").single();
+  const { data: recentMessagesRows } = await admin
+    .from("marketplace_messages")
+    .select("sender_role, content, created_at")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true })
+    .limit(8);
+
+  const recentMessages: RecentMessage[] = (recentMessagesRows ?? []).map((item) => ({
+    senderRole: item.sender_role,
+    content: item.content,
+  }));
+
+  const { data: inquiry } = await admin
+    .from("catalog_inquiries")
+    .insert({
+      agency_id: agency.id,
+      property_id: property.id,
+      name: current.profile.full_name ?? current.user.email ?? "Cliente Props",
+      email: current.user.email ?? "",
+      phone: "Pendiente",
+      message,
+      operation: property.operation,
+      budget: null,
+      source: "marketplace_chat",
+    })
+    .select("id")
+    .single();
 
   const openAI = getOpenAIEnv();
   const relatedProperties = await listProperties({ tenantSlug });
-  const catalogContext = relatedProperties
-    .slice(0, 10)
-    .map(
-      (item) =>
-        `- ${item.title} | ${item.operation} | ${item.status} | ${item.location} | direccion: ${item.exactAddress} | precio: ${item.price} ${item.currency} | tipo: ${item.propertyType} | dormitorios: ${item.bedrooms} | banos: ${item.bathrooms} | m2: ${item.area} | mascotas: ${item.petsPolicy || "consultar"} | requisitos: ${item.requirements || "sin requisitos cargados"} | amenities: ${item.amenities.join(", ") || "sin amenities"} | descripcion: ${item.description}`
-    )
+  const conversationContext = recentMessages
+    .map((item) => `${item.senderRole === "customer" ? "Cliente" : "IA"}: ${item.content}`)
     .join("\n");
 
-  let reply =
-    buildPropertyChatFallback({
-      property,
-      agencyName: agency.name,
-      message,
-    });
+  let reply = buildPropertyChatFallback({
+    property,
+    agencyName: agency.name,
+    message,
+    recentMessages,
+  });
 
   if (openAI.configured) {
     const aiResponse = await fetch("https://api.openai.com/v1/responses", {
@@ -146,7 +187,7 @@ export async function POST(request: Request) {
               {
                 type: "input_text",
                 text:
-      "Sos la IA de captacion de Props para compradores e inquilinos. Responde en espanol rioplatense, breve, amable y comercial. Debes responder la pregunta concreta del usuario usando primero la propiedad consultada y luego, si ayuda, el portafolio adicional. Si te preguntan por precio, expensas, mascotas, ubicacion, disponibilidad, requisitos o ambientes, responde con esos datos. No repitas un mensaje generico si ya hay informacion suficiente. Cierra con una sola pregunta de avance o siguiente paso.",
+                  "Sos la IA de captacion de Props para compradores e inquilinos. Responde en espanol rioplatense, breve, amable y comercial. Estas dentro de la ficha de una sola propiedad: responde solo sobre esa propiedad y no recomiendes otras salvo que el usuario lo pida de forma explicita. Responde solo lo que preguntaron, sin volcar toda la ficha ni hacer listas largas. Si el usuario responde algo como 'si', 'si por favor' o 'dale', interpreta el contexto inmediato de la conversacion y contesta solo a eso. Si preguntan por precio, expensas, mascotas, ubicacion, disponibilidad, requisitos o ambientes, da ese dato puntual. Como maximo cierra con una sola pregunta corta para avanzar.",
               },
             ],
           },
@@ -155,7 +196,7 @@ export async function POST(request: Request) {
             content: [
               {
                 type: "input_text",
-        text: `Inmobiliaria: ${agency.name} (${agency.city}). Propiedad consultada: ${property.title} | ${property.operation} | ${property.status} | ${property.location} | direccion: ${property.exact_address} | precio: ${property.price} ${property.currency} | tipo: ${property.property_type} | dormitorios: ${property.bedrooms} | banos: ${property.bathrooms} | m2: ${property.area} | expensas: ${property.expenses ?? "n/d"} ${property.expenses_currency ?? ""} | disponible desde: ${property.available_from ?? "inmediata"} | mascotas: ${property.pets_policy || "consultar"} | requisitos: ${property.requirements || "sin requisitos cargados"} | amenities: ${Array.isArray(property.amenities) ? property.amenities.join(", ") : "sin amenities"} | descripcion: ${property.description}.\nPortafolio adicional:\n${catalogContext}\n\nMensaje del cliente:\n${message}`,
+                text: `Inmobiliaria: ${agency.name} (${agency.city}). Propiedad consultada: ${property.title} | ${property.operation} | ${property.status} | ${property.location} | direccion: ${property.exact_address} | precio: ${property.price} ${property.currency} | tipo: ${property.property_type} | dormitorios: ${property.bedrooms} | banos: ${property.bathrooms} | m2: ${property.area} | expensas: ${property.expenses ?? "n/d"} ${property.expenses_currency ?? ""} | disponible desde: ${property.available_from ?? "inmediata"} | mascotas: ${property.pets_policy || "consultar"} | requisitos: ${property.requirements || "sin requisitos cargados"} | amenities: ${Array.isArray(property.amenities) ? property.amenities.join(", ") : "sin amenities"} | descripcion: ${property.description}.\n\nHistorial reciente de la conversacion:\n${conversationContext}\n\nUltimo mensaje del cliente:\n${message}`,
               },
             ],
           },
@@ -167,7 +208,7 @@ export async function POST(request: Request) {
       const payload = (await aiResponse.json()) as Record<string, unknown>;
       const aiReply = extractResponseText(payload);
       if (aiReply) {
-        reply = aiReply;
+        reply = sanitizePropertyReply(aiReply);
       }
     } else {
       console.error("[public-conversations] openai error", {
@@ -236,7 +277,7 @@ function extractResponseText(payload: Record<string, unknown>) {
     }
 
     const content = Array.isArray((item as { content?: unknown }).content)
-      ? ((item as { content: Array<Record<string, unknown>> }).content)
+      ? (item as { content: Array<Record<string, unknown>> }).content
       : [];
 
     for (const chunk of content) {
@@ -260,27 +301,12 @@ function buildPropertyChatFallback({
   property,
   agencyName,
   message,
+  recentMessages,
 }: {
-  property: {
-    title: string;
-    operation: string;
-    location: string;
-    exact_address: string | null;
-    description: string;
-    price: number;
-    currency: string;
-    property_type: string | null;
-    bedrooms: number | null;
-    bathrooms: number | null;
-    area: number | null;
-    expenses: number | null;
-    expenses_currency: string | null;
-    available_from: string | null;
-    pets_policy: string | null;
-    requirements: string | null;
-  };
+  property: PropertyRecord;
   agencyName: string;
   message: string;
+  recentMessages: RecentMessage[];
 }) {
   const normalized = message.toLowerCase();
   const address = property.exact_address || property.location;
@@ -288,6 +314,13 @@ function buildPropertyChatFallback({
     `${property.title} es una ${property.property_type?.toLowerCase() || "propiedad"} en ${property.location}.`,
     `El valor publicado es ${property.price} ${property.currency}.`,
   ];
+  const lastAssistantMessage = [...recentMessages]
+    .reverse()
+    .find((item) => item.senderRole === "assistant")?.content
+    ?.toLowerCase();
+  const affirmativeFollowUp = /^(si|sí|si por favor|sí por favor|dale|perfecto|ok|oka)$/.test(
+    normalized.replace(/[!.?]+/g, "").trim()
+  );
 
   if (
     normalized.includes("precio") ||
@@ -295,33 +328,51 @@ function buildPropertyChatFallback({
     normalized.includes("cuanto") ||
     normalized.includes("valor")
   ) {
-    return `${details.join(" ")} Si querés, también te cuento expensas, requisitos o coordinamos una visita con ${agencyName}.`;
+    return `${details.join(" ")} Si queres, tambien te cuento expensas, requisitos o coordinamos una visita con ${agencyName}.`;
   }
 
   if (normalized.includes("expensa")) {
     return property.expenses && property.expenses_currency
-      ? `Las expensas informadas son ${property.expenses} ${property.expenses_currency}. Si querés, también te paso disponibilidad y requisitos.`
-      : `En esta publicación no hay expensas cargadas. Si querés, dejo la consulta para que ${agencyName} te lo confirme.`;
+      ? `Las expensas informadas son ${property.expenses} ${property.expenses_currency}.`
+      : `En esta publicacion no hay expensas cargadas. Si queres, dejo la consulta para que ${agencyName} te lo confirme.`;
   }
 
   if (normalized.includes("mascota")) {
     return property.pets_policy
-      ? `Sobre mascotas, la publicación indica: ${property.pets_policy}. Si querés, también te puedo contar requisitos y disponibilidad.`
-      : `En esta propiedad no hay política de mascotas cargada. Si querés, le consulto a ${agencyName}.`;
+      ? `Si, la politica cargada es: ${property.pets_policy}.`
+      : `En esta propiedad no hay politica de mascotas cargada. Si queres, se lo consulto a ${agencyName}.`;
   }
 
   if (normalized.includes("requis")) {
     return property.requirements
       ? `Los requisitos cargados son: ${property.requirements}`
-      : `Esta publicación no tiene requisitos cargados todavía. Si querés, le dejo la consulta a ${agencyName}.`;
+      : `Esta publicacion no tiene requisitos cargados todavia. Si queres, le dejo la consulta a ${agencyName}.`;
+  }
+
+  if (
+    affirmativeFollowUp &&
+    lastAssistantMessage?.includes("requisitos") &&
+    (lastAssistantMessage.includes("costo total") || lastAssistantMessage.includes("costo de ingreso"))
+  ) {
+    return [
+      `Alquiler: ${property.price} ${property.currency}.`,
+      property.expenses && property.expenses_currency
+        ? `Expensas: ${property.expenses} ${property.expenses_currency}.`
+        : null,
+      property.requirements
+        ? `Requisitos: ${property.requirements}`
+        : "Requisitos: la inmobiliaria no los cargo todavia.",
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
 
   if (normalized.includes("donde") || normalized.includes("ubic") || normalized.includes("direccion")) {
-    return `La propiedad está en ${address}. Si querés, también te paso precio, disponibilidad o coordinamos una visita.`;
+    return `La propiedad esta en ${address}.`;
   }
 
   if (normalized.includes("dispon")) {
-    return `La disponibilidad cargada es ${property.available_from || "inmediata"}. Si querés, también te cuento requisitos y próximos pasos para avanzar.`;
+    return `La disponibilidad cargada es ${property.available_from || "inmediata"}.`;
   }
 
   if (
@@ -332,8 +383,18 @@ function buildPropertyChatFallback({
     normalized.includes("metro") ||
     normalized.includes("m2")
   ) {
-    return `${property.title} tiene ${property.bedrooms ?? "n/d"} dormitorio(s), ${property.bathrooms ?? "n/d"} baño(s) y ${property.area ?? "n/d"} m2. Si querés, también te paso ubicación y precio.`;
+    return `${property.title} tiene ${property.bedrooms ?? "n/d"} dormitorio(s), ${property.bathrooms ?? "n/d"} baño(s) y ${property.area ?? "n/d"} m2.`;
   }
 
-  return `Puedo ayudarte con el precio, la ubicación, la disponibilidad, las expensas o los requisitos de ${property.title}. Decime qué querés saber y te respondo puntual.`;
+  return `Puedo ayudarte con el precio, la ubicacion, la disponibilidad, las expensas o los requisitos de ${property.title}. Decime que queres saber y te respondo puntual.`;
+}
+
+function sanitizePropertyReply(reply: string) {
+  return reply
+    .replace(/\*\*/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/también hay .*$/gim, "")
+    .replace(/tambien hay .*$/gim, "")
+    .replace(/adem[aá]s puedo recomendarte .*$/gim, "")
+    .trim();
 }
