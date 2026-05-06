@@ -1,7 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { CheckCheck, Clock3, Loader2, MessageCircleMore, RefreshCcw, CalendarClock } from "lucide-react";
+import {
+  CalendarClock,
+  CheckCheck,
+  Clock3,
+  Loader2,
+  MessageCircleMore,
+  RefreshCcw,
+} from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 
@@ -30,25 +37,30 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
     setBusyAction(null);
 
     if (!response.ok) {
-      setFeedback(payload?.error ?? "No se pudo ejecutar la automatizacion.");
+      setFeedback(payload?.error ?? "No se pudo ejecutar la automatización.");
       return;
     }
 
     setFeedback(
       kind === "followups"
-        ? `Seguimientos ejecutados: ${payload?.processed ?? 0}.`
-        : `Recordatorios de visita ejecutados: ${payload?.processed ?? 0}.`
+        ? `Se enviaron ${payload?.processed ?? 0} seguimientos automáticos.`
+        : `Se enviaron ${payload?.processed ?? 0} recordatorios de visita.`
     );
     router.refresh();
   }
+
+  const followUpLabel =
+    snapshot.counters.automaticFollowUps > 0
+      ? `Enviar ${snapshot.counters.automaticFollowUps} seguimientos automáticos`
+      : "No hay seguimientos automáticos pendientes";
 
   return (
     <Card className="rounded-[30px] border-0 bg-card shadow-sm">
       <CardHeader className="gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <CardTitle className="text-xl">Que tengo que hacer hoy</CardTitle>
+          <CardTitle className="text-xl">Qué tengo que hacer hoy</CardTitle>
           <p className="mt-2 text-sm text-muted-foreground">
-            Una vista corta para responder primero lo urgente y no dejar consultas sin avanzar.
+            Lo urgente primero: contactos humanos, tareas operativas y visitas del día.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -56,10 +68,14 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
             variant="outline"
             className="rounded-2xl"
             onClick={() => runAction("followups")}
-            disabled={busyAction !== null}
+            disabled={busyAction !== null || snapshot.counters.automaticFollowUps === 0}
           >
-            {busyAction === "followups" ? <Loader2 className="size-4 animate-spin" /> : <MessageCircleMore className="size-4" />}
-            Ejecutar seguimientos
+            {busyAction === "followups" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <MessageCircleMore className="size-4" />
+            )}
+            {followUpLabel}
           </Button>
           <Button
             variant="outline"
@@ -67,17 +83,29 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
             onClick={() => runAction("visits")}
             disabled={busyAction !== null}
           >
-            {busyAction === "visits" ? <Loader2 className="size-4 animate-spin" /> : <CalendarClock className="size-4" />}
-            Enviar recordatorios
+            {busyAction === "visits" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <CalendarClock className="size-4" />
+            )}
+            Enviar recordatorios de visitas
           </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <section className="grid gap-4 md:grid-cols-4">
+        <div className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground">
+          Los seguimientos automáticos envían mensajes reales a leads pendientes que ya están listos para retomar. Las tareas operativas de contacto manual siguen quedando abajo.
+        </div>
+
+        <section className="grid gap-4 md:grid-cols-5">
           <MiniStat label="Tareas pendientes" value={String(snapshot.counters.pendingTasks)} />
           <MiniStat label="Visitas de hoy" value={String(snapshot.counters.visitsToday)} />
           <MiniStat label="Leads urgentes" value={String(snapshot.counters.urgentLeads)} />
-          <MiniStat label="Seguimientos por salir" value={String(snapshot.counters.automaticFollowUps)} />
+          <MiniStat
+            label="Seguimientos automáticos"
+            value={String(snapshot.counters.automaticFollowUps)}
+          />
+          <MiniStat label="IA ya atendió" value={String(snapshot.counters.aiResolved)} />
         </section>
 
         {feedback ? (
@@ -88,7 +116,7 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
 
         <div className="grid gap-4 xl:grid-cols-3">
           <TodayList
-            title="Responder ahora"
+            title="Requieren contacto humano"
             icon={<Clock3 className="size-4 text-primary" />}
             items={
               snapshot.myDay.leadsToAnswer.length > 0
@@ -100,11 +128,11 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
                   }))
                 : []
             }
-            empty="No hay consultas abiertas para responder ahora."
+            empty="No hay conversaciones que necesiten respuesta manual ahora."
           />
 
           <TodayList
-            title="Tareas vencidas o de hoy"
+            title="Tareas operativas"
             icon={<RefreshCcw className="size-4 text-primary" />}
             items={
               snapshot.myDay.dueNow.length > 0
@@ -116,28 +144,56 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
                   }))
                 : []
             }
-            empty="No hay tareas operativas vencidas."
+            empty="No hay tareas operativas activas para hoy."
           />
 
           <TodayList
-            title="Visitas de hoy"
+            title="IA ya resolvió"
             icon={<CheckCheck className="size-4 text-primary" />}
             items={
-              snapshot.myDay.visitsToday.length > 0
-                ? snapshot.myDay.visitsToday.map((visit) => ({
-                    id: visit.id,
-                    title: visit.leadName,
-                    description: `${visit.propertyTitle ?? "Propiedad"} · ${formatShortDate(visit.scheduledFor.slice(0, 10))}`,
-                    meta: visit.status,
+              snapshot.myDay.aiResolved.length > 0
+                ? snapshot.myDay.aiResolved.map((lead) => ({
+                    id: lead.id,
+                    title: lead.fullName,
+                    description: `${lead.propertyTitle ?? "Consulta general"} · ${lead.lastCustomerMessage}`,
+                    meta: deriveChannelLabel(lead.source),
                   }))
                 : []
             }
-            empty="No hay visitas programadas para hoy."
+            empty="No hay conversaciones web resueltas por IA para revisar."
           />
         </div>
+
+        <TodayList
+          title="Visitas de hoy"
+          icon={<CalendarClock className="size-4 text-primary" />}
+          items={
+            snapshot.myDay.visitsToday.length > 0
+              ? snapshot.myDay.visitsToday.map((visit) => ({
+                  id: visit.id,
+                  title: visit.leadName,
+                  description: `${visit.propertyTitle ?? "Propiedad"} · ${formatShortDate(
+                    visit.scheduledFor.slice(0, 10)
+                  )}`,
+                  meta: visit.status,
+                }))
+              : []
+          }
+          empty="No hay visitas programadas para hoy."
+        />
       </CardContent>
     </Card>
   );
+}
+
+function deriveChannelLabel(source: string) {
+  const normalized = source.toLowerCase();
+  if (normalized.includes("whatsapp")) return "WhatsApp";
+  if (normalized.includes("instagram")) return "Instagram";
+  if (normalized.includes("web") || normalized.includes("marketplace") || normalized.includes("catalog")) {
+    return "Web";
+  }
+  return "CRM";
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
@@ -175,7 +231,9 @@ function TodayList({
                   <p className="font-medium">{item.title}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
                 </div>
-                <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium">{item.meta}</span>
+                <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
+                  {item.meta}
+                </span>
               </div>
             </div>
           ))

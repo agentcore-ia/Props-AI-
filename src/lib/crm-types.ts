@@ -136,11 +136,13 @@ export type TodayWorkspaceSnapshot = {
     dueNow: EmployeeTaskSummary[];
     visitsToday: VisitAppointmentSummary[];
     leadsToAnswer: CrmLeadSummary[];
+    aiResolved: CrmLeadSummary[];
   };
   counters: {
     pendingTasks: number;
     visitsToday: number;
     urgentLeads: number;
     automaticFollowUps: number;
+    aiResolved: number;
   };
 };

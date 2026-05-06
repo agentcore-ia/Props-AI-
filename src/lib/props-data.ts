@@ -1588,7 +1588,19 @@ export async function getTodayWorkspaceSnapshot(options?: { agencySlug?: string 
       updatedAt: new Date().toISOString(),
     }));
   const allDueNow = [...dueNow, ...contractReviewTasks];
-  const leadsToAnswer = leads.filter((lead) => lead.needsResponse).slice(0, 8);
+  const pendingTaskLeadIds = new Set(
+    allDueNow
+      .filter((task) => task.status === "Pendiente" && Boolean(task.leadId))
+      .map((task) => task.leadId as string)
+  );
+  const isSelfServedWebLead = (lead: CrmLeadSummary) =>
+    /web|marketplace|catalog/i.test(lead.source) &&
+    lead.stage === "Nuevo" &&
+    !pendingTaskLeadIds.has(lead.id);
+  const leadsToAnswer = leads
+    .filter((lead) => lead.needsResponse && !pendingTaskLeadIds.has(lead.id) && !isSelfServedWebLead(lead))
+    .slice(0, 8);
+  const aiResolved = leads.filter((lead) => isSelfServedWebLead(lead)).slice(0, 8);
   const automaticFollowUps = leads.filter(
     (lead) =>
       Boolean(lead.nextFollowUpAt) &&
@@ -1600,12 +1612,14 @@ export async function getTodayWorkspaceSnapshot(options?: { agencySlug?: string 
       dueNow: allDueNow,
       visitsToday,
       leadsToAnswer,
+      aiResolved,
     },
     counters: {
       pendingTasks: tasks.length + contractReviewTasks.length,
       visitsToday: visitsToday.length,
       urgentLeads: leads.filter((lead) => lead.priority === "Alta" || lead.needsResponse).length,
       automaticFollowUps,
+      aiResolved: aiResolved.length,
     },
   };
 }
