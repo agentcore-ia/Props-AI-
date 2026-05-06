@@ -579,12 +579,15 @@ export async function sendLeadWhatsApp(input: {
   agencyMessagingInstance: string;
   property?: Property | null;
   customPrompt?: string | null;
+  directText?: string | null;
 }) {
-  const text = await generateLeadReply({
-    lead: input.lead,
-    property: input.property,
-    customPrompt: input.customPrompt,
-  });
+  const text =
+    String(input.directText ?? "").trim() ||
+    (await generateLeadReply({
+      lead: input.lead,
+      property: input.property,
+      customPrompt: input.customPrompt,
+    }));
 
   const normalizedPhone = normalizePhone(input.lead.phone);
   if (!normalizedPhone) {
@@ -635,6 +638,73 @@ export async function sendLeadWhatsApp(input: {
   });
 
   return text;
+}
+
+export async function registerVisitOutcome(input: {
+  visitId: string;
+  leadId: string;
+  agencyId: string;
+  propertyId?: string | null;
+  status: VisitStatus;
+  outcomeSummary: string;
+  objections: string;
+  interestLevel: LeadPriority;
+  nextAction: string;
+}) {
+  const admin = createAdminClient();
+
+  const { error: visitError } = await admin
+    .from("visit_appointments")
+    .update({
+      status: input.status,
+      notes: [input.outcomeSummary, input.objections ? `Objeciones: ${input.objections}` : "", input.nextAction ? `Siguiente paso: ${input.nextAction}` : ""]
+        .filter(Boolean)
+        .join("\n"),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.visitId);
+
+  if (visitError) throw visitError;
+
+  const nextStage: LeadStage =
+    input.status === "Realizada"
+      ? "Seguimiento"
+      : input.status === "Confirmada"
+        ? "Visita"
+        : input.status === "Cancelada"
+          ? "Seguimiento"
+          : "Visita";
+
+  const { error: leadError } = await admin
+    .from("crm_leads")
+    .update({
+      stage: nextStage,
+      priority: input.interestLevel,
+      qualification_summary: input.outcomeSummary,
+      requirements_summary: input.objections || null,
+      last_activity_at: new Date().toISOString(),
+      next_follow_up_at:
+        input.nextAction && input.status === "Realizada"
+          ? addHoursIso(input.interestLevel === "Alta" ? 4 : 24)
+          : null,
+    })
+    .eq("id", input.leadId);
+
+  if (leadError) throw leadError;
+
+  if (input.nextAction.trim()) {
+    await ensureLeadTask({
+      agencyId: input.agencyId,
+      leadId: input.leadId,
+      propertyId: input.propertyId ?? null,
+      title: "Seguimiento post-visita",
+      details: input.nextAction,
+      dueAt: addHoursIso(input.interestLevel === "Alta" ? 4 : 24),
+      taskType: "Seguimiento",
+      priority: input.interestLevel,
+      automationSource: "post_visit",
+    });
+  }
 }
 
 export async function runAutomaticLeadFollowUps(agencyIds?: string[]) {

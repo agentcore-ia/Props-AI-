@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { getAgencyScopeFromUser } from "@/lib/crm-automation";
+import { suggestAssistantFallback } from "@/lib/crm-insights";
 import { getOpenAIEnv } from "@/lib/openai-env";
-import { listProperties } from "@/lib/props-data";
+import {
+  getTodayWorkspaceSnapshot,
+  listCrmLeads,
+  listEmployeeTasks,
+  listProperties,
+  listRentalContracts,
+  listVisitAppointments,
+} from "@/lib/props-data";
 
 function clip(text: string, maxLength: number) {
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
@@ -26,11 +35,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Escribe una consulta para Props AI." }, { status: 400 });
   }
 
-  const properties = await listProperties(
-    current.profile.role === "agency_admin" && current.profile.agency_slug
-      ? { tenantSlug: current.profile.agency_slug }
-      : undefined
-  );
+  const scope = getAgencyScopeFromUser(current);
+  const [properties, leads, visits, tasks, contracts, today] = await Promise.all([
+    listProperties(scope?.agencySlug ? { tenantSlug: scope.agencySlug } : undefined),
+    listCrmLeads(scope),
+    listVisitAppointments(scope),
+    listEmployeeTasks(scope),
+    listRentalContracts(scope),
+    getTodayWorkspaceSnapshot(scope),
+  ]);
 
   const propertyContext = properties
     .slice(0, 18)
@@ -42,13 +55,43 @@ export async function POST(request: Request) {
       return `- ${property.title} | ${property.operation} | ${property.status} | ${property.location} | precio ${property.price}${rentalContext}`;
     })
     .join("\n");
+  const leadsContext = leads
+    .slice(0, 10)
+    .map(
+      (lead) =>
+        `- ${lead.fullName} | etapa ${lead.stage} | prioridad ${lead.priority} | score ${lead.score} | busca ${lead.desiredOperation ?? lead.propertyOperation ?? "sin definir"} en ${lead.desiredLocation ?? lead.propertyLocation ?? "sin zona"} | ultimo mensaje: ${clip(lead.lastCustomerMessage, 240)}`
+    )
+    .join("\n");
+  const tasksContext = tasks
+    .slice(0, 10)
+    .map((task) => `- ${task.title} | ${task.priority} | vence ${task.dueAt} | ${clip(task.details, 200)}`)
+    .join("\n");
+  const visitsContext = visits
+    .slice(0, 10)
+    .map(
+      (visit) =>
+        `- ${visit.leadName} | ${visit.propertyTitle ?? "propiedad"} | ${visit.status} | ${visit.scheduledFor}`
+    )
+    .join("\n");
+  const contractsContext = contracts
+    .slice(0, 10)
+    .map(
+      (contract) =>
+        `- ${contract.tenantName} | ${contract.status} | ${contract.indexType} cada ${contract.adjustmentFrequencyMonths} meses | proximo ajuste ${contract.nextAdjustmentDate}`
+    )
+    .join("\n");
 
   const openAI = getOpenAIEnv();
 
   if (!openAI.configured) {
     return NextResponse.json({
-      reply:
-        "La IA real todavia no esta configurada en este entorno. Igual ya puedo guardar contratos y dejarlos listos para analisis cuando conectes OpenAI.",
+      reply: suggestAssistantFallback({
+        prompt,
+        leads,
+        tasks,
+        visits,
+        properties,
+      }),
       configured: false,
     });
   }
@@ -68,7 +111,7 @@ export async function POST(request: Request) {
             {
               type: "input_text",
               text:
-                "Sos Props AI, un copiloto para equipos inmobiliarios. Responde en espanol claro y accionable. Puedes usar la informacion de propiedades y contratos adjuntos. Si te piden interpretar un contrato, resume clausulas, riesgos, fechas, ajustes y proximos pasos sin inventar datos faltantes.",
+                "Sos Props AI, un copiloto para equipos inmobiliarios. Responde en espanol claro y accionable. Ayuda a empleados a contestar mejor, resumir contratos, detectar objeciones, sugerir propiedades similares y priorizar tareas del dia. Se muy concreto. Si faltan datos, dilo. No inventes disponibilidad ni condiciones.",
             },
           ],
         },
@@ -77,7 +120,7 @@ export async function POST(request: Request) {
           content: [
             {
               type: "input_text",
-              text: `Contexto del CRM:\n${propertyContext}\n\nConsulta del equipo:\n${prompt}`,
+              text: `Contexto del CRM:\nPropiedades:\n${propertyContext}\n\nLeads:\n${leadsContext}\n\nVisitas:\n${visitsContext}\n\nTareas:\n${tasksContext}\n\nContratos:\n${contractsContext}\n\nPanel de hoy: tareas ${today.counters.pendingTasks}, visitas ${today.counters.visitsToday}, leads urgentes ${today.counters.urgentLeads}, seguimientos ${today.counters.automaticFollowUps}.\n\nConsulta del equipo:\n${prompt}`,
             },
           ],
         },
@@ -94,8 +137,14 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     reply:
-      payload.output_text ??
-      "No pude generar una respuesta util esta vez. Proba con otra pregunta o mas contexto.",
+      payload.output_text?.trim() ||
+      suggestAssistantFallback({
+        prompt,
+        leads,
+        tasks,
+        visits,
+        properties,
+      }),
     configured: true,
   });
 }

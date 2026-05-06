@@ -86,6 +86,29 @@ export function LeasesWorkspace({
 
       {leases.length > 0 ? (
         <>
+          <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+            <MiniInfoCard
+              label="Contratos activos"
+              value={String(rentalSummary.totalActiveContracts)}
+              hint="Contratos hoy en marcha."
+            />
+            <MiniInfoCard
+              label="Ajustan hoy"
+              value={String(rentalSummary.dueToday)}
+              hint="Conviene revisar y avisar."
+            />
+            <MiniInfoCard
+              label="Ajustan en 7 dias"
+              value={String(rentalSummary.dueThisWeek)}
+              hint="Planifica avisos y seguimiento."
+            />
+            <MiniInfoCard
+              label="Avisos fallidos"
+              value={String(rentalSummary.failedNotifications)}
+              hint="Necesitan revision manual."
+            />
+          </section>
+
           <section className="hidden overflow-hidden rounded-[30px] border bg-card shadow-sm xl:block">
             <div className="grid grid-cols-[1.1fr_1fr_0.8fr_0.9fr_0.8fr_0.7fr_0.8fr] gap-4 border-b px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               <span>Inquilino</span>
@@ -190,6 +213,31 @@ export function LeasesWorkspace({
                   </div>
                 ) : null}
 
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-[22px] border bg-background p-4 text-sm text-muted-foreground">
+                    <p className="text-xs uppercase tracking-[0.2em] text-primary/75">Documentacion</p>
+                    <p className="mt-2 font-medium text-foreground">
+                      Contrato y soporte del alquiler
+                    </p>
+                    <p className="mt-1">
+                      Todo queda centralizado aca para revisar fechas, clausulas y siguientes pasos.
+                    </p>
+                  </div>
+                  <div className="rounded-[22px] border bg-background p-4 text-sm text-muted-foreground">
+                    <p className="text-xs uppercase tracking-[0.2em] text-primary/75">Historial operativo</p>
+                    <p className="mt-2 font-medium text-foreground">
+                      {recentAdjustments.find((item) => item.contractId === lease.contractId)
+                        ? "Ya tiene ajustes registrados"
+                        : "Todavia sin ajustes aplicados"}
+                    </p>
+                    <p className="mt-1">
+                      {recentAdjustments.find((item) => item.contractId === lease.contractId)
+                        ? "Puedes revisar el ultimo aviso y volver a probar mensajeria si hace falta."
+                        : "Cuando se procese el primer aumento, el historial quedara guardado aca."}
+                    </p>
+                  </div>
+                </div>
+
                 <div className="mt-4">
                   <Button
                     variant="outline"
@@ -230,6 +278,24 @@ function InfoRow({
     <div className="inline-flex items-start gap-2">
       <span className="mt-0.5 text-primary">{icon}</span>
       <span>{label}</span>
+    </div>
+  );
+}
+
+function MiniInfoCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+}) {
+  return (
+    <div className="rounded-[24px] border bg-card p-5 shadow-sm">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="mt-3 text-3xl font-semibold">{value}</p>
+      <p className="mt-2 text-sm text-muted-foreground">{hint}</p>
     </div>
   );
 }

@@ -65,6 +65,22 @@ export type CrmLeadSummary = {
   updatedAt: string;
 };
 
+export type AgencyMessageTemplateKey =
+  | "rental_requirements"
+  | "sale_reply"
+  | "follow_up"
+  | "visit_confirmation"
+  | "gentle_rejection";
+
+export type AgencyMessageTemplateSummary = {
+  id: string;
+  agencyId: string;
+  templateKey: AgencyMessageTemplateKey;
+  label: string;
+  body: string;
+  updatedAt: string;
+};
+
 export type CrmLeadMessageSummary = {
   id: string;
   leadId: string;

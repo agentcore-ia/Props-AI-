@@ -3,23 +3,43 @@
 import { useState } from "react";
 import { Loader2, Sparkles, WandSparkles } from "lucide-react";
 
-import { AIMessage, aiMessages } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
+type Message = {
+  id: string;
+  role: "assistant" | "user";
+  content: string;
+};
+
+const starterPrompts = [
+  "Que le puedo contestar a un lead que pide visita pero no definio presupuesto?",
+  "Resumime el contrato de alquiler y marcame proximos hitos.",
+  "Que objeciones puso este lead y como las responderias?",
+  "Que propiedades similares tengo para mostrar hoy?",
+  "Que tengo pendiente hoy como recepcionista?",
+];
+
 export function AIChat() {
-  const [messages, setMessages] = useState<AIMessage[]>(aiMessages);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content:
+        "Puedo ayudarte a contestar mejor, resumir contratos, detectar objeciones, sugerir propiedades similares y ordenar que mover hoy.",
+    },
+  ]);
   const [prompt, setPrompt] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  async function handleSubmit() {
-    if (!prompt.trim() || submitting) {
+  async function handleSubmit(customPrompt?: string) {
+    const currentPrompt = (customPrompt ?? prompt).trim();
+    if (!currentPrompt || submitting) {
       return;
     }
 
-    const currentPrompt = prompt.trim();
     setSubmitting(true);
     setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", content: currentPrompt }]);
     setPrompt("");
@@ -59,11 +79,25 @@ export function AIChat() {
             <Sparkles className="size-5" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold">Asistente de operaciones</h3>
+            <h3 className="text-lg font-semibold">Copiloto del equipo</h3>
             <p className="text-sm text-muted-foreground">
-              Usa prompts para ventas, mensajes, resúmenes y lectura de contratos.
+              Pensado para recepcionistas, asesores y administracion: menos improvisacion, mas claridad operativa.
             </p>
           </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {starterPrompts.map((item) => (
+            <Button
+              key={item}
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              disabled={submitting}
+              onClick={() => void handleSubmit(item)}
+            >
+              {item}
+            </Button>
+          ))}
         </div>
       </div>
 
@@ -80,7 +114,7 @@ export function AIChat() {
               <p className="mb-2 text-xs uppercase tracking-[0.24em] opacity-70">
                 {message.role === "assistant" ? "Props AI" : "Equipo"}
               </p>
-              <p className="text-sm">{message.content}</p>
+              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
             </div>
           ))}
         </div>
@@ -91,7 +125,7 @@ export function AIChat() {
           <Input
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
-            placeholder="Ej. resumí el contrato del alquiler de Torre Libertad y marcame próximos hitos..."
+            placeholder="Ej. que le contesto, que pendiente tengo hoy o que similares deberia ofrecer..."
             className="border-0 shadow-none focus-visible:ring-0"
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
@@ -100,7 +134,7 @@ export function AIChat() {
               }
             }}
           />
-          <Button className="rounded-2xl" disabled={submitting || !prompt.trim()} onClick={handleSubmit}>
+          <Button className="rounded-2xl" disabled={submitting || !prompt.trim()} onClick={() => void handleSubmit()}>
             {submitting ? <Loader2 className="size-4 animate-spin" /> : <WandSparkles className="size-4" />}
             Generar
           </Button>

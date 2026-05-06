@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import type { CurrentUserContext } from "@/lib/auth/current-user";
+import type { AgencyMessageTemplateSummary } from "@/lib/crm-types";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -109,6 +110,8 @@ export function AgencySettingsWorkspace({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<AgencyMessageTemplateSummary[]>([]);
+  const [templatesBusy, setTemplatesBusy] = useState(false);
   const selectedAgency = useMemo(
     () => agencies.find((agency) => agency.slug === selectedSlug) ?? null,
     [agencies, selectedSlug]
@@ -133,6 +136,33 @@ export function AgencySettingsWorkspace({
     setForm(buildInitialForm(selectedAgency));
     setSaveError(null);
     setSaveSuccess(null);
+  }, [selectedAgency]);
+
+  useEffect(() => {
+    if (!selectedAgency) return;
+
+    let cancelled = false;
+    const agencySlug = selectedAgency.slug;
+
+    async function loadTemplates() {
+      setTemplatesBusy(true);
+      const response = await fetch(
+        `/api/admin/templates?agencySlug=${encodeURIComponent(agencySlug)}`,
+        { cache: "no-store" }
+      );
+      const payload = await response.json().catch(() => null);
+      if (cancelled) return;
+      setTemplatesBusy(false);
+      if (response.ok) {
+        setTemplates(payload?.templates ?? []);
+      }
+    }
+
+    void loadTemplates();
+
+    return () => {
+      cancelled = true;
+    };
   }, [selectedAgency]);
 
   const loadStatus = useCallback(async () => {
@@ -287,6 +317,37 @@ export function AgencySettingsWorkspace({
       messagingInstance: payload?.agency?.messaging_instance ?? prev.messagingInstance,
     }));
     await loadStatus();
+  }
+
+  async function handleSaveTemplates() {
+    if (!selectedAgency) return;
+    setTemplatesBusy(true);
+    setSaveError(null);
+    setSaveSuccess(null);
+
+    const response = await fetch("/api/admin/templates", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        agencySlug: selectedAgency.slug,
+        templates: templates.map((template) => ({
+          templateKey: template.templateKey,
+          label: template.label,
+          body: template.body,
+        })),
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+    setTemplatesBusy(false);
+
+    if (!response.ok) {
+      setSaveError(payload?.error ?? "No se pudieron guardar las plantillas.");
+      return;
+    }
+
+    setTemplates(payload?.templates ?? templates);
+    setSaveSuccess("Plantillas guardadas.");
   }
 
   const statusCopy = getStatusCopy(connectionState);
@@ -498,6 +559,54 @@ export function AgencySettingsWorkspace({
           </CardContent>
         </Card>
       </div>
+
+      <Card className="rounded-[32px] border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle>Plantillas vivas para el equipo</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Cada inmobiliaria puede adaptar sus respuestas base para alquiler, venta, seguimiento, visita y rechazo amable. Props AI usa este tono al sugerir mensajes.
+          </p>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {templates.map((template) => (
+              <div key={template.id} className="rounded-[24px] border bg-background p-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Etiqueta</label>
+                  <Input
+                    value={template.label}
+                    onChange={(event) =>
+                      setTemplates((current) =>
+                        current.map((item) =>
+                          item.id === template.id ? { ...item, label: event.target.value } : item
+                        )
+                      )
+                    }
+                  />
+                </div>
+                <div className="mt-3 space-y-2">
+                  <label className="text-sm font-medium">Mensaje base</label>
+                  <Textarea
+                    rows={5}
+                    value={template.body}
+                    onChange={(event) =>
+                      setTemplates((current) =>
+                        current.map((item) =>
+                          item.id === template.id ? { ...item, body: event.target.value } : item
+                        )
+                      )
+                    }
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <Button className="rounded-2xl" onClick={handleSaveTemplates} disabled={templatesBusy}>
+            {templatesBusy ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            Guardar plantillas
+          </Button>
+        </CardContent>
+      </Card>
 
       <Dialog
         open={qrOpen}

@@ -37,6 +37,7 @@ export async function POST(
 
   const body = await request.json().catch(() => null);
   const customPrompt = String(body?.customPrompt ?? "").trim() || null;
+  const directText = String(body?.directText ?? "").trim() || null;
   const property =
     lead.propertyId && lead.agencySlug
       ? await getPropertyBySlugAndId(lead.agencySlug, lead.propertyId)
@@ -47,6 +48,7 @@ export async function POST(
     agencyMessagingInstance: agency.messaging_instance,
     property,
     customPrompt,
+    directText,
   });
 
   return NextResponse.json({ ok: true, message: sentText });

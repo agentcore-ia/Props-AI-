@@ -37,6 +37,7 @@ type AppRole = "superadmin" | "agency_admin" | "agent" | "customer";
 
 const defaultNavigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/recepcion", label: "Recepcion", icon: MessageSquareText },
   { href: "/propiedades", label: "Propiedades", icon: Building2 },
   { href: "/alquileres", label: "Alquileres", icon: KeyRound },
   { href: "/leads", label: "Leads", icon: Users },

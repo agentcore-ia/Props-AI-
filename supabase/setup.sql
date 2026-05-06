@@ -256,6 +256,17 @@ create table if not exists public.crm_lead_messages (
   created_at timestamptz not null default timezone('utc'::text, now())
 );
 
+create table if not exists public.agency_message_templates (
+  id uuid primary key default gen_random_uuid(),
+  agency_id uuid not null references public.agencies (id) on delete cascade,
+  template_key text not null check (template_key in ('rental_requirements', 'sale_reply', 'follow_up', 'visit_confirmation', 'gentle_rejection')),
+  label text not null,
+  body text not null default '',
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now()),
+  unique (agency_id, template_key)
+);
+
 create unique index if not exists crm_lead_messages_wa_message_id_idx
   on public.crm_lead_messages (wa_message_id)
   where wa_message_id is not null;
@@ -285,6 +296,7 @@ alter table public.crm_leads enable row level security;
 alter table public.visit_appointments enable row level security;
 alter table public.employee_tasks enable row level security;
 alter table public.crm_lead_messages enable row level security;
+alter table public.agency_message_templates enable row level security;
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -324,6 +336,7 @@ drop trigger if exists rental_contracts_set_updated_at on public.rental_contract
 drop trigger if exists crm_leads_set_updated_at on public.crm_leads;
 drop trigger if exists visit_appointments_set_updated_at on public.visit_appointments;
 drop trigger if exists employee_tasks_set_updated_at on public.employee_tasks;
+drop trigger if exists agency_message_templates_set_updated_at on public.agency_message_templates;
 
 create trigger profiles_set_updated_at
   before update on public.profiles
@@ -357,6 +370,10 @@ create trigger employee_tasks_set_updated_at
   before update on public.employee_tasks
   for each row execute procedure public.touch_updated_at();
 
+create trigger agency_message_templates_set_updated_at
+  before update on public.agency_message_templates
+  for each row execute procedure public.touch_updated_at();
+
 drop policy if exists "Users can view their own profile" on public.profiles;
 drop policy if exists "Users can update their own profile" on public.profiles;
 drop policy if exists "Public can view agencies" on public.agencies;
@@ -372,6 +389,7 @@ drop policy if exists "Service role manages crm leads" on public.crm_leads;
 drop policy if exists "Service role manages visit appointments" on public.visit_appointments;
 drop policy if exists "Service role manages employee tasks" on public.employee_tasks;
 drop policy if exists "Service role manages crm lead messages" on public.crm_lead_messages;
+drop policy if exists "Service role manages agency message templates" on public.agency_message_templates;
 
 create policy "Users can view their own profile"
 on public.profiles
@@ -460,6 +478,12 @@ with check (auth.role() = 'service_role');
 
 create policy "Service role manages crm lead messages"
 on public.crm_lead_messages
+for all
+using (auth.role() = 'service_role')
+with check (auth.role() = 'service_role');
+
+create policy "Service role manages agency message templates"
+on public.agency_message_templates
 for all
 using (auth.role() = 'service_role')
 with check (auth.role() = 'service_role');

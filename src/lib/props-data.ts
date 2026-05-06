@@ -1,12 +1,14 @@
 import type { Agency, Metric, Property } from "@/lib/mock-data";
 import type { PropertyCurrency, PropertyType } from "@/lib/mock-data";
 import type {
+  AgencyMessageTemplateSummary,
   CrmLeadMessageSummary,
   CrmLeadSummary,
   EmployeeTaskSummary,
   TodayWorkspaceSnapshot,
   VisitAppointmentSummary,
 } from "@/lib/crm-types";
+import { getDefaultAgencyTemplates } from "@/lib/crm-insights";
 import type {
   RentalAdjustmentSummary,
   RentalContractSummary,
@@ -271,6 +273,16 @@ type CrmLeadMessageRow = {
   created_at: string;
 };
 
+type AgencyMessageTemplateRow = {
+  id: string;
+  agency_id: string;
+  template_key: string;
+  label: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+};
+
 const PROPERTY_SELECT = `
   id,
   agency_id,
@@ -440,6 +452,17 @@ function mapCrmLeadMessage(row: CrmLeadMessageRow): CrmLeadMessageSummary {
   };
 }
 
+function mapAgencyMessageTemplate(row: AgencyMessageTemplateRow): AgencyMessageTemplateSummary {
+  return {
+    id: row.id,
+    agencyId: row.agency_id,
+    templateKey: row.template_key as AgencyMessageTemplateSummary["templateKey"],
+    label: row.label,
+    body: row.body,
+    updatedAt: row.updated_at,
+  };
+}
+
 function mapAgency(row: AgencyRow): Agency {
   return {
     id: row.id,
@@ -557,6 +580,77 @@ export async function listAgencies() {
   }
 
   return ((data ?? []) as AgencyRow[]).map(mapAgency);
+}
+
+export async function listAgencyMessageTemplates(options?: { agencySlug?: string }) {
+  const admin = createAdminClient();
+
+  const agencySlug = options?.agencySlug;
+  const agencies: Agency[] = agencySlug ? [] : await listAgencies();
+
+  if (agencySlug) {
+    const agency = await getAgencyBySlug(agencySlug);
+    if (agency) agencies.push(agency);
+  }
+
+  if (agencies.length === 0) {
+    return [];
+  }
+
+  let query = admin
+    .from("agency_message_templates")
+    .select("*")
+    .order("updated_at", { ascending: false });
+
+  if (agencySlug) {
+    query = query.in(
+      "agency_id",
+      agencies.map((agency) => agency!.id)
+    );
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    if (/agency_message_templates/i.test(error.message ?? "")) {
+      return agencies.flatMap((agency) =>
+        getDefaultAgencyTemplates(agency.name).map((template) => ({
+          id: `${agency.id}-${template.templateKey}`,
+          agencyId: agency.id,
+          templateKey: template.templateKey,
+          label: template.label,
+          body: template.body,
+          updatedAt: new Date().toISOString(),
+        }))
+      );
+    }
+    throw error;
+  }
+
+  const mapped = ((data ?? []) as AgencyMessageTemplateRow[]).map(mapAgencyMessageTemplate);
+  const templatesByAgency = new Map<string, AgencyMessageTemplateSummary[]>();
+
+  for (const template of mapped) {
+    const current = templatesByAgency.get(template.agencyId) ?? [];
+    current.push(template);
+    templatesByAgency.set(template.agencyId, current);
+  }
+
+  return agencies.flatMap((agency) => {
+    const existing = templatesByAgency.get(agency.id) ?? [];
+    const existingKeys = new Set(existing.map((template) => template.templateKey));
+    const defaults = getDefaultAgencyTemplates(agency.name)
+      .filter((template) => !existingKeys.has(template.templateKey))
+      .map((template) => ({
+        id: `${agency.id}-${template.templateKey}`,
+        agencyId: agency.id,
+        templateKey: template.templateKey,
+        label: template.label,
+        body: template.body,
+        updatedAt: new Date().toISOString(),
+      }));
+    return [...existing, ...defaults];
+  });
 }
 
 export async function listAgencySummaries() {
@@ -1373,10 +1467,11 @@ export async function listEmployeeTasks(options?: { agencySlug?: string; include
 }
 
 export async function getTodayWorkspaceSnapshot(options?: { agencySlug?: string }): Promise<TodayWorkspaceSnapshot> {
-  const [leads, visits, tasks] = await Promise.all([
+  const [leads, visits, tasks, leases] = await Promise.all([
     listCrmLeads(options),
     listVisitAppointments(options),
     listEmployeeTasks(options),
+    listLeaseRoster(options),
   ]);
 
   const startOfDay = new Date();
@@ -1390,6 +1485,28 @@ export async function getTodayWorkspaceSnapshot(options?: { agencySlug?: string 
   });
 
   const dueNow = tasks.filter((task) => new Date(task.dueAt).getTime() <= Date.now());
+  const contractReviewTasks: EmployeeTaskSummary[] = leases
+    .filter((lease) => lease.status === "Pausado")
+    .slice(0, 3)
+    .map((lease) => ({
+      id: `contract-review-${lease.contractId}`,
+      agencyId: lease.agencyId,
+      leadId: null,
+      propertyId: lease.propertyId,
+      visitId: null,
+      title: `Revisar contrato de ${lease.tenantName}`,
+      details: `${lease.propertyTitle}: revisar fechas, indice y activar automatizacion si ya esta correcto.`,
+      dueAt: new Date().toISOString(),
+      taskType: "Contrato",
+      priority: "Alta",
+      status: "Pendiente",
+      automationSource: "rental_review",
+      assignedUserId: null,
+      completedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+  const allDueNow = [...dueNow, ...contractReviewTasks];
   const leadsToAnswer = leads.filter((lead) => lead.needsResponse).slice(0, 8);
   const automaticFollowUps = leads.filter(
     (lead) =>
@@ -1399,12 +1516,12 @@ export async function getTodayWorkspaceSnapshot(options?: { agencySlug?: string 
 
   return {
     myDay: {
-      dueNow,
+      dueNow: allDueNow,
       visitsToday,
       leadsToAnswer,
     },
     counters: {
-      pendingTasks: tasks.length,
+      pendingTasks: tasks.length + contractReviewTasks.length,
       visitsToday: visitsToday.length,
       urgentLeads: leads.filter((lead) => lead.priority === "Alta" || lead.needsResponse).length,
       automaticFollowUps,

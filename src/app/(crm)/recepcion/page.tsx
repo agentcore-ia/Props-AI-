@@ -1,7 +1,8 @@
-import { LeadsWorkspace } from "@/components/leads/leads-workspace";
+import { InboxWorkspace } from "@/components/messages/inbox-workspace";
 import { getCurrentUserContext } from "@/lib/auth/current-user";
 import { getAgencyScopeFromUser } from "@/lib/crm-automation";
 import {
+  listAgencyMessageTemplates,
   listCrmLeadMessages,
   listCrmLeads,
   listProperties,
@@ -10,28 +11,39 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function LeadsPage() {
+export default async function ReceptionPage() {
   const currentUser = await getCurrentUserContext();
   if (!currentUser) {
     return null;
   }
 
   const scope = getAgencyScopeFromUser(currentUser);
-  const [leads, properties, visits] = await Promise.all([
+  const [leads, properties, visits, templates] = await Promise.all([
     listCrmLeads(scope),
     listProperties(scope?.agencySlug ? { tenantSlug: scope.agencySlug } : undefined),
     listVisitAppointments(scope),
+    listAgencyMessageTemplates(scope),
   ]);
+  const visibleLeads = leads.filter(
+    (lead) =>
+      lead.needsResponse ||
+      lead.stage === "Nuevo" ||
+      lead.stage === "Precalificado" ||
+      lead.stage === "Visita"
+  );
   const messages = await listCrmLeadMessages({
     agencySlug: scope?.agencySlug,
-    leadIds: leads.map((lead) => lead.id),
+    leadIds: visibleLeads.map((lead) => lead.id),
   });
+
   return (
-    <LeadsWorkspace
-      leads={leads}
+    <InboxWorkspace
+      leads={visibleLeads}
       messages={messages}
       properties={properties}
       visits={visits}
+      templates={templates}
+      initialMode="recepcion"
     />
   );
 }
