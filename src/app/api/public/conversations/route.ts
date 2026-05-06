@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
-import { recordCrmLeadMessage, upsertLeadFromSignal } from "@/lib/crm-automation";
+import { ensureLeadTask, recordCrmLeadMessage, upsertLeadFromSignal } from "@/lib/crm-automation";
 import { getOpenAIEnv } from "@/lib/openai-env";
 import { listProperties } from "@/lib/props-data";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -255,6 +255,49 @@ export async function POST(request: Request) {
     message,
   });
 
+  const extractedPhone = extractPhoneFromText(message);
+  const visitPreference = extractVisitPreference(message);
+  const visitFlowActive = recentMessages.some(
+    (item) =>
+      item.senderRole === "assistant" &&
+      /visita|telefono|teléfono|contacta|coordinar/i.test(item.content)
+  );
+
+  if (visitFlowActive && (extractedPhone || visitPreference)) {
+    await admin
+      .from("crm_leads")
+      .update({
+        phone: extractedPhone ?? lead.phone,
+        stage: "Visita",
+        priority: "Alta",
+        needs_response: true,
+        next_follow_up_at: new Date().toISOString(),
+        last_activity_at: new Date().toISOString(),
+      })
+      .eq("id", lead.id);
+
+    const details = [
+      `Lead web solicitó visita por ${property.title}.`,
+      extractedPhone ? `Telefono: ${extractedPhone}.` : null,
+      visitPreference ? `Preferencia: ${visitPreference}.` : null,
+      `Ultimo mensaje: ${message}`,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    await ensureLeadTask({
+      agencyId: agency.id,
+      leadId: lead.id,
+      propertyId: property.id,
+      title: `Contactar a ${lead.full_name} para coordinar visita`,
+      details,
+      dueAt: new Date().toISOString(),
+      taskType: "Visita",
+      priority: "Alta",
+      automationSource: "marketplace_chat_visit",
+    });
+  }
+
   await recordCrmLeadMessage({
     leadId: lead.id,
     agencyId: agency.id,
@@ -427,4 +470,23 @@ function sanitizePropertyReply(reply: string) {
     .replace(/tambien hay .*$/gim, "")
     .replace(/adem[aá]s puedo recomendarte .*$/gim, "")
     .trim();
+}
+
+function extractPhoneFromText(text: string) {
+  const match = text.match(/(?:\+?54[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d{3,4}[\s-]?\d{4}/);
+  if (!match) return null;
+  const digits = match[0].replace(/[^\d]/g, "");
+  if (digits.length < 8) return null;
+  return digits.startsWith("54") ? digits : `54${digits}`;
+}
+
+function extractVisitPreference(text: string) {
+  const normalized = text.toLowerCase();
+  if (/mañana|manana/.test(normalized)) return "Prefiere por la mañana";
+  if (/tarde/.test(normalized)) return "Prefiere por la tarde";
+  if (/noche/.test(normalized)) return "Prefiere por la noche";
+  if (/finde|fin de semana|sabado|sábado|domingo/.test(normalized)) {
+    return "Prefiere fin de semana";
+  }
+  return null;
 }
