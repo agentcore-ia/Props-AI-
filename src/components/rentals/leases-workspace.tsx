@@ -4,8 +4,13 @@ import { useState, type ReactNode } from "react";
 import { Building2, CalendarDays, CircleDollarSign, Loader2, Phone, Send, UserRound } from "lucide-react";
 
 import type { LeaseRosterItem } from "@/lib/props-data";
+import type {
+  RentalAdjustmentSummary,
+  RentalDashboardSummary,
+} from "@/lib/rental-types";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
+import { RentAutomationPanel } from "@/components/props/rent-automation-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatMoney, formatShortDate } from "@/lib/utils";
@@ -18,19 +23,15 @@ const statusStyles: Record<LeaseRosterItem["status"], string> = {
 
 export function LeasesWorkspace({
   leases,
+  rentalSummary,
+  recentAdjustments,
 }: {
   leases: LeaseRosterItem[];
+  rentalSummary: RentalDashboardSummary;
+  recentAdjustments: RentalAdjustmentSummary[];
 }) {
   const [sendingTestId, setSendingTestId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<null | { type: "success" | "error"; message: string }>(null);
-  const active = leases.filter((lease) => lease.status === "Activo").length;
-  const dueSoon = leases.filter((lease) => {
-    if (lease.status !== "Activo") return false;
-    const next = new Date(`${lease.nextAdjustmentDate}T00:00:00`).getTime();
-    const inSevenDays = Date.now() + 7 * 24 * 60 * 60 * 1000;
-    return next <= inSevenDays;
-  }).length;
-  const autoNotify = leases.filter((lease) => lease.autoNotify).length;
 
   async function handleSendTest(contractId: string, tenantName: string) {
     setSendingTestId(contractId);
@@ -69,12 +70,7 @@ export function LeasesWorkspace({
         description="Sigue contratos activos, datos de inquilinos, propiedades alquiladas y proximos ajustes desde una sola vista."
       />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Contratos activos" value={String(active)} hint="alquileres en curso" />
-        <MetricCard label="Aumentos proximos" value={String(dueSoon)} hint="vencen en 7 dias" />
-        <MetricCard label="Aviso automatico" value={String(autoNotify)} hint="con notificacion habilitada" />
-        <MetricCard label="Inquilinos cargados" value={String(leases.length)} hint="base actual del CRM" />
-      </section>
+      <RentAutomationPanel summary={rentalSummary} recentAdjustments={recentAdjustments} />
 
       {feedback ? (
         <div
@@ -219,24 +215,6 @@ export function LeasesWorkspace({
           description="Cuando una propiedad tenga contrato activo, el inquilino y su cronograma de aumentos apareceran automaticamente en esta seccion."
         />
       )}
-    </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-}) {
-  return (
-    <div className="rounded-[28px] border bg-card p-5 shadow-sm">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-3 text-3xl font-semibold">{value}</p>
-      <p className="mt-2 text-sm text-muted-foreground">{hint}</p>
     </div>
   );
 }

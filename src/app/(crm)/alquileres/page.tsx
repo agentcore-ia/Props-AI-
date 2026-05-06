@@ -1,7 +1,11 @@
 import { LeasesWorkspace } from "@/components/rentals/leases-workspace";
 import { getCurrentUserContext } from "@/lib/auth/current-user";
 import { getAgencyScopeFromUser } from "@/lib/crm-automation";
-import { listLeaseRoster } from "@/lib/props-data";
+import {
+  getRentalDashboardSummary,
+  listLeaseRoster,
+  listRecentRentalAdjustments,
+} from "@/lib/props-data";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +18,17 @@ export default async function LeasesPage() {
 
   const agencyScope = getAgencyScopeFromUser(currentUser);
 
-  const leases = await listLeaseRoster(agencyScope);
+  const [leases, rentalSummary, recentAdjustments] = await Promise.all([
+    listLeaseRoster(agencyScope),
+    getRentalDashboardSummary(agencyScope),
+    listRecentRentalAdjustments({ ...agencyScope, limit: 8 }),
+  ]);
 
-  return <LeasesWorkspace leases={leases} />;
+  return (
+    <LeasesWorkspace
+      leases={leases}
+      rentalSummary={rentalSummary}
+      recentAdjustments={recentAdjustments}
+    />
+  );
 }
