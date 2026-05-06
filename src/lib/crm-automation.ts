@@ -301,6 +301,7 @@ export async function recordCrmLeadMessage(input: {
   leadId: string;
   agencyId: string;
   propertyId?: string | null;
+  channel?: "whatsapp" | "web" | "instagram" | "crm";
   content: string;
   direction: "incoming" | "outgoing";
   senderRole: "customer" | "assistant" | "agent" | "system";
@@ -332,7 +333,7 @@ export async function recordCrmLeadMessage(input: {
       lead_id: input.leadId,
       agency_id: input.agencyId,
       property_id: input.propertyId ?? null,
-      channel: "whatsapp",
+      channel: input.channel ?? "whatsapp",
       direction: input.direction,
       sender_role: input.senderRole,
       content,

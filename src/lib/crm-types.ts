@@ -86,7 +86,7 @@ export type CrmLeadMessageSummary = {
   leadId: string;
   agencyId: string;
   propertyId: string | null;
-  channel: "whatsapp";
+  channel: "whatsapp" | "web" | "instagram" | "crm";
   direction: "incoming" | "outgoing";
   senderRole: "customer" | "assistant" | "agent" | "system";
   content: string;

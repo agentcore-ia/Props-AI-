@@ -264,7 +264,7 @@ type CrmLeadMessageRow = {
   lead_id: string;
   agency_id: string;
   property_id: string | null;
-  channel: "whatsapp";
+  channel: "whatsapp" | "web" | "instagram" | "crm";
   direction: "incoming" | "outgoing";
   sender_role: "customer" | "assistant" | "agent" | "system";
   content: string;
@@ -1410,8 +1410,89 @@ export async function listCrmLeadMessages(options?: {
 
   const { data, error } = await query;
   if (error) throw error;
+  const crmMessages = ((data ?? []) as unknown as CrmLeadMessageRow[]).map(mapCrmLeadMessage);
 
-  return ((data ?? []) as unknown as CrmLeadMessageRow[]).map(mapCrmLeadMessage);
+  const leadRowsQuery = admin
+    .from("crm_leads")
+    .select("id, agency_id, property_id, conversation_id");
+
+  if (agencyIds?.length) {
+    leadRowsQuery.in("agency_id", agencyIds);
+  }
+
+  if (options?.leadIds?.length) {
+    leadRowsQuery.in("id", options.leadIds);
+  }
+
+  const { data: leadRows, error: leadRowsError } = await leadRowsQuery;
+  if (leadRowsError) throw leadRowsError;
+
+  const existingLeadIds = new Set(crmMessages.map((message) => message.leadId));
+  const missingConversationLeads = ((leadRows ?? []) as Array<{
+    id: string;
+    agency_id: string;
+    property_id: string | null;
+    conversation_id: string | null;
+  }>).filter((lead) => lead.conversation_id && !existingLeadIds.has(lead.id));
+
+  if (missingConversationLeads.length === 0) {
+    return crmMessages;
+  }
+
+  const conversationIds = missingConversationLeads
+    .map((lead) => lead.conversation_id)
+    .filter((value): value is string => Boolean(value));
+
+  const { data: marketplaceMessages, error: marketplaceError } = await admin
+    .from("marketplace_messages")
+    .select("id, conversation_id, sender_role, content, metadata, created_at")
+    .in("conversation_id", conversationIds)
+    .order("created_at", { ascending: true });
+
+  if (marketplaceError) throw marketplaceError;
+
+  const leadByConversation = new Map(
+    missingConversationLeads.map((lead) => [
+      lead.conversation_id as string,
+      {
+        leadId: lead.id,
+        agencyId: lead.agency_id,
+        propertyId: lead.property_id,
+      },
+    ])
+  );
+
+  const mirroredMessages = ((marketplaceMessages ?? []) as Array<{
+    id: string;
+    conversation_id: string;
+    sender_role: "customer" | "assistant";
+    content: string;
+    metadata: Record<string, unknown> | null;
+    created_at: string;
+  }>)
+    .map((message) => {
+      const owner = leadByConversation.get(message.conversation_id);
+      if (!owner) return null;
+
+      return {
+        id: `marketplace-${message.id}`,
+        leadId: owner.leadId,
+        agencyId: owner.agencyId,
+        propertyId: owner.propertyId,
+        channel: "web" as const,
+        direction: message.sender_role === "customer" ? "incoming" as const : "outgoing" as const,
+        senderRole: message.sender_role,
+        content: message.content,
+        waMessageId: null,
+        metadata: message.metadata ?? {},
+        createdAt: message.created_at,
+      };
+    })
+    .filter((message): message is NonNullable<typeof message> => Boolean(message));
+
+  return [...crmMessages, ...mirroredMessages].sort((left, right) =>
+    left.createdAt.localeCompare(right.createdAt)
+  );
 }
 
 export async function getCrmLeadById(leadId: string) {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
-import { upsertLeadFromSignal } from "@/lib/crm-automation";
+import { recordCrmLeadMessage, upsertLeadFromSignal } from "@/lib/crm-automation";
 import { getOpenAIEnv } from "@/lib/openai-env";
 import { listProperties } from "@/lib/props-data";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -237,7 +237,7 @@ export async function POST(request: Request) {
     })
     .eq("id", conversationId);
 
-  await upsertLeadFromSignal({
+  const { lead } = await upsertLeadFromSignal({
     agency: {
       id: agency.id,
       name: agency.name,
@@ -253,6 +253,36 @@ export async function POST(request: Request) {
     phone: null,
     source: "chat_marketplace",
     message,
+  });
+
+  await recordCrmLeadMessage({
+    leadId: lead.id,
+    agencyId: agency.id,
+    propertyId: property.id,
+    channel: "web",
+    content: message,
+    direction: "incoming",
+    senderRole: "customer",
+    metadata: {
+      source: "marketplace_chat",
+      conversationId,
+      inquiryId: inquiry?.id ?? null,
+    },
+  });
+
+  await recordCrmLeadMessage({
+    leadId: lead.id,
+    agencyId: agency.id,
+    propertyId: property.id,
+    channel: "web",
+    content: reply,
+    direction: "outgoing",
+    senderRole: "assistant",
+    metadata: {
+      source: "marketplace_chat",
+      conversationId,
+      inquiryId: inquiry?.id ?? null,
+    },
   });
 
   return NextResponse.json({
