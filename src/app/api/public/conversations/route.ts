@@ -164,14 +164,24 @@ export async function POST(request: Request) {
     .map((item) => `${item.senderRole === "customer" ? "Cliente" : "IA"}: ${item.content}`)
     .join("\n");
 
-  let reply = buildPropertyChatFallback({
-    property,
-    agencyName: agency.name,
+  const visitState = analyzeVisitFlow({
     message,
     recentMessages,
+    fallbackName: current.profile.full_name ?? null,
+    propertyTitle: property.title,
+    agencyName: agency.name,
   });
 
-  if (openAI.configured) {
+  let reply = visitState.reply
+    ? visitState.reply
+    : buildPropertyChatFallback({
+        property,
+        agencyName: agency.name,
+        message,
+        recentMessages,
+      });
+
+  if (!visitState.reply && openAI.configured) {
     const aiResponse = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
@@ -255,13 +265,20 @@ export async function POST(request: Request) {
     message,
   });
 
-  const extractedPhone = extractPhoneFromText(message);
+  const extractedPhone = visitState.phone ?? extractPhoneFromText(message);
   const visitPreference = extractVisitPreference(message);
-  const visitFlowActive = recentMessages.some(
-    (item) =>
-      item.senderRole === "assistant" &&
-      /visita|telefono|teléfono|contacta|coordinar/i.test(item.content)
-  );
+  const visitFlowActive = visitState.flowActive;
+
+  if (visitState.customerName || extractedPhone) {
+    await admin
+      .from("crm_leads")
+      .update({
+        full_name: visitState.customerName ?? lead.full_name,
+        phone: extractedPhone ?? lead.phone,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", lead.id);
+  }
 
   if (visitFlowActive && (extractedPhone || visitPreference)) {
     await admin
@@ -489,4 +506,131 @@ function extractVisitPreference(text: string) {
     return "Prefiere fin de semana";
   }
   return null;
+}
+
+function analyzeVisitFlow({
+  message,
+  recentMessages,
+  fallbackName,
+  propertyTitle,
+  agencyName,
+}: {
+  message: string;
+  recentMessages: RecentMessage[];
+  fallbackName: string | null;
+  propertyTitle: string;
+  agencyName: string;
+}) {
+  const normalized = normalizeForIntent(message);
+  const phone = extractPhoneFromText(message);
+  const explicitName = extractCustomerName(message);
+  const customerName = explicitName ?? fallbackName ?? null;
+  const assistantAskedForContact = recentMessages.some(
+    (item) =>
+      item.senderRole === "assistant" &&
+      /pasame tu nombre|pasame tu celular|pasame tu nombre y (un )?(telefono|celular)|telefono de contacto|coordinarla/i.test(
+        normalizeForIntent(item.content)
+      )
+  );
+  const anyVisitContext = recentMessages.some(
+    (item) => /visita|visitar|coordinar/i.test(normalizeForIntent(item.content))
+  );
+  const wantsVisit =
+    /visitar|visita|coordinar.*visita|quiero verla|quiero visitar|me gustaria visitar|me gustaría visitar/.test(
+      normalized
+    ) ||
+    (/^si\b|^dale\b|^perfecto\b/.test(normalized) && anyVisitContext);
+
+  const flowActive = wantsVisit || assistantAskedForContact || anyVisitContext;
+
+  if (!flowActive) {
+    return {
+      flowActive: false,
+      phone,
+      customerName,
+      reply: null as string | null,
+    };
+  }
+
+  if (phone) {
+    const firstName = customerName?.split(/\s+/)[0] ?? "gracias";
+    return {
+      flowActive: true,
+      phone,
+      customerName,
+      reply: `Gracias, ${capitalizeName(firstName)}. Ya quedó tu solicitud de visita para ${propertyTitle}. ${agencyName} te va a contactar para coordinarla.`,
+    };
+  }
+
+  if (assistantAskedForContact && !phone) {
+    if (explicitName) {
+      return {
+        flowActive: true,
+        phone: null,
+        customerName,
+        reply: `Gracias, ${capitalizeName(explicitName.split(/\s+/)[0])}. Ahora pasame tu celular y ${agencyName} te contacta para coordinar la visita.`,
+      };
+    }
+
+    return {
+      flowActive: true,
+      phone: null,
+      customerName,
+      reply: "Perfecto. Para coordinar la visita pasame tu nombre y tu celular.",
+    };
+  }
+
+  if (wantsVisit) {
+    return {
+      flowActive: true,
+      phone: null,
+      customerName,
+      reply: "Perfecto. Para coordinar la visita pasame tu nombre y tu celular.",
+    };
+  }
+
+  return {
+    flowActive: true,
+    phone: null,
+    customerName,
+    reply: null as string | null,
+  };
+}
+
+function extractCustomerName(text: string) {
+  const explicitMatch = text.match(
+    /(?:mi nombre es|soy)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+){0,2})/i
+  );
+
+  if (explicitMatch?.[1]) {
+    return explicitMatch[1].trim();
+  }
+
+  const normalized = text.trim();
+  if (/^\+?\d[\d\s.-]{7,}$/.test(normalized)) {
+    return null;
+  }
+
+  if (/^[a-záéíóúñ]+(?:\s+[a-záéíóúñ]+){0,2}[.!]?$/i.test(normalized)) {
+    return normalized.replace(/[.!]+$/g, "").trim();
+  }
+
+  return null;
+}
+
+function normalizeForIntent(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function capitalizeName(value: string) {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1).toLowerCase())
+    .join(" ");
 }
