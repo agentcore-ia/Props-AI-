@@ -6,6 +6,7 @@ import { buildAbsoluteUrl } from "@/lib/request-url";
 export async function POST(request: Request) {
   const formData = await request.formData();
   const fullName = String(formData.get("fullName") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const redirectTo = String(formData.get("redirectTo") ?? "/");
@@ -15,11 +16,18 @@ export async function POST(request: Request) {
     signupUrl.searchParams.set("redirectTo", redirectTo);
   }
 
-  if (!fullName || !email || password.length < 8) {
+  const normalizedPhone = phone.replace(/[^\d+]/g, "");
+
+  if (!fullName || !email || !phone || password.length < 8) {
     signupUrl.searchParams.set(
       "error",
-      password.length < 8 ? "weak_password" : "unexpected"
+      !phone ? "missing_phone" : password.length < 8 ? "weak_password" : "unexpected"
     );
+    return NextResponse.redirect(signupUrl, { status: 303 });
+  }
+
+  if (normalizedPhone.replace(/\D/g, "").length < 8) {
+    signupUrl.searchParams.set("error", "invalid_phone");
     return NextResponse.redirect(signupUrl, { status: 303 });
   }
 
@@ -41,6 +49,7 @@ export async function POST(request: Request) {
     email_confirm: true,
     user_metadata: {
       full_name: fullName,
+      phone: normalizedPhone,
     },
   });
 
@@ -54,6 +63,7 @@ export async function POST(request: Request) {
     .update({
       email,
       full_name: fullName,
+      phone: normalizedPhone,
       role: "customer",
       agency_slug: null,
     })

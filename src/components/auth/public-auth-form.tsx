@@ -1,4 +1,4 @@
-import { LockKeyhole, Mail, UserRound } from "lucide-react";
+import { LockKeyhole, Mail, Phone, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,17 +23,34 @@ export function PublicAuthForm({
       <input type="hidden" name="redirectTo" value={redirectTo} />
 
       {isSignup ? (
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Nombre completo</label>
-          <div className="relative">
-            <UserRound className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              required
-              type="text"
-              name="fullName"
-              placeholder="Juan Perez"
-              className="h-12 rounded-2xl border-0 bg-muted/55 pl-11 shadow-none"
-            />
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Nombre completo</label>
+            <div className="relative">
+              <UserRound className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                required
+                type="text"
+                name="fullName"
+                placeholder="Juan Perez"
+                className="h-12 rounded-2xl border-0 bg-muted/55 pl-11 shadow-none"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Celular</label>
+            <div className="relative">
+              <Phone className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                required
+                type="tel"
+                name="phone"
+                placeholder="+54 11 5555 5555"
+                autoComplete="tel"
+                className="h-12 rounded-2xl border-0 bg-muted/55 pl-11 shadow-none"
+              />
+            </div>
           </div>
         </div>
       ) : null}

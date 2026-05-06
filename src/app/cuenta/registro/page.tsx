@@ -31,6 +31,10 @@ export default async function PublicSignupPage({
   const error =
     searchParams.error === "user_exists"
       ? "Ya existe una cuenta con ese email."
+      : searchParams.error === "missing_phone"
+        ? "El numero de celular es obligatorio."
+        : searchParams.error === "invalid_phone"
+          ? "Ingresa un numero de celular valido."
       : searchParams.error === "weak_password"
         ? "La password debe tener al menos 8 caracteres."
         : searchParams.error === "unexpected"

@@ -6,11 +6,15 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   email text unique,
   full_name text,
+  phone text,
   role text not null default 'agent' check (role in ('superadmin', 'agency_admin', 'agent', 'customer')),
   agency_slug text,
   created_at timestamptz not null default timezone('utc'::text, now()),
   updated_at timestamptz not null default timezone('utc'::text, now())
 );
+
+alter table public.profiles
+  add column if not exists phone text;
 
 create table if not exists public.agencies (
   id uuid primary key default gen_random_uuid(),
