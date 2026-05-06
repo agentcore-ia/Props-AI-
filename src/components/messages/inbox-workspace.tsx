@@ -53,6 +53,27 @@ const conversationStatusTone = {
   Cerrado: "bg-emerald-500/10 text-emerald-700",
 } as const;
 
+const channelTone = {
+  whatsapp: "bg-emerald-500/10 text-emerald-700",
+  web: "bg-sky-500/10 text-sky-700",
+  instagram: "bg-fuchsia-500/10 text-fuchsia-700",
+  crm: "bg-slate-500/10 text-slate-700",
+} as const;
+
+const senderRoleLabel = {
+  customer: "Cliente",
+  assistant: "IA",
+  agent: "Asesor",
+  system: "Sistema",
+} as const;
+
+const channelLabel = {
+  whatsapp: "WhatsApp",
+  web: "Web",
+  instagram: "Instagram",
+  crm: "CRM",
+} as const;
+
 export function InboxWorkspace({
   leads,
   messages,
@@ -397,15 +418,19 @@ export function InboxWorkspace({
                   <MessageBubble
                     key={message.id}
                     role={message.senderRole === "customer" ? "customer" : "assistant"}
-                    title={message.senderRole === "customer" ? "Cliente" : "Equipo / IA"}
+                    title={senderRoleLabel[message.senderRole]}
+                    channel={message.channel}
                     content={message.content}
+                    createdAt={message.createdAt}
                   />
                 ))
               ) : (
                 <MessageBubble
                   role="customer"
                   title="Ultimo mensaje del cliente"
+                  channel="web"
                   content={selectedLead.lastCustomerMessage}
+                  createdAt={selectedLead.lastActivityAt}
                 />
               )}
 
@@ -761,11 +786,15 @@ export function InboxWorkspace({
 function MessageBubble({
   role,
   title,
+  channel,
   content,
+  createdAt,
 }: {
   role: "customer" | "assistant";
   title: string;
+  channel: "whatsapp" | "web" | "instagram" | "crm";
   content: string;
+  createdAt: string;
 }) {
   return (
     <div className={cn("flex", role === "assistant" ? "justify-end" : "justify-start")}>
@@ -777,7 +806,27 @@ function MessageBubble({
             : "border bg-background"
         )}
       >
-        <p className="mb-2 text-[11px] uppercase tracking-[0.2em] opacity-80">{title}</p>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <p className="text-[11px] uppercase tracking-[0.2em] opacity-80">{title}</p>
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]",
+              role === "assistant"
+                ? "bg-white/15 text-white"
+                : channelTone[channel]
+            )}
+          >
+            {channelLabel[channel]}
+          </span>
+          <span className="text-[10px] opacity-70">
+            {new Date(createdAt).toLocaleString("es-AR", {
+              day: "2-digit",
+              month: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+        </div>
         <p>{content}</p>
       </div>
     </div>
