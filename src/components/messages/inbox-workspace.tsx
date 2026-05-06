@@ -265,7 +265,7 @@ export function InboxWorkspace({
               className="rounded-2xl"
               onClick={() => setMode("recepcion")}
             >
-              Modo recepcion
+              Vista rapida
             </Button>
             <Button
               variant={mode === "completo" ? "default" : "outline"}

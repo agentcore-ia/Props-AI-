@@ -11,7 +11,11 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function MessagesPage() {
+export default async function MessagesPage({
+  searchParams,
+}: {
+  searchParams?: { modo?: string };
+}) {
   const currentUser = await getCurrentUserContext();
   if (!currentUser) {
     return null;
@@ -39,6 +43,7 @@ export default async function MessagesPage() {
       properties={properties}
       visits={visits}
       templates={templates}
+      initialMode={searchParams?.modo === "recepcion" ? "recepcion" : "completo"}
     />
   );
 }
