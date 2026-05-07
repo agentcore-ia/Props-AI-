@@ -9,7 +9,8 @@ import type {
   TaskType,
   VisitStatus,
 } from "@/lib/crm-types";
-import { sendEvolutionTextMessage } from "@/lib/evolution";
+import { getEffectiveMessagingInstance } from "@/lib/agency-access";
+import { ensureEvolutionInstance, sendEvolutionTextMessage } from "@/lib/evolution";
 import { buildAutomaticFollowUpMessage } from "@/lib/crm-insights";
 import { getOpenAIEnv } from "@/lib/openai-env";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -226,17 +227,29 @@ async function findExistingLead(params: {
   if (params.propertyId) query = query.eq("property_id", params.propertyId);
 
   if (params.customerId) {
-    const { data } = await query.eq("customer_id", params.customerId).limit(1).maybeSingle();
+    const { data } = await query
+      .eq("customer_id", params.customerId)
+      .order("last_activity_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
     if (data) return data as LeadRow;
   }
 
   if (params.phone) {
-    const { data } = await query.eq("phone", params.phone).limit(1).maybeSingle();
+    const { data } = await query
+      .eq("phone", params.phone)
+      .order("last_activity_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
     if (data) return data as LeadRow;
   }
 
   if (params.email) {
-    const { data } = await query.eq("email", params.email).limit(1).maybeSingle();
+    const { data } = await query
+      .eq("email", params.email)
+      .order("last_activity_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
     if (data) return data as LeadRow;
   }
 
@@ -736,6 +749,12 @@ export async function runAutomaticLeadFollowUps(agencyIds?: string[]) {
     const property = Array.isArray(row.properties) ? row.properties[0] : row.properties;
 
     try {
+      const instanceName = getEffectiveMessagingInstance({
+        slug: agency?.slug ?? "",
+        messaging_instance: agency?.messaging_instance ?? "",
+      });
+      await ensureEvolutionInstance(instanceName);
+
       await sendLeadWhatsApp({
         lead: {
           id: row.id,
@@ -776,7 +795,7 @@ export async function runAutomaticLeadFollowUps(agencyIds?: string[]) {
           createdAt: row.created_at,
           updatedAt: row.updated_at,
         },
-        agencyMessagingInstance: agency?.messaging_instance ?? "agentcore",
+        agencyMessagingInstance: instanceName,
       });
 
       results.push({ leadId: row.id, status: "sent" });
@@ -802,7 +821,7 @@ export async function runVisitReminders(agencyIds?: string[]) {
   const end = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   let query = admin
     .from("visit_appointments")
-    .select("id, scheduled_for, status, reminder_sent_at, crm_leads!inner(full_name, phone), properties(title), agency_id, agencies!inner(messaging_instance)")
+    .select("id, scheduled_for, status, reminder_sent_at, crm_leads!inner(full_name, phone), properties(title), agency_id, agencies!inner(slug, messaging_instance)")
     .in("status", ["Programada", "Confirmada"])
     .is("reminder_sent_at", null)
     .gte("scheduled_for", start)
@@ -824,7 +843,7 @@ export async function runVisitReminders(agencyIds?: string[]) {
     reminder_sent_at: string | null;
     crm_leads: { full_name: string; phone: string | null } | { full_name: string; phone: string | null }[];
     properties: { title: string } | { title: string }[] | null;
-    agencies: { messaging_instance: string } | { messaging_instance: string }[] | null;
+    agencies: { slug: string; messaging_instance: string } | { slug: string; messaging_instance: string }[] | null;
   }>) {
     const lead = Array.isArray(visit.crm_leads) ? visit.crm_leads[0] : visit.crm_leads;
     const property = Array.isArray(visit.properties) ? visit.properties[0] : visit.properties;
@@ -837,8 +856,14 @@ export async function runVisitReminders(agencyIds?: string[]) {
     }
 
     try {
+      const instanceName = getEffectiveMessagingInstance({
+        slug: agency?.slug ?? "",
+        messaging_instance: agency?.messaging_instance ?? "",
+      });
+      await ensureEvolutionInstance(instanceName);
+
       await sendEvolutionTextMessage({
-        instanceName: agency?.messaging_instance ?? "agentcore",
+        instanceName,
         number: phone,
         text: `Hola ${lead?.full_name ?? ""}, te recordamos la visita de ${property?.title ?? "la propiedad"} programada para ${new Date(visit.scheduled_for).toLocaleString("es-AR")}. Si necesitas reprogramar, responde a este mensaje.`,
       });

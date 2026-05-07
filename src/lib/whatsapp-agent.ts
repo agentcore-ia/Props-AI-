@@ -215,14 +215,11 @@ export async function buildAgencyCatalogContext(options: {
   messageText?: string | null;
 }) {
   const properties = await listProperties({ tenantSlug: options.agencySlug });
-  const selectedProperty =
-    matchPropertyFromMessage(
-      properties,
-      options.messageText ?? "",
-      options.selectedPropertyId ?? null
-    ) ?? null;
+  const selectedProperty = options.selectedPropertyId
+    ? properties.find((property) => property.id === options.selectedPropertyId) ?? null
+    : matchPropertyFromMessage(properties, options.messageText ?? "", null) ?? null;
   const featured = selectedProperty
-    ? [selectedProperty, ...properties.filter((property) => property.id !== selectedProperty.id)]
+    ? [selectedProperty]
     : properties;
 
   return {

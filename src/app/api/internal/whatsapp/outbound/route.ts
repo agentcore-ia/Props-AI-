@@ -74,7 +74,7 @@ export async function POST(request: Request) {
       ? await getPropertyBySlugAndId(lead.agencySlug, selectedPropertyId || lead.propertyId || "")
       : null;
 
-  if (!property && lead.agencySlug) {
+  if (!property && !lead.propertyId && lead.agencySlug) {
     const agencyProperties = await listProperties({ tenantSlug: lead.agencySlug });
     property =
       matchPropertyFromMessage(agencyProperties, lead.lastCustomerMessage || "", null) ?? null;
