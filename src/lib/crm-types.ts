@@ -137,6 +137,7 @@ export type TodayWorkspaceSnapshot = {
     visitsToday: VisitAppointmentSummary[];
     leadsToAnswer: CrmLeadSummary[];
     aiResolved: CrmLeadSummary[];
+    automaticFollowUps: CrmLeadSummary[];
   };
   counters: {
     pendingTasks: number;

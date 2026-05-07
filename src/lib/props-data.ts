@@ -1597,15 +1597,17 @@ export async function getTodayWorkspaceSnapshot(options?: { agencySlug?: string 
     /web|marketplace|catalog/i.test(lead.source) &&
     lead.stage === "Nuevo" &&
     !pendingTaskLeadIds.has(lead.id);
+  const automaticFollowUpLeads = leads
+    .filter((lead) => {
+      if (!lead.needsResponse || !lead.phone || !lead.nextFollowUpAt) return false;
+      if (!["Nuevo", "Precalificado", "Seguimiento", "Visita"].includes(lead.stage)) return false;
+      return new Date(lead.nextFollowUpAt).getTime() <= Date.now();
+    })
+    .slice(0, 8);
   const leadsToAnswer = leads
     .filter((lead) => lead.needsResponse && !pendingTaskLeadIds.has(lead.id) && !isSelfServedWebLead(lead))
     .slice(0, 8);
   const aiResolved = leads.filter((lead) => isSelfServedWebLead(lead)).slice(0, 8);
-  const automaticFollowUps = leads.filter(
-    (lead) =>
-      Boolean(lead.nextFollowUpAt) &&
-      new Date(lead.nextFollowUpAt!).getTime() <= Date.now() + 24 * 60 * 60 * 1000
-  ).length;
 
   return {
     myDay: {
@@ -1613,12 +1615,13 @@ export async function getTodayWorkspaceSnapshot(options?: { agencySlug?: string 
       visitsToday,
       leadsToAnswer,
       aiResolved,
+      automaticFollowUps: automaticFollowUpLeads,
     },
     counters: {
       pendingTasks: tasks.length + contractReviewTasks.length,
       visitsToday: visitsToday.length,
       urgentLeads: leads.filter((lead) => lead.priority === "Alta" || lead.needsResponse).length,
-      automaticFollowUps,
+      automaticFollowUps: automaticFollowUpLeads.length,
       aiResolved: aiResolved.length,
     },
   };

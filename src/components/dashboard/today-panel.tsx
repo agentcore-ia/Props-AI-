@@ -14,7 +14,7 @@ import {
 import { useState } from "react";
 import type { ReactNode } from "react";
 
-import type { TodayWorkspaceSnapshot } from "@/lib/crm-types";
+import type { CrmLeadSummary, TodayWorkspaceSnapshot } from "@/lib/crm-types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatShortDate } from "@/lib/utils";
@@ -45,7 +45,7 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
 
     setFeedback(
       kind === "followups"
-        ? `Se enviaron ${payload?.processed ?? 0} seguimientos automáticos.`
+        ? `Se enviaron mensajes automáticos por WhatsApp a ${payload?.processed ?? 0} leads.`
         : `Se enviaron ${payload?.processed ?? 0} recordatorios de visita.`
     );
     router.refresh();
@@ -53,8 +53,8 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
 
   const followUpLabel =
     snapshot.counters.automaticFollowUps > 0
-      ? `Enviar ${snapshot.counters.automaticFollowUps} seguimientos automáticos`
-      : "No hay seguimientos automáticos pendientes";
+      ? `Recontactar ${snapshot.counters.automaticFollowUps} leads por WhatsApp`
+      : "No hay leads listos para recontactar";
 
   return (
     <Card className="rounded-[28px] border-0 bg-card shadow-sm">
@@ -96,15 +96,34 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-2xl border bg-background px-4 py-2.5 text-sm text-muted-foreground">
-          Los seguimientos automáticos envían mensajes reales a leads pendientes que ya están listos para retomar. Las tareas operativas de contacto manual siguen quedando abajo.
+          Esta acción envía mensajes reales por WhatsApp a los leads listos para retomar ahora.
+          No crea solo tareas internas: los contactos manuales siguen quedando abajo.
         </div>
+
+        <TodayList
+          title="Leads que se van a recontactar ahora"
+          icon={<MessageCircleMore className="size-4 text-primary" />}
+          items={
+            snapshot.myDay.automaticFollowUps.length > 0
+              ? snapshot.myDay.automaticFollowUps.map((lead) => ({
+                  id: lead.id,
+                  title: lead.fullName,
+                  description: `${deriveFollowUpReason(lead)} ${lead.propertyTitle ? `· ${lead.propertyTitle}` : ""}`,
+                  meta: "WhatsApp",
+                  actionLabel: "Abrir lead",
+                  actionHref: `/mensajes?lead=${lead.id}`,
+                }))
+              : []
+          }
+          empty="No hay leads con seguimiento automático listo para salir ahora."
+        />
 
         <section className="grid gap-3 md:grid-cols-5">
           <MiniStat label="Tareas pendientes" value={String(snapshot.counters.pendingTasks)} />
           <MiniStat label="Visitas de hoy" value={String(snapshot.counters.visitsToday)} />
           <MiniStat label="Leads urgentes" value={String(snapshot.counters.urgentLeads)} />
           <MiniStat
-            label="Seguimientos automáticos"
+            label="Recontactos automáticos"
             value={String(snapshot.counters.automaticFollowUps)}
           />
           <MiniStat label="IA ya atendió" value={String(snapshot.counters.aiResolved)} />
@@ -204,6 +223,22 @@ function deriveChannelLabel(source: string) {
     return "Web";
   }
   return "CRM";
+}
+
+function deriveFollowUpReason(lead: CrmLeadSummary) {
+  if (lead.stage === "Visita") {
+    return "Pidió avanzar con una visita y falta retomar la coordinación.";
+  }
+  if (lead.stage === "Seguimiento") {
+    return "Quedó pendiente reactivar la conversación comercial.";
+  }
+  if (lead.desiredOperation === "Alquiler") {
+    return "Consultó por alquiler y ya corresponde retomarlo.";
+  }
+  if (lead.desiredOperation === "Venta") {
+    return "Consultó por compra y ya corresponde retomarlo.";
+  }
+  return "Es un lead pendiente que ya está listo para recontactar.";
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
