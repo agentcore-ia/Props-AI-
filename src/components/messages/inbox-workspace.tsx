@@ -81,6 +81,7 @@ export function InboxWorkspace({
   visits,
   templates,
   initialMode = "completo",
+  initialLeadId,
 }: {
   leads: CrmLeadSummary[];
   messages: CrmLeadMessageSummary[];
@@ -88,9 +89,12 @@ export function InboxWorkspace({
   visits: VisitAppointmentSummary[];
   templates: AgencyMessageTemplateSummary[];
   initialMode?: "completo" | "recepcion";
+  initialLeadId?: string;
 }) {
   const router = useRouter();
-  const [selectedId, setSelectedId] = useState(leads[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState(
+    leads.some((lead) => lead.id === initialLeadId) ? initialLeadId ?? "" : leads[0]?.id ?? ""
+  );
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -123,6 +127,12 @@ export function InboxWorkspace({
     }
     return grouped;
   }, [leads]);
+
+  useEffect(() => {
+    if (initialLeadId && leads.some((lead) => lead.id === initialLeadId)) {
+      setSelectedId(initialLeadId);
+    }
+  }, [initialLeadId, leads]);
 
   const filteredLeads = useMemo(() => {
     if (mode === "recepcion") {

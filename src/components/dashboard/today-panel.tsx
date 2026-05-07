@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ArrowRight,
   CalendarClock,
   CheckCheck,
   Clock3,
@@ -125,6 +127,8 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
                     title: lead.fullName,
                     description: `${lead.propertyTitle ?? "Consulta general"} · ${lead.lastCustomerMessage}`,
                     meta: lead.priority,
+                    actionLabel: "Abrir mensajes",
+                    actionHref: `/mensajes?lead=${lead.id}`,
                   }))
                 : []
             }
@@ -141,6 +145,8 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
                     title: task.title,
                     description: task.details,
                     meta: task.priority,
+                    actionLabel: task.leadId ? "Ver lead" : "Abrir agenda",
+                    actionHref: task.leadId ? `/mensajes?lead=${task.leadId}` : "/agenda",
                   }))
                 : []
             }
@@ -157,6 +163,8 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
                     title: lead.fullName,
                     description: `${lead.propertyTitle ?? "Consulta general"} · ${lead.lastCustomerMessage}`,
                     meta: deriveChannelLabel(lead.source),
+                    actionLabel: "Ver conversación",
+                    actionHref: `/mensajes?lead=${lead.id}`,
                   }))
                 : []
             }
@@ -176,6 +184,8 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
                     visit.scheduledFor.slice(0, 10)
                   )}`,
                   meta: visit.status,
+                  actionLabel: "Abrir agenda",
+                  actionHref: "/agenda",
                 }))
               : []
           }
@@ -213,7 +223,14 @@ function TodayList({
 }: {
   title: string;
   icon: ReactNode;
-  items: Array<{ id: string; title: string; description: string; meta: string }>;
+  items: Array<{
+    id: string;
+    title: string;
+    description: string;
+    meta: string;
+    actionLabel?: string;
+    actionHref?: string;
+  }>;
   empty: string;
 }) {
   return (
@@ -230,6 +247,15 @@ function TodayList({
                 <div>
                   <p className="font-medium">{item.title}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
+                  {item.actionHref && item.actionLabel ? (
+                    <Link
+                      href={item.actionHref}
+                      className="mt-3 inline-flex h-8 items-center gap-1 rounded-xl px-2 text-sm font-medium text-primary transition hover:bg-primary/5"
+                    >
+                      {item.actionLabel}
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  ) : null}
                 </div>
                 <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
                   {item.meta}

@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function MessagesPage({
   searchParams,
 }: {
-  searchParams?: { modo?: string };
+  searchParams?: { modo?: string; lead?: string };
 }) {
   const currentUser = await getCurrentUserContext();
   if (!currentUser) {
@@ -44,6 +44,7 @@ export default async function MessagesPage({
       visits={visits}
       templates={templates}
       initialMode={searchParams?.modo === "recepcion" ? "recepcion" : "completo"}
+      initialLeadId={searchParams?.lead}
     />
   );
 }
