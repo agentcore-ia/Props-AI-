@@ -15,6 +15,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 
 import type { CrmLeadSummary, TodayWorkspaceSnapshot } from "@/lib/crm-types";
+import { buildAutomaticFollowUpMessage } from "@/lib/crm-insights";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatShortDate } from "@/lib/utils";
@@ -132,7 +133,7 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
                   meta: "WhatsApp",
                   actionLabel: "Abrir lead",
                   actionHref: `/mensajes?lead=${lead.id}`,
-                  preview: lead.aiReplyDraft || "Se enviara un mensaje breve para retomar la conversacion.",
+                  preview: buildAutomaticFollowUpMessage({ lead, property: null }),
                 }))
               : []
           }

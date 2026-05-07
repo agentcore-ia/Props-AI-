@@ -10,6 +10,7 @@ import type {
   VisitStatus,
 } from "@/lib/crm-types";
 import { sendEvolutionTextMessage } from "@/lib/evolution";
+import { buildAutomaticFollowUpMessage } from "@/lib/crm-insights";
 import { getOpenAIEnv } from "@/lib/openai-env";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -584,6 +585,9 @@ export async function sendLeadWhatsApp(input: {
 }) {
   const text =
     String(input.directText ?? "").trim() ||
+    (input.lead.stage === "Visita" || input.lead.stage === "Seguimiento"
+      ? buildAutomaticFollowUpMessage({ lead: input.lead, property: input.property ?? null })
+      : "") ||
     (await generateLeadReply({
       lead: input.lead,
       property: input.property,

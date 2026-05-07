@@ -440,6 +440,33 @@ export function buildQuickReplyScenarios(input: {
   return scenarios;
 }
 
+export function buildAutomaticFollowUpMessage(input: {
+  lead: CrmLeadSummary;
+  property?: Property | null;
+}) {
+  const { lead, property } = input;
+  const firstName = lead.fullName.split(" ")[0] || "Hola";
+  const propertyLabel = property?.title ?? lead.propertyTitle ?? "la propiedad";
+
+  if (lead.stage === "Visita") {
+    return `Hola ${firstName}, retomo por la visita a ${propertyLabel}. Si te parece, coordinamos dia y horario para verla esta semana.`;
+  }
+
+  if (lead.stage === "Seguimiento") {
+    return `Hola ${firstName}, retomo esta conversacion por ${propertyLabel}. Si seguis interesado, te ayudo a avanzar con el proximo paso.`;
+  }
+
+  if (lead.desiredOperation === "Alquiler") {
+    return `Hola ${firstName}, retomo tu consulta por ${propertyLabel}. Si seguis buscando alquiler, te paso requisitos y coordinamos visita.`;
+  }
+
+  if (lead.desiredOperation === "Venta") {
+    return `Hola ${firstName}, retomo tu consulta por ${propertyLabel}. Si queres, avanzamos con disponibilidad, detalles y visita.`;
+  }
+
+  return `Hola ${firstName}, retomo tu consulta para ayudarte a avanzar con el proximo paso.`;
+}
+
 export function derivePropertyHealth(
   properties: Property[],
   leads: CrmLeadSummary[],
