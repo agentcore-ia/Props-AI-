@@ -62,16 +62,13 @@ function SidebarContent({ userRole = "agency_admin" }: { userRole?: AppRole | nu
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-3 py-4">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Building2 className="size-4.5" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Props AI</p>
-            <h1 className="text-base font-semibold leading-tight">CRM inmobiliario</h1>
-          </div>
-        </div>
+      <div className="px-4 py-4">
+        <Link
+          href="/dashboard"
+          className="block text-xl font-semibold tracking-tight text-slate-950 transition-opacity hover:opacity-80"
+        >
+          PROPS
+        </Link>
       </div>
 
       <ScrollArea className="flex-1 px-2">
