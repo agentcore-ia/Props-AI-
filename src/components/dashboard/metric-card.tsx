@@ -6,7 +6,7 @@ import { Metric } from "@/lib/mock-data";
 export function MetricCard({ metric }: { metric: Metric }) {
   return (
     <Card className="rounded-[28px] border-0 bg-card shadow-sm">
-      <CardContent className="space-y-5 p-6">
+      <CardContent className="space-y-3 p-5">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-muted-foreground">{metric.label}</p>
           {metric.delta ? (
@@ -17,7 +17,7 @@ export function MetricCard({ metric }: { metric: Metric }) {
           ) : null}
         </div>
         <div>
-          <p className="text-3xl font-semibold tracking-tight">{metric.value}</p>
+          <p className="text-2xl font-semibold tracking-tight md:text-3xl">{metric.value}</p>
           <p className="mt-1 text-sm text-muted-foreground">{metric.hint}</p>
         </div>
       </CardContent>

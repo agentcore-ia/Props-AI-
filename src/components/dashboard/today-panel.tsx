@@ -57,11 +57,11 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
       : "No hay seguimientos automáticos pendientes";
 
   return (
-    <Card className="rounded-[30px] border-0 bg-card shadow-sm">
-      <CardHeader className="gap-4 md:flex-row md:items-start md:justify-between">
+    <Card className="rounded-[28px] border-0 bg-card shadow-sm">
+      <CardHeader className="gap-3 pb-4 md:flex-row md:items-start md:justify-between">
         <div>
           <CardTitle className="text-xl">Qué tengo que hacer hoy</CardTitle>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-1.5 text-sm text-muted-foreground">
             Lo urgente primero: contactos humanos, tareas operativas y visitas del día.
           </p>
         </div>
@@ -94,12 +94,12 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground">
+      <CardContent className="space-y-4">
+        <div className="rounded-2xl border bg-background px-4 py-2.5 text-sm text-muted-foreground">
           Los seguimientos automáticos envían mensajes reales a leads pendientes que ya están listos para retomar. Las tareas operativas de contacto manual siguen quedando abajo.
         </div>
 
-        <section className="grid gap-4 md:grid-cols-5">
+        <section className="grid gap-3 md:grid-cols-5">
           <MiniStat label="Tareas pendientes" value={String(snapshot.counters.pendingTasks)} />
           <MiniStat label="Visitas de hoy" value={String(snapshot.counters.visitsToday)} />
           <MiniStat label="Leads urgentes" value={String(snapshot.counters.urgentLeads)} />
@@ -116,7 +116,7 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
           </div>
         ) : null}
 
-        <div className="grid gap-4 xl:grid-cols-3">
+        <div className="grid gap-3 xl:grid-cols-3">
           <TodayList
             title="Requieren contacto humano"
             icon={<Clock3 className="size-4 text-primary" />}
@@ -208,9 +208,9 @@ function deriveChannelLabel(source: string) {
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[24px] border bg-background p-4">
+    <div className="rounded-[22px] border bg-background p-3.5">
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-3 text-3xl font-semibold">{value}</p>
+      <p className="mt-2 text-2xl font-semibold md:text-3xl">{value}</p>
     </div>
   );
 }
@@ -234,15 +234,15 @@ function TodayList({
   empty: string;
 }) {
   return (
-    <div className="rounded-[28px] border bg-background p-4">
+    <div className="rounded-[24px] border bg-background p-3.5">
       <div className="flex items-center gap-2">
         {icon}
         <h3 className="font-semibold">{title}</h3>
       </div>
-      <div className="mt-4 space-y-3">
+      <div className="mt-3 space-y-2.5">
         {items.length > 0 ? (
           items.map((item) => (
-            <div key={item.id} className="rounded-2xl border p-3">
+            <div key={item.id} className="rounded-2xl border p-2.5">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium">{item.title}</p>
