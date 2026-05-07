@@ -63,11 +63,11 @@ function SidebarContent({ userRole = "agency_admin" }: { userRole?: AppRole | nu
   return (
     <div className="flex h-full flex-col">
       <div className="px-4 py-4">
-        <Link
-          href="/dashboard"
-          className="block text-xl font-semibold tracking-tight text-slate-950 transition-opacity hover:opacity-80"
-        >
-          PROPS
+        <Link href="/dashboard" className="block transition-opacity hover:opacity-80">
+          <span className="block text-xl font-semibold tracking-tight text-slate-950">PROPS</span>
+          <span className="mt-0.5 block text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            Control inmobiliario
+          </span>
         </Link>
       </div>
 
