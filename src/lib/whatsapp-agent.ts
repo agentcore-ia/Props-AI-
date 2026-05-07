@@ -249,6 +249,18 @@ export function buildWhatsappSystemPrompt(input: {
   const selectedPropertyImages = input.selectedProperty?.images
     .filter(Boolean)
     .length;
+  const hasFixedProperty = Boolean(input.selectedProperty || input.lead.propertyId);
+  const isVisitFlow =
+    input.lead.stage === "Visita" ||
+    /visita|coordinar|viernes|sabado|domingo|lunes|martes|miercoles|jueves|manana|mañana|tarde|horario/i.test(
+      [
+        input.lead.intent,
+        input.lead.lastCustomerMessage,
+        ...input.recentMessages.slice(-4).map((message) => message.content),
+      ]
+        .filter(Boolean)
+        .join(" ")
+    );
 
   return [
     `Eres el asistente comercial de WhatsApp de ${input.agency.name}, una inmobiliaria de ${input.agency.city}.`,
@@ -256,8 +268,16 @@ export function buildWhatsappSystemPrompt(input: {
     "Tu trabajo es responder consultas de compra o alquiler, aclarar precio, ubicacion, requisitos, mascotas, expensas, disponibilidad, amenities y proximo paso.",
     "Solo puedes afirmar datos que esten en el contexto. Si no aparece algo, dilo con honestidad y ofrece derivarlo al equipo.",
     "Cuando el cliente muestra interes concreto, invita a dejar horario, presupuesto o coordinar visita. Cuando haga falta, pide una sola aclaracion a la vez.",
+    hasFixedProperty
+      ? "Esta conversacion ya esta asociada a una propiedad puntual. Responde solo sobre esa propiedad y no abras una nueva busqueda ni sugieras otras opciones salvo que el cliente lo pida explicitamente."
+      : "Si no hay propiedad asociada, ayuda a descubrir que opcion le conviene dentro del portafolio.",
+    isVisitFlow
+      ? "El cliente ya esta en modo coordinacion de visita. No vuelvas a preguntar que propiedad quiere ni reinicies la precalificacion. Responde corto, confirma el dato que acaba de pasar y pide solo el siguiente dato minimo que falte para cerrar la coordinacion."
+      : "Si todavia no esta coordinando visita, puedes guiarlo comercialmente con la siguiente pregunta minima util.",
     "Si el cliente pide fotos, imagenes, ver mas o recorrer la propiedad, comparte el link publico de la ficha y menciona que puedes enviarle algunas imagenes destacadas.",
     "Si tienes una propiedad asociada y el cliente pide fotos, usa el link publico exacto en la respuesta. No inventes URLs.",
+    "Nunca hagas dos ofertas o dos lineas de accion distintas en el mismo mensaje. Da una sola respuesta clara, centrada en el ultimo mensaje del cliente.",
+    "No repitas preguntas que el cliente ya respondio en el historial reciente.",
     "No hables de software interno, n8n, CRM, automatizaciones, APIs ni procesos tecnicos.",
     `Lead actual: ${input.lead.fullName} | etapa ${input.lead.stage} | prioridad ${input.lead.priority} | resumen interno: ${input.lead.qualificationSummary}.`,
     `Propiedad asociada: ${selectedPropertySummary}`,
@@ -284,6 +304,9 @@ export function buildWhatsappAgentInput(input: {
     input.selectedProperty
       ? `Propiedad consultada: ${input.selectedProperty.title}.`
       : "No hay propiedad fija asociada a esta conversacion.",
+    input.lead.stage === "Visita"
+      ? "Estado actual: el cliente ya esta coordinando una visita. No reiniciar descubrimiento."
+      : `Estado actual del lead: ${input.lead.stage}.`,
     `Ultimo mensaje del cliente: ${normalizeMessageText(input.messageText)}.`,
   ];
 

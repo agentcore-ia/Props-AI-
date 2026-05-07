@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { isAutomationRequest } from "@/lib/automation-auth";
 import { recordCrmLeadMessage, upsertLeadFromSignal } from "@/lib/crm-automation";
 import { getCrmLeadById, getPropertyBySlugAndId } from "@/lib/props-data";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAgencyByMessagingInstance } from "@/lib/whatsapp-agent";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,26 @@ export async function POST(request: Request) {
       { error: "No encontramos una inmobiliaria asociada a esta instancia." },
       { status: 404 }
     );
+  }
+
+  if (waMessageId) {
+    const admin = createAdminClient();
+    const { data: existingMessage } = await admin
+      .from("crm_lead_messages")
+      .select("id, lead_id")
+      .eq("wa_message_id", waMessageId)
+      .maybeSingle();
+
+    if (existingMessage?.id) {
+      return NextResponse.json({
+        ok: true,
+        duplicate: true,
+        ai_active: false,
+        leadId: existingMessage.lead_id,
+        agencySlug: agency.slug,
+        agencyName: agency.name,
+      });
+    }
   }
 
   const signal = await upsertLeadFromSignal({
