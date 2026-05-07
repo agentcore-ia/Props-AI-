@@ -19,14 +19,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatShortDate } from "@/lib/utils";
 
+type FollowUpResult = {
+  leadId: string;
+  status: "sent" | "error" | string;
+  error?: string;
+};
+
 export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
   const router = useRouter();
   const [busyAction, setBusyAction] = useState<null | "followups" | "visits">(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [followUpResults, setFollowUpResults] = useState<FollowUpResult[]>([]);
 
   async function runAction(kind: "followups" | "visits") {
     setBusyAction(kind);
     setFeedback(null);
+    if (kind === "followups") {
+      setFollowUpResults([]);
+    }
 
     const response = await fetch(
       kind === "followups" ? "/api/admin/follow-ups/run" : "/api/admin/visits/reminders/run",
@@ -39,30 +49,39 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
     setBusyAction(null);
 
     if (!response.ok) {
-      setFeedback(payload?.error ?? "No se pudo ejecutar la automatización.");
+      setFeedback(payload?.error ?? "No se pudo ejecutar la automatizacion.");
       return;
     }
 
-    setFeedback(
-      kind === "followups"
-        ? `Se enviaron mensajes automáticos por WhatsApp a ${payload?.processed ?? 0} leads.`
-        : `Se enviaron ${payload?.processed ?? 0} recordatorios de visita.`
-    );
+    if (kind === "followups") {
+      const results = Array.isArray(payload?.results) ? (payload.results as FollowUpResult[]) : [];
+      const sentCount = results.filter((item) => item.status === "sent").length;
+      const errorCount = results.filter((item) => item.status === "error").length;
+      setFollowUpResults(results);
+      setFeedback(
+        errorCount > 0
+          ? `Se enviaron ${sentCount} mensajes por WhatsApp y ${errorCount} quedaron con error.`
+          : `Se enviaron ${sentCount} mensajes por WhatsApp.`
+      );
+    } else {
+      setFeedback(`Se enviaron ${payload?.processed ?? 0} recordatorios de visita.`);
+    }
+
     router.refresh();
   }
 
   const followUpLabel =
     snapshot.counters.automaticFollowUps > 0
-      ? `Recontactar ${snapshot.counters.automaticFollowUps} leads por WhatsApp`
+      ? `Recontactar ${snapshot.counters.automaticFollowUps} lead${snapshot.counters.automaticFollowUps === 1 ? "" : "s"} por WhatsApp`
       : "No hay leads listos para recontactar";
 
   return (
     <Card className="rounded-[28px] border-0 bg-card shadow-sm">
       <CardHeader className="gap-3 pb-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <CardTitle className="text-xl">Qué tengo que hacer hoy</CardTitle>
+          <CardTitle className="text-xl">Que tengo que hacer hoy</CardTitle>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Lo urgente primero: contactos humanos, tareas operativas y visitas del día.
+            Lo urgente primero: contactos humanos, tareas operativas y visitas del dia.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -94,10 +113,11 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
           </Button>
         </div>
       </CardHeader>
+
       <CardContent className="space-y-4">
         <div className="rounded-2xl border bg-background px-4 py-2.5 text-sm text-muted-foreground">
-          Esta acción envía mensajes reales por WhatsApp a los leads listos para retomar ahora.
-          No crea solo tareas internas: los contactos manuales siguen quedando abajo.
+          Esta accion envia mensajes reales por WhatsApp a los leads listos para retomar.
+          No crea solo tareas internas.
         </div>
 
         <TodayList
@@ -108,25 +128,45 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
               ? snapshot.myDay.automaticFollowUps.map((lead) => ({
                   id: lead.id,
                   title: lead.fullName,
-                  description: `${deriveFollowUpReason(lead)} ${lead.propertyTitle ? `· ${lead.propertyTitle}` : ""}`,
+                  description: `${deriveFollowUpReason(lead)}${lead.propertyTitle ? ` · ${lead.propertyTitle}` : ""}`,
                   meta: "WhatsApp",
                   actionLabel: "Abrir lead",
                   actionHref: `/mensajes?lead=${lead.id}`,
+                  preview: lead.aiReplyDraft || "Se enviara un mensaje breve para retomar la conversacion.",
                 }))
               : []
           }
-          empty="No hay leads con seguimiento automático listo para salir ahora."
+          empty="No hay leads con seguimiento automatico listo para salir ahora."
         />
+
+        {followUpResults.length > 0 ? (
+          <TodayList
+            title="Resultado del ultimo envio"
+            icon={<CheckCheck className="size-4 text-primary" />}
+            items={followUpResults.map((result) => {
+              const lead = snapshot.myDay.automaticFollowUps.find((item) => item.id === result.leadId);
+              return {
+                id: result.leadId,
+                title: lead?.fullName ?? "Lead",
+                description:
+                  result.status === "sent"
+                    ? "WhatsApp enviado correctamente."
+                    : result.error ?? "No se pudo enviar el seguimiento.",
+                meta: result.status === "sent" ? "Enviado" : "Error",
+                actionLabel: lead ? "Abrir lead" : undefined,
+                actionHref: lead ? `/mensajes?lead=${lead.id}` : undefined,
+              };
+            })}
+            empty="Todavia no se ejecuto ningun seguimiento automatico."
+          />
+        ) : null}
 
         <section className="grid gap-3 md:grid-cols-5">
           <MiniStat label="Tareas pendientes" value={String(snapshot.counters.pendingTasks)} />
           <MiniStat label="Visitas de hoy" value={String(snapshot.counters.visitsToday)} />
           <MiniStat label="Leads urgentes" value={String(snapshot.counters.urgentLeads)} />
-          <MiniStat
-            label="Recontactos automáticos"
-            value={String(snapshot.counters.automaticFollowUps)}
-          />
-          <MiniStat label="IA ya atendió" value={String(snapshot.counters.aiResolved)} />
+          <MiniStat label="Recontactos automaticos" value={String(snapshot.counters.automaticFollowUps)} />
+          <MiniStat label="IA ya atendio" value={String(snapshot.counters.aiResolved)} />
         </section>
 
         {feedback ? (
@@ -173,7 +213,7 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
           />
 
           <TodayList
-            title="IA ya resolvió"
+            title="IA ya resolvio"
             icon={<CheckCheck className="size-4 text-primary" />}
             items={
               snapshot.myDay.aiResolved.length > 0
@@ -182,7 +222,7 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
                     title: lead.fullName,
                     description: `${lead.propertyTitle ?? "Consulta general"} · ${lead.lastCustomerMessage}`,
                     meta: deriveChannelLabel(lead.source),
-                    actionLabel: "Ver conversación",
+                    actionLabel: "Ver conversacion",
                     actionHref: `/mensajes?lead=${lead.id}`,
                   }))
                 : []
@@ -227,18 +267,18 @@ function deriveChannelLabel(source: string) {
 
 function deriveFollowUpReason(lead: CrmLeadSummary) {
   if (lead.stage === "Visita") {
-    return "Pidió avanzar con una visita y falta retomar la coordinación.";
+    return "Pidio avanzar con una visita y falta retomar la coordinacion.";
   }
   if (lead.stage === "Seguimiento") {
-    return "Quedó pendiente reactivar la conversación comercial.";
+    return "Quedo pendiente reactivar la conversacion comercial.";
   }
   if (lead.desiredOperation === "Alquiler") {
-    return "Consultó por alquiler y ya corresponde retomarlo.";
+    return "Consulto por alquiler y ya corresponde retomarlo.";
   }
   if (lead.desiredOperation === "Venta") {
-    return "Consultó por compra y ya corresponde retomarlo.";
+    return "Consulto por compra y ya corresponde retomarlo.";
   }
-  return "Es un lead pendiente que ya está listo para recontactar.";
+  return "Es un lead pendiente que ya esta listo para recontactar.";
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
@@ -265,6 +305,7 @@ function TodayList({
     meta: string;
     actionLabel?: string;
     actionHref?: string;
+    preview?: string;
   }>;
   empty: string;
 }) {
@@ -279,9 +320,17 @@ function TodayList({
           items.map((item) => (
             <div key={item.id} className="rounded-2xl border p-2.5">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium">{item.title}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
+                  {item.preview ? (
+                    <div className="mt-3 rounded-xl bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                      <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Mensaje sugerido
+                      </span>
+                      {item.preview}
+                    </div>
+                  ) : null}
                   {item.actionHref && item.actionLabel ? (
                     <Link
                       href={item.actionHref}
@@ -292,7 +341,7 @@ function TodayList({
                     </Link>
                   ) : null}
                 </div>
-                <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
+                <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
                   {item.meta}
                 </span>
               </div>
