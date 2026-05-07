@@ -134,13 +134,15 @@ export async function POST(request: Request) {
     .from("marketplace_messages")
     .select("sender_role, content, created_at")
     .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true })
-    .limit(8);
+    .order("created_at", { ascending: false })
+    .limit(12);
 
-  const recentMessages: RecentMessage[] = (recentMessagesRows ?? []).map((item) => ({
-    senderRole: item.sender_role,
-    content: item.content,
-  }));
+  const recentMessages: RecentMessage[] = [...(recentMessagesRows ?? [])]
+    .reverse()
+    .map((item) => ({
+      senderRole: item.sender_role,
+      content: item.content,
+    }));
 
   const { data: inquiry } = await admin
     .from("catalog_inquiries")
@@ -524,7 +526,13 @@ function analyzeVisitFlow({
   const normalized = normalizeForIntent(message);
   const phone = extractPhoneFromText(message);
   const explicitName = extractCustomerName(message);
-  const customerName = explicitName ?? fallbackName ?? null;
+  const customerMessages = recentMessages
+    .filter((item) => item.senderRole === "customer")
+    .map((item) => item.content);
+  const previousPhone = customerMessages.map(extractPhoneFromText).find(Boolean) ?? null;
+  const previousName = customerMessages.map(extractCustomerName).find(Boolean) ?? null;
+  const customerName = explicitName ?? previousName ?? fallbackName ?? null;
+  const knownPhone = phone ?? previousPhone;
   const assistantAskedForContact = recentMessages.some(
     (item) =>
       item.senderRole === "assistant" &&
@@ -535,6 +543,9 @@ function analyzeVisitFlow({
   const anyVisitContext = recentMessages.some(
     (item) => /visita|visitar|coordinar/i.test(normalizeForIntent(item.content))
   );
+  const currentVisitPreference = extractVisitPreference(message);
+  const previousVisitPreference =
+    customerMessages.map(extractVisitPreference).find(Boolean) ?? null;
   const wantsVisit =
     /visitar|visita|coordinar.*visita|quiero verla|quiero visitar|me gustaria visitar|me gustaría visitar/.test(
       normalized
@@ -546,9 +557,19 @@ function analyzeVisitFlow({
   if (!flowActive) {
     return {
       flowActive: false,
-      phone,
+      phone: knownPhone,
       customerName,
       reply: null as string | null,
+    };
+  }
+
+  if (knownPhone && currentVisitPreference) {
+    const firstName = customerName?.split(/\s+/)[0] ?? "gracias";
+    return {
+      flowActive: true,
+      phone: knownPhone,
+      customerName,
+      reply: `Perfecto, ${capitalizeName(firstName)}. Dejo asentado que te sirve ${currentVisitPreference.toLowerCase()}. ${agencyName} te va a contactar para terminar de coordinar la visita a ${propertyTitle}.`,
     };
   }
 
@@ -556,13 +577,25 @@ function analyzeVisitFlow({
     const firstName = customerName?.split(/\s+/)[0] ?? "gracias";
     return {
       flowActive: true,
-      phone,
+      phone: knownPhone,
       customerName,
       reply: `Gracias, ${capitalizeName(firstName)}. Ya quedó tu solicitud de visita para ${propertyTitle}. ${agencyName} te va a contactar para coordinarla.`,
     };
   }
 
-  if (assistantAskedForContact && !phone) {
+  if (knownPhone && (assistantAskedForContact || anyVisitContext)) {
+    const firstName = customerName?.split(/\s+/)[0] ?? "gracias";
+    return {
+      flowActive: true,
+      phone: knownPhone,
+      customerName,
+      reply: previousVisitPreference
+        ? `Perfecto, ${capitalizeName(firstName)}. Ya tengo tus datos y tu preferencia ${previousVisitPreference.toLowerCase()}. ${agencyName} te va a contactar para cerrar la visita a ${propertyTitle}.`
+        : `Perfecto, ${capitalizeName(firstName)}. Ya tengo tus datos para coordinar la visita a ${propertyTitle}. Si queres, decime que dia o franja horaria te sirve y lo dejo asentado para ${agencyName}.`,
+    };
+  }
+
+  if (assistantAskedForContact && !knownPhone) {
     if (explicitName) {
       return {
         flowActive: true,
@@ -581,17 +614,28 @@ function analyzeVisitFlow({
   }
 
   if (wantsVisit) {
+    if (customerName && !knownPhone) {
+      return {
+        flowActive: true,
+        phone: null,
+        customerName,
+        reply: `Perfecto, ${capitalizeName(customerName.split(/\s+/)[0])}. Ahora pasame tu celular y ${agencyName} te contacta para coordinar la visita.`,
+      };
+    }
+
     return {
       flowActive: true,
-      phone: null,
+      phone: knownPhone,
       customerName,
-      reply: "Perfecto. Para coordinar la visita pasame tu nombre y tu celular.",
+      reply: knownPhone
+        ? `Perfecto. Ya tengo tus datos. Decime que dia o franja horaria te sirve y ${agencyName} te contacta para coordinar la visita.`
+        : "Perfecto. Para coordinar la visita pasame tu nombre y tu celular.",
     };
   }
 
   return {
     flowActive: true,
-    phone: null,
+    phone: knownPhone,
     customerName,
     reply: null as string | null,
   };
