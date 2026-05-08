@@ -10,6 +10,7 @@ import type {
 } from "@/lib/crm-types";
 import { getDefaultAgencyTemplates } from "@/lib/crm-insights";
 import type {
+  OwnerSettlementSummary,
   RentalAdjustmentSummary,
   RentalContractSummary,
   RentalDashboardSummary,
@@ -92,6 +93,12 @@ type RentalContractRow = {
   contract_file_mime_type: string | null;
   contract_file_size_bytes: number | null;
   contract_text: string | null;
+  owner_name: string | null;
+  owner_phone: string | null;
+  owner_email: string | null;
+  management_fee_percent: number | null;
+  monthly_owner_costs: number | null;
+  owner_notes: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -113,6 +120,32 @@ type RentalAdjustmentRow = {
   notification_status: "Pendiente" | "Enviado" | "Fallido";
   notified_at: string | null;
   created_at: string;
+};
+
+type OwnerSettlementRow = {
+  id: string;
+  contract_id: string;
+  property_id: string;
+  agency_id: string;
+  settlement_month: string;
+  owner_name: string;
+  owner_email: string | null;
+  owner_phone: string | null;
+  rent_collected: number;
+  management_fee_percent: number;
+  management_fee_amount: number;
+  monthly_owner_costs: number;
+  other_charges_amount: number;
+  other_charges_detail: string;
+  owner_payout_amount: number;
+  status: "Borrador" | "Emitida" | "Pagada";
+  sent_at: string | null;
+  paid_at: string | null;
+  created_at: string;
+  properties:
+    | { title: string; location: string }
+    | { title: string; location: string }[]
+    | null;
 };
 
 export type AgencySummary = Agency & {
@@ -142,6 +175,12 @@ export type LeaseRosterItem = {
   status: "Activo" | "Pausado" | "Finalizado";
   autoNotify: boolean;
   requirements: string;
+  ownerName: string | null;
+  ownerPhone: string | null;
+  ownerEmail: string | null;
+  managementFeePercent: number;
+  monthlyOwnerCosts: number;
+  ownerNotes: string;
 };
 
 export type DashboardSnapshot = {
@@ -509,6 +548,12 @@ function mapRentalContract(row: RentalContractRow, agencyMessagingInstance = "ag
     contractFileMimeType: row.contract_file_mime_type,
     contractFileSizeBytes: row.contract_file_size_bytes,
     contractText: row.contract_text ?? "",
+    ownerName: row.owner_name,
+    ownerPhone: row.owner_phone,
+    ownerEmail: row.owner_email,
+    managementFeePercent: Number(row.management_fee_percent ?? 0),
+    monthlyOwnerCosts: Number(row.monthly_owner_costs ?? 0),
+    ownerNotes: row.owner_notes ?? "",
   };
 }
 
@@ -528,6 +573,34 @@ function mapRentalAdjustment(row: RentalAdjustmentRow): RentalAdjustmentSummary 
     sourceLabel: row.source_label,
     notificationStatus: row.notification_status,
     notifiedAt: row.notified_at,
+    createdAt: row.created_at,
+  };
+}
+
+function mapOwnerSettlement(row: OwnerSettlementRow): OwnerSettlementSummary {
+  const property = Array.isArray(row.properties) ? row.properties[0] : row.properties;
+
+  return {
+    id: row.id,
+    contractId: row.contract_id,
+    propertyId: row.property_id,
+    agencyId: row.agency_id,
+    ownerName: row.owner_name,
+    ownerEmail: row.owner_email,
+    ownerPhone: row.owner_phone,
+    propertyTitle: property?.title ?? "",
+    propertyLocation: property?.location ?? "",
+    settlementMonth: row.settlement_month,
+    rentCollected: Number(row.rent_collected ?? 0),
+    managementFeePercent: Number(row.management_fee_percent ?? 0),
+    managementFeeAmount: Number(row.management_fee_amount ?? 0),
+    monthlyOwnerCosts: Number(row.monthly_owner_costs ?? 0),
+    otherChargesAmount: Number(row.other_charges_amount ?? 0),
+    otherChargesDetail: row.other_charges_detail ?? "",
+    ownerPayoutAmount: Number(row.owner_payout_amount ?? 0),
+    status: row.status,
+    sentAt: row.sent_at,
+    paidAt: row.paid_at,
     createdAt: row.created_at,
   };
 }
@@ -848,7 +921,7 @@ export async function listLeaseRoster(options?: { agencySlug?: string }) {
   let query = admin
     .from("rental_contracts")
     .select(
-      "id, property_id, agency_id, tenant_name, tenant_phone, tenant_email, current_rent, currency, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, last_adjustment_date, auto_notify, status, agencies!inner(name, slug), properties!inner(title, location, exact_address, requirements)"
+      "id, property_id, agency_id, tenant_name, tenant_phone, tenant_email, current_rent, currency, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, last_adjustment_date, auto_notify, status, owner_name, owner_phone, owner_email, management_fee_percent, monthly_owner_costs, owner_notes, agencies!inner(name, slug), properties!inner(title, location, exact_address, requirements)"
     )
     .order("next_adjustment_date", { ascending: true });
 
@@ -878,6 +951,12 @@ export async function listLeaseRoster(options?: { agencySlug?: string }) {
     last_adjustment_date: string | null;
     auto_notify: boolean;
     status: "Activo" | "Pausado" | "Finalizado";
+    owner_name: string | null;
+    owner_phone: string | null;
+    owner_email: string | null;
+    management_fee_percent: number | null;
+    monthly_owner_costs: number | null;
+    owner_notes: string | null;
     agencies: { name: string; slug: string } | { name: string; slug: string }[] | null;
     properties:
       | { title: string; location: string; exact_address: string; requirements: string | null }
@@ -909,8 +988,42 @@ export async function listLeaseRoster(options?: { agencySlug?: string }) {
       status: item.status,
       autoNotify: item.auto_notify,
       requirements: property?.requirements ?? "",
+      ownerName: item.owner_name,
+      ownerPhone: item.owner_phone,
+      ownerEmail: item.owner_email,
+      managementFeePercent: Number(item.management_fee_percent ?? 0),
+      monthlyOwnerCosts: Number(item.monthly_owner_costs ?? 0),
+      ownerNotes: item.owner_notes ?? "",
     } satisfies LeaseRosterItem;
   });
+}
+
+export async function listOwnerSettlements(options?: { agencySlug?: string; limit?: number }) {
+  const admin = createAdminClient();
+  let query = admin
+    .from("owner_settlements")
+    .select(
+      "id, contract_id, property_id, agency_id, settlement_month, owner_name, owner_email, owner_phone, rent_collected, management_fee_percent, management_fee_amount, monthly_owner_costs, other_charges_amount, other_charges_detail, owner_payout_amount, status, sent_at, paid_at, created_at, agencies!inner(slug), properties!inner(title, location)"
+    )
+    .order("created_at", { ascending: false })
+    .limit(options?.limit ?? 16);
+
+  if (options?.agencySlug) {
+    query = query.eq("agencies.slug", options.agencySlug);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    if (/owner_settlements/i.test(error.message ?? "")) {
+      return [];
+    }
+    throw error;
+  }
+
+  return ((data ?? []) as Array<OwnerSettlementRow & {
+    agencies: { slug: string } | { slug: string }[] | null;
+  }>).map(mapOwnerSettlement);
 }
 
 export async function listRecentRentalAdjustments(options?: { agencySlug?: string; limit?: number }) {
@@ -956,9 +1069,11 @@ export async function listRecentRentalAdjustments(options?: { agencySlug?: strin
 export async function getRentalDashboardSummary(options?: { agencySlug?: string }): Promise<RentalDashboardSummary> {
   const contracts = await listRentalContracts(options);
   const adjustments = await listRecentRentalAdjustments({ agencySlug: options?.agencySlug, limit: 50 });
+  const settlements = await listOwnerSettlements({ agencySlug: options?.agencySlug, limit: 80 });
 
   const today = new Date().toISOString().slice(0, 10);
   const inSevenDays = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const currentMonth = new Date().toISOString().slice(0, 7);
 
   return {
     totalActiveContracts: contracts.filter((contract) => contract.status === "Activo").length,
@@ -973,6 +1088,12 @@ export async function getRentalDashboardSummary(options?: { agencySlug?: string 
     ).length,
     failedNotifications: adjustments.filter(
       (adjustment) => adjustment.notificationStatus === "Fallido"
+    ).length,
+    ownerSettlementsThisMonth: settlements.filter(
+      (settlement) => settlement.settlementMonth === currentMonth
+    ).length,
+    pendingOwnerPayouts: settlements.filter(
+      (settlement) => settlement.status !== "Pagada"
     ).length,
   };
 }

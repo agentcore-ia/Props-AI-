@@ -6,6 +6,8 @@ export type RentalNotificationStatus = "Pendiente" | "Enviado" | "Fallido";
 
 export type RentalNotificationChannel = "whatsapp";
 
+export type OwnerSettlementStatus = "Borrador" | "Emitida" | "Pagada";
+
 export type RentalContractSummary = {
   id: string;
   propertyId: string;
@@ -31,6 +33,12 @@ export type RentalContractSummary = {
   contractFileMimeType: string | null;
   contractFileSizeBytes: number | null;
   contractText: string;
+  ownerName: string | null;
+  ownerPhone: string | null;
+  ownerEmail: string | null;
+  managementFeePercent: number;
+  monthlyOwnerCosts: number;
+  ownerNotes: string;
 };
 
 export type RentalAdjustmentSummary = {
@@ -56,4 +64,30 @@ export type RentalDashboardSummary = {
   dueToday: number;
   dueThisWeek: number;
   failedNotifications: number;
+  ownerSettlementsThisMonth: number;
+  pendingOwnerPayouts: number;
+};
+
+export type OwnerSettlementSummary = {
+  id: string;
+  contractId: string;
+  propertyId: string;
+  agencyId: string;
+  ownerName: string;
+  ownerEmail: string | null;
+  ownerPhone: string | null;
+  propertyTitle: string;
+  propertyLocation: string;
+  settlementMonth: string;
+  rentCollected: number;
+  managementFeePercent: number;
+  managementFeeAmount: number;
+  monthlyOwnerCosts: number;
+  otherChargesAmount: number;
+  otherChargesDetail: string;
+  ownerPayoutAmount: number;
+  status: OwnerSettlementStatus;
+  sentAt: string | null;
+  paidAt: string | null;
+  createdAt: string;
 };

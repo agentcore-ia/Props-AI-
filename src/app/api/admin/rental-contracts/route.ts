@@ -34,6 +34,12 @@ export async function POST(request: Request) {
   const tenantName = String(formData.get("tenantName") ?? "").trim();
   const tenantPhone = String(formData.get("tenantPhone") ?? "").trim();
   const tenantEmail = String(formData.get("tenantEmail") ?? "").trim();
+  const ownerName = String(formData.get("ownerName") ?? "").trim();
+  const ownerPhone = String(formData.get("ownerPhone") ?? "").trim();
+  const ownerEmail = String(formData.get("ownerEmail") ?? "").trim();
+  const managementFeePercentRaw = String(formData.get("managementFeePercent") ?? "").trim();
+  const monthlyOwnerCostsRaw = String(formData.get("monthlyOwnerCosts") ?? "").trim();
+  const ownerNotes = String(formData.get("ownerNotes") ?? "").trim();
   const currentRentRaw = String(formData.get("currentRent") ?? "").trim();
   const indexType = String(formData.get("indexType") ?? "").trim();
   const adjustmentFrequencyMonths = Number(formData.get("adjustmentFrequencyMonths") ?? 0);
@@ -90,7 +96,7 @@ export async function POST(request: Request) {
 
   const { data: existingContract, error: existingContractError } = await admin
     .from("rental_contracts")
-    .select("id, tenant_name, tenant_phone, tenant_email, current_rent, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, rent_reference_date, last_adjustment_date, contract_file_name, contract_file_path, contract_file_mime_type, contract_file_size_bytes, contract_text")
+    .select("id, tenant_name, tenant_phone, tenant_email, current_rent, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, rent_reference_date, last_adjustment_date, contract_file_name, contract_file_path, contract_file_mime_type, contract_file_size_bytes, contract_text, owner_name, owner_phone, owner_email, management_fee_percent, monthly_owner_costs, owner_notes")
     .eq("property_id", property.id)
     .maybeSingle();
 
@@ -138,6 +144,22 @@ export async function POST(request: Request) {
     tenantName || analyzedContract?.tenantName || existingContract?.tenant_name || "";
   const resolvedTenantPhone = tenantPhone || existingContract?.tenant_phone || "";
   const resolvedTenantEmail = normalizeOptionalString(tenantEmail) ?? existingContract?.tenant_email ?? null;
+  const resolvedOwnerName = normalizeOptionalString(ownerName) ?? existingContract?.owner_name ?? null;
+  const resolvedOwnerPhone = normalizeOptionalString(ownerPhone) ?? existingContract?.owner_phone ?? null;
+  const resolvedOwnerEmail = normalizeOptionalString(ownerEmail) ?? existingContract?.owner_email ?? null;
+  const resolvedManagementFeePercent = Math.max(
+    0,
+    Number.isFinite(Number(managementFeePercentRaw))
+      ? Number(managementFeePercentRaw)
+      : Number(existingContract?.management_fee_percent ?? 0)
+  );
+  const resolvedMonthlyOwnerCosts = Math.max(
+    0,
+    Number.isFinite(Number(monthlyOwnerCostsRaw))
+      ? Number(monthlyOwnerCostsRaw)
+      : Number(existingContract?.monthly_owner_costs ?? 0)
+  );
+  const resolvedOwnerNotes = ownerNotes || existingContract?.owner_notes || "";
   const resolvedCurrentRent =
     analyzedContract?.currentRent ??
     existingContract?.current_rent ??
@@ -223,6 +245,12 @@ export async function POST(request: Request) {
       uploadedContract?.extractedText ??
       existingContract?.contract_text ??
       "",
+    owner_name: resolvedOwnerName,
+    owner_phone: resolvedOwnerPhone,
+    owner_email: resolvedOwnerEmail,
+    management_fee_percent: resolvedManagementFeePercent,
+    monthly_owner_costs: resolvedMonthlyOwnerCosts,
+    owner_notes: resolvedOwnerNotes,
     created_by: current.user.id,
   };
 
@@ -284,6 +312,12 @@ export async function PATCH(request: Request) {
         tenantName?: string;
         tenantPhone?: string;
         tenantEmail?: string | null;
+        ownerName?: string | null;
+        ownerPhone?: string | null;
+        ownerEmail?: string | null;
+        managementFeePercent?: number;
+        monthlyOwnerCosts?: number;
+        ownerNotes?: string;
         currentRent?: number;
         indexType?: "IPC" | "ICL";
         adjustmentFrequencyMonths?: number;
@@ -302,7 +336,7 @@ export async function PATCH(request: Request) {
   const admin = createAdminClient();
   const { data: contract, error } = await admin
     .from("rental_contracts")
-    .select("id, agency_id, tenant_name, tenant_phone, tenant_email, current_rent, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, auto_notify, notes, agencies!inner(slug)")
+    .select("id, agency_id, tenant_name, tenant_phone, tenant_email, owner_name, owner_phone, owner_email, management_fee_percent, monthly_owner_costs, owner_notes, current_rent, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, auto_notify, notes, agencies!inner(slug)")
     .eq("id", contractId)
     .maybeSingle();
 
@@ -327,6 +361,22 @@ export async function PATCH(request: Request) {
   const tenantName = String(body?.tenantName ?? contract.tenant_name).trim();
   const tenantPhone = String(body?.tenantPhone ?? contract.tenant_phone).trim();
   const tenantEmail = body?.tenantEmail?.trim?.() || null;
+  const ownerName = body?.ownerName?.trim?.() || contract.owner_name || null;
+  const ownerPhone = body?.ownerPhone?.trim?.() || contract.owner_phone || null;
+  const ownerEmail = body?.ownerEmail?.trim?.() || contract.owner_email || null;
+  const managementFeePercent = Math.max(
+    0,
+    Number.isFinite(Number(body?.managementFeePercent))
+      ? Number(body?.managementFeePercent)
+      : Number(contract.management_fee_percent ?? 0)
+  );
+  const monthlyOwnerCosts = Math.max(
+    0,
+    Number.isFinite(Number(body?.monthlyOwnerCosts))
+      ? Number(body?.monthlyOwnerCosts)
+      : Number(contract.monthly_owner_costs ?? 0)
+  );
+  const ownerNotes = String(body?.ownerNotes ?? contract.owner_notes ?? "").trim();
   const currentRent = Number(body?.currentRent ?? contract.current_rent);
   const indexType = body?.indexType ?? contract.index_type;
   const adjustmentFrequencyMonths = Number(
@@ -364,6 +414,12 @@ export async function PATCH(request: Request) {
       tenant_name: tenantName,
       tenant_phone: tenantPhone,
       tenant_email: tenantEmail,
+      owner_name: ownerName,
+      owner_phone: ownerPhone,
+      owner_email: ownerEmail,
+      management_fee_percent: managementFeePercent,
+      monthly_owner_costs: monthlyOwnerCosts,
+      owner_notes: ownerNotes,
       current_rent: currentRent,
       index_type: indexType,
       adjustment_frequency_months: adjustmentFrequencyMonths,

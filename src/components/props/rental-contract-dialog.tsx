@@ -33,6 +33,12 @@ function getInitialForm(property: Property) {
     tenantName: property.rentalContract?.tenantName ?? "",
     tenantPhone: property.rentalContract?.tenantPhone ?? "",
     tenantEmail: property.rentalContract?.tenantEmail ?? "",
+    ownerName: property.rentalContract?.ownerName ?? "",
+    ownerPhone: property.rentalContract?.ownerPhone ?? "",
+    ownerEmail: property.rentalContract?.ownerEmail ?? "",
+    managementFeePercent: String(property.rentalContract?.managementFeePercent ?? 8),
+    monthlyOwnerCosts: String(property.rentalContract?.monthlyOwnerCosts ?? 0),
+    ownerNotes: property.rentalContract?.ownerNotes ?? "",
     currentRent: property.rentalContract?.currentRent
       ? String(property.rentalContract.currentRent)
       : String(property.price),
@@ -113,6 +119,12 @@ export function RentalContractDialog({ property }: { property: Property }) {
     body.set("tenantName", form.tenantName);
     body.set("tenantPhone", form.tenantPhone);
     body.set("tenantEmail", form.tenantEmail);
+    body.set("ownerName", form.ownerName);
+    body.set("ownerPhone", form.ownerPhone);
+    body.set("ownerEmail", form.ownerEmail);
+    body.set("managementFeePercent", form.managementFeePercent);
+    body.set("monthlyOwnerCosts", form.monthlyOwnerCosts);
+    body.set("ownerNotes", form.ownerNotes);
     body.set("currentRent", form.currentRent);
     body.set("indexType", form.indexType);
     body.set("adjustmentFrequencyMonths", form.adjustmentFrequencyMonths);
@@ -164,6 +176,12 @@ export function RentalContractDialog({ property }: { property: Property }) {
         tenantName: form.tenantName,
         tenantPhone: form.tenantPhone,
         tenantEmail: form.tenantEmail || null,
+        ownerName: form.ownerName || null,
+        ownerPhone: form.ownerPhone || null,
+        ownerEmail: form.ownerEmail || null,
+        managementFeePercent: Number(form.managementFeePercent),
+        monthlyOwnerCosts: Number(form.monthlyOwnerCosts),
+        ownerNotes: form.ownerNotes,
         currentRent: Number(form.currentRent),
         indexType: form.indexType,
         adjustmentFrequencyMonths: Number(form.adjustmentFrequencyMonths),
@@ -346,6 +364,69 @@ export function RentalContractDialog({ property }: { property: Property }) {
                       placeholder="Observaciones, restricciones o contexto del contrato..."
                       value={form.notes}
                       onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-[28px] border bg-card p-5">
+                <SectionTitle
+                  eyebrow="Propietario"
+                  title="Liquidacion al propietario"
+                  description="Define a quien se le liquida y que retencion aplica la inmobiliaria cada mes."
+                />
+
+                <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-12">
+                  <div className="space-y-2 xl:col-span-4">
+                    <label className="text-sm font-medium">Nombre del propietario</label>
+                    <Input
+                      placeholder="Carlos Perez"
+                      value={form.ownerName}
+                      onChange={(event) => setForm((prev) => ({ ...prev, ownerName: event.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2 xl:col-span-4">
+                    <label className="text-sm font-medium">WhatsApp del propietario</label>
+                    <Input
+                      placeholder="+54 11 5555 8888"
+                      value={form.ownerPhone}
+                      onChange={(event) => setForm((prev) => ({ ...prev, ownerPhone: event.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2 xl:col-span-4">
+                    <label className="text-sm font-medium">Email del propietario</label>
+                    <Input
+                      placeholder="propietario@email.com"
+                      value={form.ownerEmail}
+                      onChange={(event) => setForm((prev) => ({ ...prev, ownerEmail: event.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2 xl:col-span-3">
+                    <label className="text-sm font-medium">Comision (%)</label>
+                    <Input
+                      placeholder="8"
+                      value={form.managementFeePercent}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, managementFeePercent: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2 xl:col-span-3">
+                    <label className="text-sm font-medium">Gastos fijos mensuales</label>
+                    <Input
+                      placeholder="0"
+                      value={form.monthlyOwnerCosts}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, monthlyOwnerCosts: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2 xl:col-span-6">
+                    <label className="text-sm font-medium">Notas para liquidacion</label>
+                    <Input
+                      placeholder="Ej: sumar seguro, administracion y gastos bancarios."
+                      value={form.ownerNotes}
+                      onChange={(event) => setForm((prev) => ({ ...prev, ownerNotes: event.target.value }))}
                     />
                   </div>
                 </div>

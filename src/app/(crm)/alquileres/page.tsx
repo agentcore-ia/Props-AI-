@@ -4,6 +4,7 @@ import { getAgencyScopeFromUser } from "@/lib/crm-automation";
 import {
   getRentalDashboardSummary,
   listLeaseRoster,
+  listOwnerSettlements,
   listRecentRentalAdjustments,
 } from "@/lib/props-data";
 
@@ -18,10 +19,11 @@ export default async function LeasesPage() {
 
   const agencyScope = getAgencyScopeFromUser(currentUser);
 
-  const [leases, rentalSummary, recentAdjustments] = await Promise.all([
+  const [leases, rentalSummary, recentAdjustments, ownerSettlements] = await Promise.all([
     listLeaseRoster(agencyScope),
     getRentalDashboardSummary(agencyScope),
     listRecentRentalAdjustments({ ...agencyScope, limit: 8 }),
+    listOwnerSettlements({ ...agencyScope, limit: 12 }),
   ]);
 
   return (
@@ -29,6 +31,7 @@ export default async function LeasesPage() {
       leases={leases}
       rentalSummary={rentalSummary}
       recentAdjustments={recentAdjustments}
+      ownerSettlements={ownerSettlements}
     />
   );
 }

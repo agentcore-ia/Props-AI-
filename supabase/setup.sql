@@ -180,6 +180,31 @@ create table if not exists public.rental_adjustments (
   created_at timestamptz not null default timezone('utc'::text, now())
 );
 
+create table if not exists public.owner_settlements (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references public.rental_contracts (id) on delete cascade,
+  property_id uuid not null references public.properties (id) on delete cascade,
+  agency_id uuid not null references public.agencies (id) on delete cascade,
+  settlement_month text not null,
+  owner_name text not null,
+  owner_email text,
+  owner_phone text,
+  rent_collected numeric(14, 2) not null default 0,
+  management_fee_percent numeric(7, 2) not null default 0,
+  management_fee_amount numeric(14, 2) not null default 0,
+  monthly_owner_costs numeric(14, 2) not null default 0,
+  other_charges_amount numeric(14, 2) not null default 0,
+  other_charges_detail text not null default '',
+  owner_payout_amount numeric(14, 2) not null default 0,
+  status text not null default 'Emitida' check (status in ('Borrador', 'Emitida', 'Pagada')),
+  sent_at timestamptz,
+  paid_at timestamptz,
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now()),
+  unique (contract_id, settlement_month)
+);
+
 create table if not exists public.crm_leads (
   id uuid primary key default gen_random_uuid(),
   agency_id uuid not null references public.agencies (id) on delete cascade,
@@ -293,7 +318,13 @@ alter table public.rental_contracts
   add column if not exists contract_file_path text,
   add column if not exists contract_file_mime_type text,
   add column if not exists contract_file_size_bytes integer,
-  add column if not exists contract_text text not null default '';
+  add column if not exists contract_text text not null default '',
+  add column if not exists owner_name text,
+  add column if not exists owner_phone text,
+  add column if not exists owner_email text,
+  add column if not exists management_fee_percent numeric(7, 2) not null default 0,
+  add column if not exists monthly_owner_costs numeric(14, 2) not null default 0,
+  add column if not exists owner_notes text not null default '';
 
 alter table public.profiles enable row level security;
 alter table public.agencies enable row level security;
@@ -303,6 +334,7 @@ alter table public.marketplace_conversations enable row level security;
 alter table public.marketplace_messages enable row level security;
 alter table public.rental_contracts enable row level security;
 alter table public.rental_adjustments enable row level security;
+alter table public.owner_settlements enable row level security;
 alter table public.crm_leads enable row level security;
 alter table public.visit_appointments enable row level security;
 alter table public.employee_tasks enable row level security;
@@ -344,6 +376,7 @@ drop trigger if exists agencies_set_updated_at on public.agencies;
 drop trigger if exists properties_set_updated_at on public.properties;
 drop trigger if exists marketplace_conversations_set_updated_at on public.marketplace_conversations;
 drop trigger if exists rental_contracts_set_updated_at on public.rental_contracts;
+drop trigger if exists owner_settlements_set_updated_at on public.owner_settlements;
 drop trigger if exists crm_leads_set_updated_at on public.crm_leads;
 drop trigger if exists visit_appointments_set_updated_at on public.visit_appointments;
 drop trigger if exists employee_tasks_set_updated_at on public.employee_tasks;
@@ -367,6 +400,10 @@ create trigger marketplace_conversations_set_updated_at
 
 create trigger rental_contracts_set_updated_at
   before update on public.rental_contracts
+  for each row execute procedure public.touch_updated_at();
+
+create trigger owner_settlements_set_updated_at
+  before update on public.owner_settlements
   for each row execute procedure public.touch_updated_at();
 
 create trigger crm_leads_set_updated_at

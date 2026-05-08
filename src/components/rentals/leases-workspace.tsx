@@ -5,6 +5,7 @@ import { Building2, CalendarDays, CircleDollarSign, Loader2, Phone, Send, UserRo
 
 import type { LeaseRosterItem } from "@/lib/props-data";
 import type {
+  OwnerSettlementSummary,
   RentalAdjustmentSummary,
   RentalDashboardSummary,
 } from "@/lib/rental-types";
@@ -25,12 +26,15 @@ export function LeasesWorkspace({
   leases,
   rentalSummary,
   recentAdjustments,
+  ownerSettlements,
 }: {
   leases: LeaseRosterItem[];
   rentalSummary: RentalDashboardSummary;
   recentAdjustments: RentalAdjustmentSummary[];
+  ownerSettlements: OwnerSettlementSummary[];
 }) {
   const [sendingTestId, setSendingTestId] = useState<string | null>(null);
+  const [generatingSettlementId, setGeneratingSettlementId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<null | { type: "success" | "error"; message: string }>(null);
 
   async function handleSendTest(contractId: string, tenantName: string) {
@@ -61,6 +65,41 @@ export function LeasesWorkspace({
       type: "success",
       message: `Prueba enviada a ${tenantName}. Revisa ese WhatsApp para confirmar el aumento simulado.`,
     });
+  }
+
+  async function handleGenerateSettlement(contractId?: string, ownerName?: string) {
+    setGeneratingSettlementId(contractId ?? "all");
+    setFeedback(null);
+
+    const response = await fetch("/api/admin/owner-settlements", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        contractId,
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      setGeneratingSettlementId(null);
+      setFeedback({
+        type: "error",
+        message: payload?.error ?? "No se pudo generar la liquidacion.",
+      });
+      return;
+    }
+
+    setGeneratingSettlementId(null);
+    setFeedback({
+      type: "success",
+      message: contractId
+        ? `Liquidacion emitida para ${ownerName ?? "el propietario"} en ${payload?.settlementMonth ?? "este mes"}.`
+        : `Se emitieron ${payload?.processed ?? 0} liquidaciones de propietarios para ${payload?.settlementMonth ?? "este mes"}.`,
+    });
+    window.location.reload();
   }
 
   return (
@@ -107,6 +146,85 @@ export function LeasesWorkspace({
               value={String(rentalSummary.failedNotifications)}
               hint="Necesitan revision manual."
             />
+            <MiniInfoCard
+              label="Liquidaciones del mes"
+              value={String(rentalSummary.ownerSettlementsThisMonth)}
+              hint="Emitidas para propietarios."
+            />
+            <MiniInfoCard
+              label="Pagos a propietarios"
+              value={String(rentalSummary.pendingOwnerPayouts)}
+              hint="Pendientes de marcar como pagados."
+            />
+          </section>
+
+          <section className="rounded-[30px] border bg-card p-5 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/75">
+                  Liquidaciones automaticas
+                </p>
+                <h2 className="mt-2 text-xl font-semibold">Liquidaciones para propietarios</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Props calcula el neto a transferir segun alquiler, comision y gastos fijos del contrato.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="rounded-2xl"
+                disabled={generatingSettlementId === "all"}
+                onClick={() => handleGenerateSettlement()}
+              >
+                {generatingSettlementId === "all" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <CircleDollarSign className="size-4" />
+                )}
+                Generar liquidaciones del mes
+              </Button>
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+              {ownerSettlements.length > 0 ? (
+                ownerSettlements.map((settlement) => (
+                  <article key={settlement.id} className="rounded-[24px] border bg-background p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/75">
+                          {settlement.settlementMonth}
+                        </p>
+                        <h3 className="mt-2 font-semibold">{settlement.ownerName}</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {settlement.propertyTitle} · {settlement.propertyLocation}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="rounded-full">
+                        {settlement.status}
+                      </Badge>
+                    </div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <InfoMetric label="Alquiler cobrado" value={formatMoney(settlement.rentCollected, "ARS")} />
+                      <InfoMetric
+                        label={`Comision ${settlement.managementFeePercent}%`}
+                        value={formatMoney(settlement.managementFeeAmount, "ARS")}
+                      />
+                      <InfoMetric label="Gastos fijos" value={formatMoney(settlement.monthlyOwnerCosts, "ARS")} />
+                      <InfoMetric label="Neto al propietario" value={formatMoney(settlement.ownerPayoutAmount, "ARS")} />
+                    </div>
+                    {settlement.otherChargesAmount > 0 || settlement.otherChargesDetail ? (
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        Otros cargos: {formatMoney(settlement.otherChargesAmount, "ARS")}
+                        {settlement.otherChargesDetail ? ` · ${settlement.otherChargesDetail}` : ""}
+                      </p>
+                    ) : null}
+                  </article>
+                ))
+              ) : (
+                <div className="rounded-[24px] border border-dashed bg-background p-5 text-sm text-muted-foreground lg:col-span-2 xl:col-span-3">
+                  Todavia no hay liquidaciones emitidas. Configura el propietario en el contrato y genera el cierre del mes desde aca.
+                </div>
+              )}
+            </div>
           </section>
 
           <section className="hidden overflow-hidden rounded-[30px] border bg-card shadow-sm xl:block">
@@ -135,6 +253,9 @@ export function LeasesWorkspace({
                   <div className="space-y-1">
                     <p className="font-semibold">{lease.propertyTitle}</p>
                     <p className="text-sm text-muted-foreground">{lease.propertyLocation}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Propietario: {lease.ownerName || "Sin configurar"}
+                    </p>
                   </div>
 
                   <div className="text-sm leading-6 text-muted-foreground">
@@ -163,19 +284,34 @@ export function LeasesWorkspace({
                   </div>
 
                   <div className="flex items-start">
-                    <Button
-                      variant="outline"
-                      className="rounded-2xl"
-                      disabled={sendingTestId === lease.contractId}
-                      onClick={() => handleSendTest(lease.contractId, lease.tenantName)}
-                    >
-                      {sendingTestId === lease.contractId ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Send className="size-4" />
-                      )}
-                      Enviar prueba
-                    </Button>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        variant="outline"
+                        className="rounded-2xl"
+                        disabled={sendingTestId === lease.contractId}
+                        onClick={() => handleSendTest(lease.contractId, lease.tenantName)}
+                      >
+                        {sendingTestId === lease.contractId ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Send className="size-4" />
+                        )}
+                        Enviar prueba
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="rounded-2xl"
+                        disabled={!lease.ownerName || generatingSettlementId === lease.contractId}
+                        onClick={() => handleGenerateSettlement(lease.contractId, lease.ownerName ?? undefined)}
+                      >
+                        {generatingSettlementId === lease.contractId ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <CircleDollarSign className="size-4" />
+                        )}
+                        Liquidar propietario
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -224,6 +360,17 @@ export function LeasesWorkspace({
                     </p>
                   </div>
                   <div className="rounded-[22px] border bg-background p-4 text-sm text-muted-foreground">
+                    <p className="text-xs uppercase tracking-[0.2em] text-primary/75">Propietario</p>
+                    <p className="mt-2 font-medium text-foreground">
+                      {lease.ownerName || "Todavia sin propietario configurado"}
+                    </p>
+                    <p className="mt-1">
+                      {lease.ownerName
+                        ? `Comision ${lease.managementFeePercent}% · Gastos fijos ${formatMoney(lease.monthlyOwnerCosts, "ARS")}`
+                        : "Completa nombre, contacto y retencion para emitir la liquidacion mensual."}
+                    </p>
+                  </div>
+                  <div className="rounded-[22px] border bg-background p-4 text-sm text-muted-foreground">
                     <p className="text-xs uppercase tracking-[0.2em] text-primary/75">Historial operativo</p>
                     <p className="mt-2 font-medium text-foreground">
                       {recentAdjustments.find((item) => item.contractId === lease.contractId)
@@ -239,19 +386,34 @@ export function LeasesWorkspace({
                 </div>
 
                 <div className="mt-4">
-                  <Button
-                    variant="outline"
-                    className="w-full rounded-2xl"
-                    disabled={sendingTestId === lease.contractId}
-                    onClick={() => handleSendTest(lease.contractId, lease.tenantName)}
-                  >
-                    {sendingTestId === lease.contractId ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Send className="size-4" />
-                    )}
-                    Enviar prueba de aumento
-                  </Button>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Button
+                      variant="outline"
+                      className="w-full rounded-2xl"
+                      disabled={sendingTestId === lease.contractId}
+                      onClick={() => handleSendTest(lease.contractId, lease.tenantName)}
+                    >
+                      {sendingTestId === lease.contractId ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Send className="size-4" />
+                      )}
+                      Enviar prueba de aumento
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full rounded-2xl"
+                      disabled={!lease.ownerName || generatingSettlementId === lease.contractId}
+                      onClick={() => handleGenerateSettlement(lease.contractId, lease.ownerName ?? undefined)}
+                    >
+                      {generatingSettlementId === lease.contractId ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <CircleDollarSign className="size-4" />
+                      )}
+                      Liquidar propietario
+                    </Button>
+                  </div>
                 </div>
               </article>
             ))}
@@ -296,6 +458,15 @@ function MiniInfoCard({
       <p className="text-sm text-muted-foreground">{label}</p>
       <p className="mt-3 text-3xl font-semibold">{value}</p>
       <p className="mt-2 text-sm text-muted-foreground">{hint}</p>
+    </div>
+  );
+}
+
+function InfoMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[18px] border bg-card p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 font-semibold">{value}</p>
     </div>
   );
 }
