@@ -10,6 +10,16 @@ import type {
 } from "@/lib/crm-types";
 import { getDefaultAgencyTemplates } from "@/lib/crm-insights";
 import type {
+  CashMovementSummary,
+  ContractRescissionSummary,
+  OwnerTransferSummary,
+  RentalCollectionSummary,
+  SupplierInvoiceSummary,
+  SupplierSummary,
+  TenantRosterSummary,
+  OwnerRosterSummary,
+} from "@/lib/operations-types";
+import type {
   OwnerSettlementSummary,
   RentalAdjustmentSummary,
   RentalContractSummary,
@@ -145,6 +155,111 @@ type OwnerSettlementRow = {
   properties:
     | { title: string; location: string }
     | { title: string; location: string }[]
+    | null;
+};
+
+type RentalCollectionRow = {
+  id: string;
+  contract_id: string;
+  property_id: string;
+  agency_id: string;
+  collection_month: string;
+  expected_rent: number;
+  collected_amount: number;
+  payment_method: string;
+  payment_date: string | null;
+  status: "Pendiente" | "Parcial" | "Cobrada" | "Mora";
+  notes: string;
+  created_at: string;
+  rental_contracts:
+    | { tenant_name: string }
+    | { tenant_name: string }[]
+    | null;
+  properties:
+    | { title: string; location: string }
+    | { title: string; location: string }[]
+    | null;
+};
+
+type OwnerTransferRow = {
+  id: string;
+  settlement_id: string | null;
+  contract_id: string;
+  property_id: string;
+  agency_id: string;
+  owner_name: string;
+  amount: number;
+  destination_label: string;
+  transfer_date: string | null;
+  status: "Pendiente" | "Programada" | "Enviada" | "Confirmada";
+  notes: string;
+  created_at: string;
+  properties:
+    | { title: string }
+    | { title: string }[]
+    | null;
+};
+
+type CashMovementRow = {
+  id: string;
+  agency_id: string;
+  occurred_on: string;
+  kind: "Ingreso" | "Egreso" | "Transferencia";
+  category: string;
+  amount: number;
+  reference: string;
+  notes: string;
+  created_at: string;
+};
+
+type SupplierRow = {
+  id: string;
+  agency_id: string;
+  name: string;
+  service_type: string;
+  contact_name: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string;
+  status: "Activo" | "Inactivo";
+  created_at: string;
+};
+
+type SupplierInvoiceRow = {
+  id: string;
+  agency_id: string;
+  supplier_id: string | null;
+  invoice_number: string;
+  concept: string;
+  total_amount: number;
+  due_date: string | null;
+  status: "Borrador" | "Emitida" | "Pagada" | "Anulada";
+  notes: string;
+  created_at: string;
+  suppliers:
+    | { name: string }
+    | { name: string }[]
+    | null;
+};
+
+type ContractRescissionRow = {
+  id: string;
+  contract_id: string;
+  property_id: string;
+  agency_id: string;
+  requested_on: string;
+  effective_date: string | null;
+  reason: string;
+  settlement_terms: string;
+  status: "Borrador" | "En negociacion" | "Aprobada" | "Cerrada";
+  created_at: string;
+  rental_contracts:
+    | { tenant_name: string }
+    | { tenant_name: string }[]
+    | null;
+  properties:
+    | { title: string }
+    | { title: string }[]
     | null;
 };
 
@@ -605,6 +720,116 @@ function mapOwnerSettlement(row: OwnerSettlementRow): OwnerSettlementSummary {
   };
 }
 
+function mapRentalCollection(row: RentalCollectionRow): RentalCollectionSummary {
+  const contract = Array.isArray(row.rental_contracts) ? row.rental_contracts[0] : row.rental_contracts;
+  const property = Array.isArray(row.properties) ? row.properties[0] : row.properties;
+
+  return {
+    id: row.id,
+    contractId: row.contract_id,
+    propertyId: row.property_id,
+    agencyId: row.agency_id,
+    collectionMonth: row.collection_month,
+    tenantName: contract?.tenant_name ?? "",
+    propertyTitle: property?.title ?? "",
+    propertyLocation: property?.location ?? "",
+    expectedRent: Number(row.expected_rent ?? 0),
+    collectedAmount: Number(row.collected_amount ?? 0),
+    paymentMethod: row.payment_method,
+    paymentDate: row.payment_date,
+    status: row.status,
+    notes: row.notes,
+    createdAt: row.created_at,
+  };
+}
+
+function mapOwnerTransfer(row: OwnerTransferRow): OwnerTransferSummary {
+  const property = Array.isArray(row.properties) ? row.properties[0] : row.properties;
+
+  return {
+    id: row.id,
+    settlementId: row.settlement_id,
+    contractId: row.contract_id,
+    propertyId: row.property_id,
+    agencyId: row.agency_id,
+    ownerName: row.owner_name,
+    propertyTitle: property?.title ?? "",
+    transferDate: row.transfer_date,
+    amount: Number(row.amount ?? 0),
+    destinationLabel: row.destination_label,
+    status: row.status,
+    notes: row.notes,
+    createdAt: row.created_at,
+  };
+}
+
+function mapCashMovement(row: CashMovementRow): CashMovementSummary {
+  return {
+    id: row.id,
+    agencyId: row.agency_id,
+    occurredOn: row.occurred_on,
+    kind: row.kind,
+    category: row.category,
+    amount: Number(row.amount ?? 0),
+    reference: row.reference,
+    notes: row.notes,
+    createdAt: row.created_at,
+  };
+}
+
+function mapSupplier(row: SupplierRow): SupplierSummary {
+  return {
+    id: row.id,
+    agencyId: row.agency_id,
+    name: row.name,
+    serviceType: row.service_type,
+    contactName: row.contact_name,
+    phone: row.phone,
+    email: row.email,
+    notes: row.notes,
+    status: row.status,
+    createdAt: row.created_at,
+  };
+}
+
+function mapSupplierInvoice(row: SupplierInvoiceRow): SupplierInvoiceSummary {
+  const supplier = Array.isArray(row.suppliers) ? row.suppliers[0] : row.suppliers;
+
+  return {
+    id: row.id,
+    agencyId: row.agency_id,
+    supplierId: row.supplier_id,
+    supplierName: supplier?.name ?? "Sin proveedor",
+    invoiceNumber: row.invoice_number,
+    concept: row.concept,
+    totalAmount: Number(row.total_amount ?? 0),
+    dueDate: row.due_date,
+    status: row.status,
+    notes: row.notes,
+    createdAt: row.created_at,
+  };
+}
+
+function mapContractRescission(row: ContractRescissionRow): ContractRescissionSummary {
+  const contract = Array.isArray(row.rental_contracts) ? row.rental_contracts[0] : row.rental_contracts;
+  const property = Array.isArray(row.properties) ? row.properties[0] : row.properties;
+
+  return {
+    id: row.id,
+    contractId: row.contract_id,
+    propertyId: row.property_id,
+    agencyId: row.agency_id,
+    tenantName: contract?.tenant_name ?? "",
+    propertyTitle: property?.title ?? "",
+    requestedOn: row.requested_on,
+    effectiveDate: row.effective_date,
+    reason: row.reason,
+    settlementTerms: row.settlement_terms,
+    status: row.status,
+    createdAt: row.created_at,
+  };
+}
+
 function mapProperty(
   row: PropertyRow,
   rentalContract: RentalContractSummary | null = null
@@ -1024,6 +1249,216 @@ export async function listOwnerSettlements(options?: { agencySlug?: string; limi
   return ((data ?? []) as Array<OwnerSettlementRow & {
     agencies: { slug: string } | { slug: string }[] | null;
   }>).map(mapOwnerSettlement);
+}
+
+export async function listRentalCollections(options?: { agencySlug?: string; limit?: number }) {
+  const admin = createAdminClient();
+  let query = admin
+    .from("rental_collections")
+    .select(
+      "id, contract_id, property_id, agency_id, collection_month, expected_rent, collected_amount, payment_method, payment_date, status, notes, created_at, agencies!inner(slug), rental_contracts!inner(tenant_name), properties!inner(title, location)"
+    )
+    .order("created_at", { ascending: false })
+    .limit(options?.limit ?? 24);
+
+  if (options?.agencySlug) {
+    query = query.eq("agencies.slug", options.agencySlug);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    if (/rental_collections/i.test(error.message ?? "")) {
+      return [];
+    }
+    throw error;
+  }
+
+  return ((data ?? []) as Array<RentalCollectionRow & {
+    agencies: { slug: string } | { slug: string }[] | null;
+  }>).map(mapRentalCollection);
+}
+
+export async function listOwnerTransfers(options?: { agencySlug?: string; limit?: number }) {
+  const admin = createAdminClient();
+  let query = admin
+    .from("owner_transfers")
+    .select(
+      "id, settlement_id, contract_id, property_id, agency_id, owner_name, amount, destination_label, transfer_date, status, notes, created_at, agencies!inner(slug), properties!inner(title)"
+    )
+    .order("created_at", { ascending: false })
+    .limit(options?.limit ?? 24);
+
+  if (options?.agencySlug) {
+    query = query.eq("agencies.slug", options.agencySlug);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    if (/owner_transfers/i.test(error.message ?? "")) {
+      return [];
+    }
+    throw error;
+  }
+
+  return ((data ?? []) as Array<OwnerTransferRow & {
+    agencies: { slug: string } | { slug: string }[] | null;
+  }>).map(mapOwnerTransfer);
+}
+
+export async function listCashMovements(options?: { agencySlug?: string; limit?: number }) {
+  const admin = createAdminClient();
+  let query = admin
+    .from("cash_movements")
+    .select("id, agency_id, occurred_on, kind, category, amount, reference, notes, created_at, agencies!inner(slug)")
+    .order("occurred_on", { ascending: false })
+    .limit(options?.limit ?? 40);
+
+  if (options?.agencySlug) {
+    query = query.eq("agencies.slug", options.agencySlug);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    if (/cash_movements/i.test(error.message ?? "")) {
+      return [];
+    }
+    throw error;
+  }
+
+  return ((data ?? []) as Array<CashMovementRow & {
+    agencies: { slug: string } | { slug: string }[] | null;
+  }>).map(mapCashMovement);
+}
+
+export async function listSuppliers(options?: { agencySlug?: string; limit?: number }) {
+  const admin = createAdminClient();
+  let query = admin
+    .from("suppliers")
+    .select("id, agency_id, name, service_type, contact_name, phone, email, notes, status, created_at, agencies!inner(slug)")
+    .order("name", { ascending: true })
+    .limit(options?.limit ?? 40);
+
+  if (options?.agencySlug) {
+    query = query.eq("agencies.slug", options.agencySlug);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    if (/suppliers/i.test(error.message ?? "")) {
+      return [];
+    }
+    throw error;
+  }
+
+  return ((data ?? []) as Array<SupplierRow & {
+    agencies: { slug: string } | { slug: string }[] | null;
+  }>).map(mapSupplier);
+}
+
+export async function listSupplierInvoices(options?: { agencySlug?: string; limit?: number }) {
+  const admin = createAdminClient();
+  let query = admin
+    .from("supplier_invoices")
+    .select(
+      "id, agency_id, supplier_id, invoice_number, concept, total_amount, due_date, status, notes, created_at, agencies!inner(slug), suppliers(name)"
+    )
+    .order("created_at", { ascending: false })
+    .limit(options?.limit ?? 40);
+
+  if (options?.agencySlug) {
+    query = query.eq("agencies.slug", options.agencySlug);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    if (/supplier_invoices/i.test(error.message ?? "")) {
+      return [];
+    }
+    throw error;
+  }
+
+  return ((data ?? []) as Array<SupplierInvoiceRow & {
+    agencies: { slug: string } | { slug: string }[] | null;
+  }>).map(mapSupplierInvoice);
+}
+
+export async function listContractRescissions(options?: { agencySlug?: string; limit?: number }) {
+  const admin = createAdminClient();
+  let query = admin
+    .from("contract_rescissions")
+    .select(
+      "id, contract_id, property_id, agency_id, requested_on, effective_date, reason, settlement_terms, status, created_at, agencies!inner(slug), rental_contracts!inner(tenant_name), properties!inner(title)"
+    )
+    .order("created_at", { ascending: false })
+    .limit(options?.limit ?? 24);
+
+  if (options?.agencySlug) {
+    query = query.eq("agencies.slug", options.agencySlug);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    if (/contract_rescissions/i.test(error.message ?? "")) {
+      return [];
+    }
+    throw error;
+  }
+
+  return ((data ?? []) as Array<ContractRescissionRow & {
+    agencies: { slug: string } | { slug: string }[] | null;
+  }>).map(mapContractRescission);
+}
+
+export async function listOwnerRoster(options?: { agencySlug?: string }): Promise<OwnerRosterSummary[]> {
+  const leases = await listLeaseRoster(options);
+  const settlements = await listOwnerSettlements({ agencySlug: options?.agencySlug, limit: 100 });
+
+  return leases
+    .filter((lease) => lease.ownerName)
+    .map((lease) => {
+      const latestSettlement = settlements.find((settlement) => settlement.contractId === lease.contractId) ?? null;
+      return {
+        agencyId: lease.agencyId,
+        agencySlug: lease.agencySlug,
+        propertyId: lease.propertyId,
+        contractId: lease.contractId,
+        ownerName: lease.ownerName ?? "",
+        ownerPhone: lease.ownerPhone,
+        ownerEmail: lease.ownerEmail,
+        propertyTitle: lease.propertyTitle,
+        propertyLocation: lease.propertyLocation,
+        currentRent: lease.currentRent,
+        managementFeePercent: lease.managementFeePercent,
+        monthlyOwnerCosts: lease.monthlyOwnerCosts,
+        latestSettlementMonth: latestSettlement?.settlementMonth ?? null,
+        latestOwnerPayoutAmount: latestSettlement?.ownerPayoutAmount ?? null,
+      };
+    });
+}
+
+export async function listTenantRoster(options?: { agencySlug?: string }): Promise<TenantRosterSummary[]> {
+  const leases = await listLeaseRoster(options);
+  const collections = await listRentalCollections({ agencySlug: options?.agencySlug, limit: 100 });
+
+  return leases.map((lease) => {
+    const latestCollection = collections.find((collection) => collection.contractId === lease.contractId) ?? null;
+    return {
+      agencyId: lease.agencyId,
+      agencySlug: lease.agencySlug,
+      propertyId: lease.propertyId,
+      contractId: lease.contractId,
+      tenantName: lease.tenantName,
+      tenantPhone: lease.tenantPhone,
+      tenantEmail: lease.tenantEmail,
+      propertyTitle: lease.propertyTitle,
+      propertyLocation: lease.propertyLocation,
+      currentRent: lease.currentRent,
+      nextAdjustmentDate: lease.nextAdjustmentDate,
+      contractStatus: lease.status,
+      latestCollectionStatus: latestCollection?.status ?? null,
+      latestCollectionMonth: latestCollection?.collectionMonth ?? null,
+    };
+  });
 }
 
 export async function listRecentRentalAdjustments(options?: { agencySlug?: string; limit?: number }) {

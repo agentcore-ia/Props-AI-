@@ -5,6 +5,9 @@ import { Building2, CalendarDays, CircleDollarSign, Loader2, Phone, Send, UserRo
 
 import type { LeaseRosterItem } from "@/lib/props-data";
 import type {
+  ContractRescissionSummary,
+} from "@/lib/operations-types";
+import type {
   OwnerSettlementSummary,
   RentalAdjustmentSummary,
   RentalDashboardSummary,
@@ -27,14 +30,17 @@ export function LeasesWorkspace({
   rentalSummary,
   recentAdjustments,
   ownerSettlements,
+  rescissions,
 }: {
   leases: LeaseRosterItem[];
   rentalSummary: RentalDashboardSummary;
   recentAdjustments: RentalAdjustmentSummary[];
   ownerSettlements: OwnerSettlementSummary[];
+  rescissions: ContractRescissionSummary[];
 }) {
   const [sendingTestId, setSendingTestId] = useState<string | null>(null);
   const [generatingSettlementId, setGeneratingSettlementId] = useState<string | null>(null);
+  const [rescindingContractId, setRescindingContractId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<null | { type: "success" | "error"; message: string }>(null);
 
   async function handleSendTest(contractId: string, tenantName: string) {
@@ -98,6 +104,36 @@ export function LeasesWorkspace({
       message: contractId
         ? `Liquidacion emitida para ${ownerName ?? "el propietario"} en ${payload?.settlementMonth ?? "este mes"}.`
         : `Se emitieron ${payload?.processed ?? 0} liquidaciones de propietarios para ${payload?.settlementMonth ?? "este mes"}.`,
+    });
+    window.location.reload();
+  }
+
+  async function handleRescission(contractId: string, tenantName: string) {
+    setRescindingContractId(contractId);
+    setFeedback(null);
+
+    const response = await fetch("/api/admin/contract-rescissions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contractId,
+        reason: "Solicitud de rescisión iniciada desde el panel de alquileres.",
+        settlementTerms: "Pendiente de definir penalidad, estado de pago y entrega de unidad.",
+        status: "En negociacion",
+      }),
+    });
+    const payload = await response.json().catch(() => null);
+    setRescindingContractId(null);
+    if (!response.ok) {
+      setFeedback({
+        type: "error",
+        message: payload?.error ?? "No se pudo iniciar la rescision.",
+      });
+      return;
+    }
+    setFeedback({
+      type: "success",
+      message: `Rescision iniciada para ${tenantName}. Ya queda en seguimiento contractual.`,
     });
     window.location.reload();
   }
@@ -227,6 +263,42 @@ export function LeasesWorkspace({
             </div>
           </section>
 
+          <section className="rounded-[30px] border bg-card p-5 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/75">
+                  Administracion contractual
+                </p>
+                <h2 className="mt-2 text-xl font-semibold">Rescisiones y salida de contratos</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Inicia rescisiones, deja asentados terminos y sigue el cierre administrativo de cada alquiler.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+              {rescissions.length > 0 ? (
+                rescissions.map((rescission) => (
+                  <article key={rescission.id} className="rounded-[24px] border bg-background p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/75">
+                      {rescission.status}
+                    </p>
+                    <h3 className="mt-2 font-semibold">{rescission.tenantName}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{rescission.propertyTitle}</p>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      Solicitud: {formatShortDate(rescission.requestedOn)}
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">{rescission.reason}</p>
+                  </article>
+                ))
+              ) : (
+                <div className="rounded-[24px] border border-dashed bg-background p-5 text-sm text-muted-foreground lg:col-span-2 xl:col-span-3">
+                  Todavia no hay rescisiones abiertas. Puedes iniciarlas desde cada contrato activo cuando haga falta negociar salida, penalidades o entrega.
+                </div>
+              )}
+            </div>
+          </section>
+
           <section className="hidden overflow-hidden rounded-[30px] border bg-card shadow-sm xl:block">
             <div className="grid grid-cols-[1.1fr_1fr_0.8fr_0.9fr_0.8fr_0.7fr_0.8fr] gap-4 border-b px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               <span>Inquilino</span>
@@ -310,6 +382,19 @@ export function LeasesWorkspace({
                           <CircleDollarSign className="size-4" />
                         )}
                         Liquidar propietario
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="rounded-2xl"
+                        disabled={rescindingContractId === lease.contractId}
+                        onClick={() => handleRescission(lease.contractId, lease.tenantName)}
+                      >
+                        {rescindingContractId === lease.contractId ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <CalendarDays className="size-4" />
+                        )}
+                        Iniciar rescision
                       </Button>
                     </div>
                   </div>
@@ -412,6 +497,19 @@ export function LeasesWorkspace({
                         <CircleDollarSign className="size-4" />
                       )}
                       Liquidar propietario
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full rounded-2xl"
+                      disabled={rescindingContractId === lease.contractId}
+                      onClick={() => handleRescission(lease.contractId, lease.tenantName)}
+                    >
+                      {rescindingContractId === lease.contractId ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <CalendarDays className="size-4" />
+                      )}
+                      Iniciar rescision
                     </Button>
                   </div>
                 </div>

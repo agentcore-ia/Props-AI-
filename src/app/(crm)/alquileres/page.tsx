@@ -3,6 +3,7 @@ import { getCurrentUserContext } from "@/lib/auth/current-user";
 import { getAgencyScopeFromUser } from "@/lib/crm-automation";
 import {
   getRentalDashboardSummary,
+  listContractRescissions,
   listLeaseRoster,
   listOwnerSettlements,
   listRecentRentalAdjustments,
@@ -19,11 +20,12 @@ export default async function LeasesPage() {
 
   const agencyScope = getAgencyScopeFromUser(currentUser);
 
-  const [leases, rentalSummary, recentAdjustments, ownerSettlements] = await Promise.all([
+  const [leases, rentalSummary, recentAdjustments, ownerSettlements, rescissions] = await Promise.all([
     listLeaseRoster(agencyScope),
     getRentalDashboardSummary(agencyScope),
     listRecentRentalAdjustments({ ...agencyScope, limit: 8 }),
     listOwnerSettlements({ ...agencyScope, limit: 12 }),
+    listContractRescissions({ ...agencyScope, limit: 12 }),
   ]);
 
   return (
@@ -32,6 +34,7 @@ export default async function LeasesPage() {
       rentalSummary={rentalSummary}
       recentAdjustments={recentAdjustments}
       ownerSettlements={ownerSettlements}
+      rescissions={rescissions}
     />
   );
 }

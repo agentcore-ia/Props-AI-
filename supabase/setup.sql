@@ -205,6 +205,100 @@ create table if not exists public.owner_settlements (
   unique (contract_id, settlement_month)
 );
 
+create table if not exists public.rental_collections (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references public.rental_contracts (id) on delete cascade,
+  property_id uuid not null references public.properties (id) on delete cascade,
+  agency_id uuid not null references public.agencies (id) on delete cascade,
+  collection_month text not null,
+  expected_rent numeric(14, 2) not null default 0,
+  collected_amount numeric(14, 2) not null default 0,
+  payment_method text not null default 'Transferencia',
+  payment_date date,
+  status text not null default 'Pendiente' check (status in ('Pendiente', 'Parcial', 'Cobrada', 'Mora')),
+  notes text not null default '',
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now()),
+  unique (contract_id, collection_month)
+);
+
+create table if not exists public.owner_transfers (
+  id uuid primary key default gen_random_uuid(),
+  settlement_id uuid references public.owner_settlements (id) on delete set null,
+  contract_id uuid not null references public.rental_contracts (id) on delete cascade,
+  property_id uuid not null references public.properties (id) on delete cascade,
+  agency_id uuid not null references public.agencies (id) on delete cascade,
+  owner_name text not null,
+  amount numeric(14, 2) not null default 0,
+  destination_label text not null default '',
+  transfer_date date,
+  status text not null default 'Pendiente' check (status in ('Pendiente', 'Programada', 'Enviada', 'Confirmada')),
+  notes text not null default '',
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now())
+);
+
+create table if not exists public.cash_movements (
+  id uuid primary key default gen_random_uuid(),
+  agency_id uuid not null references public.agencies (id) on delete cascade,
+  occurred_on date not null,
+  kind text not null check (kind in ('Ingreso', 'Egreso', 'Transferencia')),
+  category text not null default '',
+  amount numeric(14, 2) not null default 0,
+  reference text not null default '',
+  notes text not null default '',
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now())
+);
+
+create table if not exists public.suppliers (
+  id uuid primary key default gen_random_uuid(),
+  agency_id uuid not null references public.agencies (id) on delete cascade,
+  name text not null,
+  service_type text not null default '',
+  contact_name text,
+  phone text,
+  email text,
+  notes text not null default '',
+  status text not null default 'Activo' check (status in ('Activo', 'Inactivo')),
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now())
+);
+
+create table if not exists public.supplier_invoices (
+  id uuid primary key default gen_random_uuid(),
+  agency_id uuid not null references public.agencies (id) on delete cascade,
+  supplier_id uuid references public.suppliers (id) on delete set null,
+  invoice_number text not null default '',
+  concept text not null default '',
+  total_amount numeric(14, 2) not null default 0,
+  due_date date,
+  status text not null default 'Borrador' check (status in ('Borrador', 'Emitida', 'Pagada', 'Anulada')),
+  notes text not null default '',
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now())
+);
+
+create table if not exists public.contract_rescissions (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references public.rental_contracts (id) on delete cascade,
+  property_id uuid not null references public.properties (id) on delete cascade,
+  agency_id uuid not null references public.agencies (id) on delete cascade,
+  requested_on date not null,
+  effective_date date,
+  reason text not null default '',
+  settlement_terms text not null default '',
+  status text not null default 'Borrador' check (status in ('Borrador', 'En negociacion', 'Aprobada', 'Cerrada')),
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now())
+);
+
 create table if not exists public.crm_leads (
   id uuid primary key default gen_random_uuid(),
   agency_id uuid not null references public.agencies (id) on delete cascade,
@@ -335,6 +429,12 @@ alter table public.marketplace_messages enable row level security;
 alter table public.rental_contracts enable row level security;
 alter table public.rental_adjustments enable row level security;
 alter table public.owner_settlements enable row level security;
+alter table public.rental_collections enable row level security;
+alter table public.owner_transfers enable row level security;
+alter table public.cash_movements enable row level security;
+alter table public.suppliers enable row level security;
+alter table public.supplier_invoices enable row level security;
+alter table public.contract_rescissions enable row level security;
 alter table public.crm_leads enable row level security;
 alter table public.visit_appointments enable row level security;
 alter table public.employee_tasks enable row level security;
@@ -377,6 +477,12 @@ drop trigger if exists properties_set_updated_at on public.properties;
 drop trigger if exists marketplace_conversations_set_updated_at on public.marketplace_conversations;
 drop trigger if exists rental_contracts_set_updated_at on public.rental_contracts;
 drop trigger if exists owner_settlements_set_updated_at on public.owner_settlements;
+drop trigger if exists rental_collections_set_updated_at on public.rental_collections;
+drop trigger if exists owner_transfers_set_updated_at on public.owner_transfers;
+drop trigger if exists cash_movements_set_updated_at on public.cash_movements;
+drop trigger if exists suppliers_set_updated_at on public.suppliers;
+drop trigger if exists supplier_invoices_set_updated_at on public.supplier_invoices;
+drop trigger if exists contract_rescissions_set_updated_at on public.contract_rescissions;
 drop trigger if exists crm_leads_set_updated_at on public.crm_leads;
 drop trigger if exists visit_appointments_set_updated_at on public.visit_appointments;
 drop trigger if exists employee_tasks_set_updated_at on public.employee_tasks;
@@ -404,6 +510,30 @@ create trigger rental_contracts_set_updated_at
 
 create trigger owner_settlements_set_updated_at
   before update on public.owner_settlements
+  for each row execute procedure public.touch_updated_at();
+
+create trigger rental_collections_set_updated_at
+  before update on public.rental_collections
+  for each row execute procedure public.touch_updated_at();
+
+create trigger owner_transfers_set_updated_at
+  before update on public.owner_transfers
+  for each row execute procedure public.touch_updated_at();
+
+create trigger cash_movements_set_updated_at
+  before update on public.cash_movements
+  for each row execute procedure public.touch_updated_at();
+
+create trigger suppliers_set_updated_at
+  before update on public.suppliers
+  for each row execute procedure public.touch_updated_at();
+
+create trigger supplier_invoices_set_updated_at
+  before update on public.supplier_invoices
+  for each row execute procedure public.touch_updated_at();
+
+create trigger contract_rescissions_set_updated_at
+  before update on public.contract_rescissions
   for each row execute procedure public.touch_updated_at();
 
 create trigger crm_leads_set_updated_at
