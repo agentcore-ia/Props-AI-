@@ -3,20 +3,19 @@
 import { useState, type ReactNode } from "react";
 import { Building2, CalendarDays, CircleDollarSign, Loader2, Phone, Send, UserRound } from "lucide-react";
 
-import type { LeaseRosterItem } from "@/lib/props-data";
-import type {
-  ContractRescissionSummary,
-} from "@/lib/operations-types";
-import type {
-  OwnerSettlementSummary,
-  RentalAdjustmentSummary,
-  RentalDashboardSummary,
-} from "@/lib/rental-types";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { RentAutomationPanel } from "@/components/props/rent-automation-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { ContractRescissionSummary } from "@/lib/operations-types";
+import type { LeaseRosterItem } from "@/lib/props-data";
+import type {
+  OwnerSettlementItemSummary,
+  OwnerSettlementSummary,
+  RentalAdjustmentSummary,
+  RentalDashboardSummary,
+} from "@/lib/rental-types";
 import { formatMoney, formatShortDate } from "@/lib/utils";
 
 const statusStyles: Record<LeaseRosterItem["status"], string> = {
@@ -30,17 +29,27 @@ export function LeasesWorkspace({
   rentalSummary,
   recentAdjustments,
   ownerSettlements,
+  ownerSettlementItems,
   rescissions,
 }: {
   leases: LeaseRosterItem[];
   rentalSummary: RentalDashboardSummary;
   recentAdjustments: RentalAdjustmentSummary[];
   ownerSettlements: OwnerSettlementSummary[];
+  ownerSettlementItems: OwnerSettlementItemSummary[];
   rescissions: ContractRescissionSummary[];
 }) {
   const [sendingTestId, setSendingTestId] = useState<string | null>(null);
   const [generatingSettlementId, setGeneratingSettlementId] = useState<string | null>(null);
   const [rescindingContractId, setRescindingContractId] = useState<string | null>(null);
+  const [editingSettlementId, setEditingSettlementId] = useState<string | null>(null);
+  const [conceptForm, setConceptForm] = useState({
+    label: "",
+    amount: "",
+    effect: "Descuento" as OwnerSettlementItemSummary["effect"],
+    applyManagementFee: false,
+    notes: "",
+  });
   const [feedback, setFeedback] = useState<null | { type: "success" | "error"; message: string }>(null);
 
   async function handleSendTest(contractId: string, tenantName: string) {
@@ -117,7 +126,7 @@ export function LeasesWorkspace({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         contractId,
-        reason: "Solicitud de rescisión iniciada desde el panel de alquileres.",
+        reason: "Solicitud de rescision iniciada desde el panel de alquileres.",
         settlementTerms: "Pendiente de definir penalidad, estado de pago y entrega de unidad.",
         status: "En negociacion",
       }),
@@ -136,6 +145,81 @@ export function LeasesWorkspace({
       message: `Rescision iniciada para ${tenantName}. Ya queda en seguimiento contractual.`,
     });
     window.location.reload();
+  }
+
+  async function handleCreateSettlementItem(settlementId: string) {
+    setFeedback(null);
+
+    const response = await fetch("/api/admin/owner-settlement-items", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        settlementId,
+        label: conceptForm.label,
+        amount: Number(conceptForm.amount),
+        effect: conceptForm.effect,
+        applyManagementFee: conceptForm.applyManagementFee,
+        notes: conceptForm.notes,
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      setFeedback({
+        type: "error",
+        message: payload?.error ?? "No se pudo agregar el concepto particular.",
+      });
+      return;
+    }
+
+    setFeedback({
+      type: "success",
+      message: "Concepto agregado y liquidacion recalculada.",
+    });
+    setConceptForm({
+      label: "",
+      amount: "",
+      effect: "Descuento",
+      applyManagementFee: false,
+      notes: "",
+    });
+    setEditingSettlementId(null);
+    window.location.reload();
+  }
+
+  async function handleDeleteSettlementItem(itemId: string) {
+    setFeedback(null);
+
+    const response = await fetch("/api/admin/owner-settlement-items", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ itemId }),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      setFeedback({
+        type: "error",
+        message: payload?.error ?? "No se pudo eliminar el concepto particular.",
+      });
+      return;
+    }
+
+    setFeedback({
+      type: "success",
+      message: "Concepto eliminado y liquidacion recalculada.",
+    });
+    window.location.reload();
+  }
+
+  function resetConceptForm() {
+    setEditingSettlementId(null);
+    setConceptForm({
+      label: "",
+      amount: "",
+      effect: "Descuento",
+      applyManagementFee: false,
+      notes: "",
+    });
   }
 
   return (
@@ -222,42 +306,204 @@ export function LeasesWorkspace({
 
             <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
               {ownerSettlements.length > 0 ? (
-                ownerSettlements.map((settlement) => (
-                  <article key={settlement.id} className="rounded-[24px] border bg-background p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/75">
-                          {settlement.settlementMonth}
-                        </p>
-                        <h3 className="mt-2 font-semibold">{settlement.ownerName}</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {settlement.propertyTitle} · {settlement.propertyLocation}
-                        </p>
+                ownerSettlements.map((settlement) => {
+                  const items = ownerSettlementItems.filter((item) => item.settlementId === settlement.id);
+
+                  return (
+                    <article key={settlement.id} className="rounded-[24px] border bg-background p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/75">
+                            {settlement.settlementMonth}
+                          </p>
+                          <h3 className="mt-2 font-semibold">{settlement.ownerName}</h3>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {settlement.propertyTitle} · {settlement.propertyLocation}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Participacion {settlement.participationPercent}%
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="rounded-full">
+                          {settlement.status}
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="rounded-full">
-                        {settlement.status}
-                      </Badge>
-                    </div>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <InfoMetric label="Alquiler cobrado" value={formatMoney(settlement.rentCollected, "ARS")} />
-                      <InfoMetric
-                        label={`Comision ${settlement.managementFeePercent}%`}
-                        value={formatMoney(settlement.managementFeeAmount, "ARS")}
-                      />
-                      <InfoMetric label="Gastos fijos" value={formatMoney(settlement.monthlyOwnerCosts, "ARS")} />
-                      <InfoMetric label="Neto al propietario" value={formatMoney(settlement.ownerPayoutAmount, "ARS")} />
-                    </div>
-                    {settlement.otherChargesAmount > 0 || settlement.otherChargesDetail ? (
-                      <p className="mt-3 text-sm text-muted-foreground">
-                        Otros cargos: {formatMoney(settlement.otherChargesAmount, "ARS")}
-                        {settlement.otherChargesDetail ? ` · ${settlement.otherChargesDetail}` : ""}
-                      </p>
-                    ) : null}
-                  </article>
-                ))
+
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <InfoMetric label="Alquiler cobrado" value={formatMoney(settlement.rentCollected, "ARS")} />
+                        <InfoMetric
+                          label={`Comision ${settlement.managementFeePercent}%`}
+                          value={formatMoney(settlement.managementFeeAmount, "ARS")}
+                        />
+                        <InfoMetric label="Gastos fijos" value={formatMoney(settlement.monthlyOwnerCosts, "ARS")} />
+                        <InfoMetric
+                          label="Neto al propietario"
+                          value={formatMoney(settlement.ownerPayoutAmount, "ARS")}
+                        />
+                      </div>
+
+                      {settlement.otherChargesAmount > 0 || settlement.otherChargesDetail ? (
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          Otros cargos: {formatMoney(settlement.otherChargesAmount, "ARS")}
+                          {settlement.otherChargesDetail ? ` · ${settlement.otherChargesDetail}` : ""}
+                        </p>
+                      ) : null}
+
+                      <div className="mt-4 rounded-2xl border bg-muted/15 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/75">
+                              Conceptos particulares
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Suma o descuenta honorarios, arreglos, impuestos o ajustes manuales antes de confirmar.
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full"
+                            onClick={() =>
+                              setEditingSettlementId((current) => (current === settlement.id ? null : settlement.id))
+                            }
+                          >
+                            {editingSettlementId === settlement.id ? "Cerrar" : "Agregar concepto"}
+                          </Button>
+                        </div>
+
+                        {items.length > 0 ? (
+                          <div className="mt-3 space-y-2">
+                            {items.map((item) => (
+                              <div
+                                key={item.id}
+                                className="flex items-start justify-between gap-3 rounded-2xl border bg-background px-3 py-2 text-sm"
+                              >
+                                <div>
+                                  <p className="font-medium">{item.label}</p>
+                                  <p className="text-muted-foreground">
+                                    {item.effect}
+                                    {item.applyManagementFee ? " · aplica comision" : ""}
+                                    {item.notes ? ` · ${item.notes}` : ""}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="font-medium">{formatMoney(item.amount, "ARS")}</span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="rounded-full px-2 text-red-600 hover:text-red-700"
+                                    onClick={() => handleDeleteSettlementItem(item.id)}
+                                  >
+                                    Quitar
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-sm text-muted-foreground">
+                            Todavia no hay conceptos particulares para esta liquidacion.
+                          </p>
+                        )}
+
+                        {editingSettlementId === settlement.id ? (
+                          <div className="mt-4 grid gap-3 rounded-2xl border bg-background p-4">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <label className="space-y-2 text-sm">
+                                <span className="font-medium">Concepto</span>
+                                <input
+                                  className="h-11 w-full rounded-2xl border bg-background px-4 outline-none transition focus:border-primary"
+                                  value={conceptForm.label}
+                                  onChange={(event) =>
+                                    setConceptForm((current) => ({ ...current, label: event.target.value }))
+                                  }
+                                  placeholder="Ej. honorarios, arreglo, impuesto"
+                                />
+                              </label>
+                              <label className="space-y-2 text-sm">
+                                <span className="font-medium">Monto</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  className="h-11 w-full rounded-2xl border bg-background px-4 outline-none transition focus:border-primary"
+                                  value={conceptForm.amount}
+                                  onChange={(event) =>
+                                    setConceptForm((current) => ({ ...current, amount: event.target.value }))
+                                  }
+                                  placeholder="20000"
+                                />
+                              </label>
+                            </div>
+
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <label className="space-y-2 text-sm">
+                                <span className="font-medium">Efecto</span>
+                                <select
+                                  className="h-11 w-full rounded-2xl border bg-background px-4 outline-none transition focus:border-primary"
+                                  value={conceptForm.effect}
+                                  onChange={(event) =>
+                                    setConceptForm((current) => ({
+                                      ...current,
+                                      effect: event.target.value as OwnerSettlementItemSummary["effect"],
+                                    }))
+                                  }
+                                >
+                                  <option value="Descuento">Descontar del propietario</option>
+                                  <option value="Suma">Sumar a lo que cobra</option>
+                                  <option value="Informativo">Solo informar</option>
+                                </select>
+                              </label>
+                              <label className="space-y-2 text-sm">
+                                <span className="font-medium">Notas</span>
+                                <input
+                                  className="h-11 w-full rounded-2xl border bg-background px-4 outline-none transition focus:border-primary"
+                                  value={conceptForm.notes}
+                                  onChange={(event) =>
+                                    setConceptForm((current) => ({ ...current, notes: event.target.value }))
+                                  }
+                                  placeholder="Detalle opcional"
+                                />
+                              </label>
+                            </div>
+
+                            <label className="flex items-center gap-3 text-sm text-muted-foreground">
+                              <input
+                                type="checkbox"
+                                checked={conceptForm.applyManagementFee}
+                                onChange={(event) =>
+                                  setConceptForm((current) => ({
+                                    ...current,
+                                    applyManagementFee: event.target.checked,
+                                  }))
+                                }
+                              />
+                              Aplicar comision de administracion sobre este concepto
+                            </label>
+
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                className="rounded-full"
+                                onClick={() => handleCreateSettlementItem(settlement.id)}
+                              >
+                                Guardar concepto
+                              </Button>
+                              <Button type="button" variant="outline" className="rounded-full" onClick={resetConceptForm}>
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    </article>
+                  );
+                })
               ) : (
                 <div className="rounded-[24px] border border-dashed bg-background p-5 text-sm text-muted-foreground lg:col-span-2 xl:col-span-3">
-                  Todavia no hay liquidaciones emitidas. Configura el propietario en el contrato y genera el cierre del mes desde aca.
+                  Todavia no hay liquidaciones emitidas. Configura el propietario en el contrato y genera el cierre del
+                  mes desde aca.
                 </div>
               )}
             </div>
@@ -293,7 +539,8 @@ export function LeasesWorkspace({
                 ))
               ) : (
                 <div className="rounded-[24px] border border-dashed bg-background p-5 text-sm text-muted-foreground lg:col-span-2 xl:col-span-3">
-                  Todavia no hay rescisiones abiertas. Puedes iniciarlas desde cada contrato activo cuando haga falta negociar salida, penalidades o entrega.
+                  Todavia no hay rescisiones abiertas. Puedes iniciarlas desde cada contrato activo cuando haga falta
+                  negociar salida, penalidades o entrega.
                 </div>
               )}
             </div>
@@ -325,9 +572,7 @@ export function LeasesWorkspace({
                   <div className="space-y-1">
                     <p className="font-semibold">{lease.propertyTitle}</p>
                     <p className="text-sm text-muted-foreground">{lease.propertyLocation}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Propietario: {lease.ownerName || "Sin configurar"}
-                    </p>
+                    <p className="text-sm text-muted-foreground">Propietario: {lease.ownerName || "Sin configurar"}</p>
                   </div>
 
                   <div className="text-sm leading-6 text-muted-foreground">
@@ -343,9 +588,7 @@ export function LeasesWorkspace({
 
                   <div className="space-y-1">
                     <p className="font-semibold">{formatShortDate(lease.nextAdjustmentDate)}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Inicio: {formatShortDate(lease.contractStartDate)}
-                    </p>
+                    <p className="text-sm text-muted-foreground">Inicio: {formatShortDate(lease.contractStartDate)}</p>
                   </div>
 
                   <div className="space-y-2">
@@ -422,24 +665,30 @@ export function LeasesWorkspace({
                 <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
                   <InfoRow icon={<Building2 className="size-4" />} label={lease.propertyTitle} />
                   <InfoRow icon={<UserRound className="size-4" />} label={lease.exactAddress || lease.propertyLocation} />
-                  <InfoRow icon={<CircleDollarSign className="size-4" />} label={formatMoney(lease.currentRent, lease.currency)} />
-                  <InfoRow icon={<CalendarDays className="size-4" />} label={`Proximo aumento: ${formatShortDate(lease.nextAdjustmentDate)}`} />
-                  <InfoRow icon={<Phone className="size-4" />} label={lease.autoNotify ? "Aviso automatico activo" : "Aviso manual"} />
+                  <InfoRow
+                    icon={<CircleDollarSign className="size-4" />}
+                    label={formatMoney(lease.currentRent, lease.currency)}
+                  />
+                  <InfoRow
+                    icon={<CalendarDays className="size-4" />}
+                    label={`Proximo aumento: ${formatShortDate(lease.nextAdjustmentDate)}`}
+                  />
+                  <InfoRow
+                    icon={<Phone className="size-4" />}
+                    label={lease.autoNotify ? "Aviso automatico activo" : "Aviso manual"}
+                  />
                 </div>
 
                 {lease.requirements ? (
                   <div className="mt-4 rounded-[22px] border bg-muted/20 p-4 text-sm leading-6 text-muted-foreground">
-                    <span className="font-medium text-foreground">Requisitos del ingreso:</span>{" "}
-                    {lease.requirements}
+                    <span className="font-medium text-foreground">Requisitos del ingreso:</span> {lease.requirements}
                   </div>
                 ) : null}
 
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   <div className="rounded-[22px] border bg-background p-4 text-sm text-muted-foreground">
                     <p className="text-xs uppercase tracking-[0.2em] text-primary/75">Documentacion</p>
-                    <p className="mt-2 font-medium text-foreground">
-                      Contrato y soporte del alquiler
-                    </p>
+                    <p className="mt-2 font-medium text-foreground">Contrato y soporte del alquiler</p>
                     <p className="mt-1">
                       Todo queda centralizado aca para revisar fechas, clausulas y siguientes pasos.
                     </p>

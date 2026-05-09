@@ -5,6 +5,7 @@ import {
   getRentalDashboardSummary,
   listContractRescissions,
   listLeaseRoster,
+  listOwnerSettlementItems,
   listOwnerSettlements,
   listRecentRentalAdjustments,
 } from "@/lib/props-data";
@@ -20,11 +21,12 @@ export default async function LeasesPage() {
 
   const agencyScope = getAgencyScopeFromUser(currentUser);
 
-  const [leases, rentalSummary, recentAdjustments, ownerSettlements, rescissions] = await Promise.all([
+  const [leases, rentalSummary, recentAdjustments, ownerSettlements, ownerSettlementItems, rescissions] = await Promise.all([
     listLeaseRoster(agencyScope),
     getRentalDashboardSummary(agencyScope),
     listRecentRentalAdjustments({ ...agencyScope, limit: 8 }),
     listOwnerSettlements({ ...agencyScope, limit: 12 }),
+    listOwnerSettlementItems({ ...agencyScope, limit: 200 }),
     listContractRescissions({ ...agencyScope, limit: 12 }),
   ]);
 
@@ -34,6 +36,7 @@ export default async function LeasesPage() {
       rentalSummary={rentalSummary}
       recentAdjustments={recentAdjustments}
       ownerSettlements={ownerSettlements}
+      ownerSettlementItems={ownerSettlementItems}
       rescissions={rescissions}
     />
   );

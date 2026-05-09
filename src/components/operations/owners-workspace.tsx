@@ -4,14 +4,16 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/lib/utils";
 import type { OwnerRosterSummary } from "@/lib/operations-types";
-import type { OwnerSettlementSummary } from "@/lib/rental-types";
+import type { OwnerSettlementItemSummary, OwnerSettlementSummary } from "@/lib/rental-types";
 
 export function OwnersWorkspace({
   owners,
   settlements,
+  settlementItems,
 }: {
   owners: OwnerRosterSummary[];
   settlements: OwnerSettlementSummary[];
+  settlementItems: OwnerSettlementItemSummary[];
 }) {
   return (
     <div className="space-y-6">
@@ -82,18 +84,38 @@ export function OwnersWorkspace({
           </CardHeader>
           <CardContent className="space-y-3">
             {settlements.length > 0 ? (
-              settlements.map((settlement) => (
-                <div key={settlement.id} className="rounded-2xl border bg-background p-4">
-                  <p className="font-semibold">{settlement.ownerName}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {settlement.propertyTitle} · {settlement.settlementMonth}
-                  </p>
-                  <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
-                    <p>Neto: {formatMoney(settlement.ownerPayoutAmount, "ARS")}</p>
-                    <p>Estado: {settlement.status}</p>
+              settlements.map((settlement) => {
+                const items = settlementItems.filter((item) => item.settlementId === settlement.id);
+                return (
+                  <div key={settlement.id} className="rounded-2xl border bg-background p-4">
+                    <p className="font-semibold">{settlement.ownerName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {settlement.propertyTitle} · {settlement.settlementMonth}
+                    </p>
+                    <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+                      <p>Neto: {formatMoney(settlement.ownerPayoutAmount, "ARS")}</p>
+                      <p>Estado: {settlement.status}</p>
+                    </div>
+                    {items.length > 0 ? (
+                      <div className="mt-3 rounded-xl border bg-muted/20 p-3 text-sm text-muted-foreground">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
+                          Conceptos particulares
+                        </p>
+                        <div className="space-y-1">
+                          {items.slice(0, 4).map((item) => (
+                            <div key={item.id} className="flex items-center justify-between gap-3">
+                              <span>
+                                {item.label} · {item.effect}
+                              </span>
+                              <span>{formatMoney(item.amount, "ARS")}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <EmptyBox text="Todavia no hay liquidaciones emitidas para propietarios." />
             )}
