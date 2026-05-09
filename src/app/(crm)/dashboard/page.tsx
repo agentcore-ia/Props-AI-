@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 
 import { AgencyList, CreateAgencyDialog } from "@/components/admin/agency-manager";
-import { DashboardAssistant } from "@/components/dashboard/dashboard-assistant";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { PipelineChart } from "@/components/dashboard/pipeline-chart";
 import { TodayPanel } from "@/components/dashboard/today-panel";
@@ -141,7 +140,6 @@ export default async function DashboardPage() {
           </div>
           <AgencyList agencies={snapshot.agencies} />
         </section>
-        <DashboardAssistant />
       </div>
     );
   }
@@ -196,7 +194,6 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </section>
-      <DashboardAssistant />
     </div>
   );
 }

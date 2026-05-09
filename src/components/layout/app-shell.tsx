@@ -26,7 +26,6 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
@@ -36,6 +35,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { DashboardAssistant } from "@/components/dashboard/dashboard-assistant";
 import { cn } from "@/lib/utils";
 
 type AppRole = "superadmin" | "agency_admin" | "agent" | "customer";
@@ -90,7 +90,7 @@ function SidebarContent({ userRole = "agency_admin" }: { userRole?: AppRole | nu
         </Link>
       </div>
 
-      <ScrollArea className="flex-1 px-2">
+      <div className="flex-1 overflow-y-auto px-2">
         <nav className="space-y-0.5 pb-4">
           {navigation.map(({ href, label, icon: Icon }) => {
             const active = pathname === href;
@@ -112,7 +112,7 @@ function SidebarContent({ userRole = "agency_admin" }: { userRole?: AppRole | nu
             );
           })}
         </nav>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
@@ -132,8 +132,8 @@ export function AppShell({
 }) {
   return (
     <div className="min-h-screen">
-      <div className="flex min-h-screen w-full">
-        <aside className="glass-panel sticky top-0 hidden h-screen w-64 border-r border-sidebar-border xl:block">
+      <div className="flex min-h-screen w-full xl:pl-64">
+        <aside className="glass-panel hidden border-r border-sidebar-border xl:fixed xl:inset-y-0 xl:left-0 xl:flex xl:h-screen xl:w-64 xl:flex-col">
           <SidebarContent userRole={userRole} />
         </aside>
 
@@ -194,6 +194,7 @@ export function AppShell({
           <main className="flex-1 px-2 py-4 sm:px-3">{children}</main>
         </div>
       </div>
+      <DashboardAssistant />
     </div>
   );
 }
