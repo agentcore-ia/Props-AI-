@@ -1143,24 +1143,42 @@ export async function listRentalContracts(options?: { agencySlug?: string }) {
 
 export async function listLeaseRoster(options?: { agencySlug?: string }) {
   const admin = createAdminClient();
-  let query = admin
-    .from("rental_contracts")
-    .select(
-      "id, property_id, agency_id, tenant_name, tenant_phone, tenant_email, current_rent, currency, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, last_adjustment_date, auto_notify, status, owner_name, owner_phone, owner_email, management_fee_percent, monthly_owner_costs, owner_notes, agencies!inner(name, slug), properties!inner(title, location, exact_address, requirements)"
+  const leaseRosterSelect =
+    "id, property_id, agency_id, tenant_name, tenant_phone, tenant_email, current_rent, currency, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, last_adjustment_date, auto_notify, status, owner_name, owner_phone, owner_email, management_fee_percent, monthly_owner_costs, owner_notes, agencies!inner(name, slug), properties!inner(title, location, exact_address, requirements)";
+  const legacyLeaseRosterSelect =
+    "id, property_id, agency_id, tenant_name, tenant_phone, tenant_email, current_rent, currency, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, last_adjustment_date, auto_notify, status, agencies!inner(name, slug), properties!inner(title, location, exact_address, requirements)";
+
+  const buildQuery = (selectClause: string) => {
+    let query = admin
+      .from("rental_contracts")
+      .select(selectClause)
+      .order("next_adjustment_date", { ascending: true });
+
+    if (options?.agencySlug) {
+      query = query.eq("agencies.slug", options.agencySlug);
+    }
+
+    return query;
+  };
+
+  let { data, error } = await buildQuery(leaseRosterSelect);
+
+  if (
+    error &&
+    /owner_name|owner_phone|owner_email|management_fee_percent|monthly_owner_costs|owner_notes/i.test(
+      error.message ?? ""
     )
-    .order("next_adjustment_date", { ascending: true });
-
-  if (options?.agencySlug) {
-    query = query.eq("agencies.slug", options.agencySlug);
+  ) {
+    const fallbackResult = await buildQuery(legacyLeaseRosterSelect);
+    data = fallbackResult.data;
+    error = fallbackResult.error;
   }
-
-  const { data, error } = await query;
 
   if (error) {
     throw error;
   }
 
-  return ((data ?? []) as Array<{
+  return ((data ?? []) as unknown as Array<{
     id: string;
     property_id: string;
     agency_id: string;
