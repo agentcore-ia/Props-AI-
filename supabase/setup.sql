@@ -180,6 +180,24 @@ create table if not exists public.rental_adjustments (
   created_at timestamptz not null default timezone('utc'::text, now())
 );
 
+create table if not exists public.rental_contract_owners (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references public.rental_contracts (id) on delete cascade,
+  property_id uuid not null references public.properties (id) on delete cascade,
+  agency_id uuid not null references public.agencies (id) on delete cascade,
+  full_name text not null,
+  email text,
+  phone text,
+  participation_percent numeric(7, 2) not null default 100,
+  bank_alias text,
+  bank_account text,
+  notes text not null default '',
+  display_order integer not null default 0,
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now())
+);
+
 create table if not exists public.owner_settlements (
   id uuid primary key default gen_random_uuid(),
   contract_id uuid not null references public.rental_contracts (id) on delete cascade,
@@ -203,6 +221,22 @@ create table if not exists public.owner_settlements (
   created_at timestamptz not null default timezone('utc'::text, now()),
   updated_at timestamptz not null default timezone('utc'::text, now()),
   unique (contract_id, settlement_month)
+);
+
+create table if not exists public.owner_settlement_items (
+  id uuid primary key default gen_random_uuid(),
+  settlement_id uuid not null references public.owner_settlements (id) on delete cascade,
+  contract_id uuid not null references public.rental_contracts (id) on delete cascade,
+  contract_owner_id uuid references public.rental_contract_owners (id) on delete set null,
+  agency_id uuid not null references public.agencies (id) on delete cascade,
+  label text not null,
+  amount numeric(14, 2) not null default 0,
+  effect text not null default 'Descuento' check (effect in ('Suma', 'Descuento', 'Informativo')),
+  apply_management_fee boolean not null default false,
+  notes text not null default '',
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now())
 );
 
 create table if not exists public.rental_collections (
@@ -416,9 +450,22 @@ alter table public.rental_contracts
   add column if not exists owner_name text,
   add column if not exists owner_phone text,
   add column if not exists owner_email text,
-  add column if not exists management_fee_percent numeric(7, 2) not null default 0,
-  add column if not exists monthly_owner_costs numeric(14, 2) not null default 0,
-  add column if not exists owner_notes text not null default '';
+    add column if not exists management_fee_percent numeric(7, 2) not null default 0,
+    add column if not exists monthly_owner_costs numeric(14, 2) not null default 0,
+    add column if not exists owner_notes text not null default '';
+
+alter table public.owner_settlements
+  add column if not exists contract_owner_id uuid references public.rental_contract_owners (id) on delete set null,
+  add column if not exists participation_percent numeric(7, 2) not null default 100;
+
+alter table public.owner_settlements
+  drop constraint if exists owner_settlements_contract_id_settlement_month_key;
+
+create unique index if not exists owner_settlements_owner_cycle_uidx
+  on public.owner_settlements ((coalesce(contract_owner_id, contract_id)), settlement_month);
+
+alter table public.owner_transfers
+  add column if not exists contract_owner_id uuid references public.rental_contract_owners (id) on delete set null;
 
 alter table public.profiles enable row level security;
 alter table public.agencies enable row level security;
@@ -428,7 +475,9 @@ alter table public.marketplace_conversations enable row level security;
 alter table public.marketplace_messages enable row level security;
 alter table public.rental_contracts enable row level security;
 alter table public.rental_adjustments enable row level security;
+alter table public.rental_contract_owners enable row level security;
 alter table public.owner_settlements enable row level security;
+alter table public.owner_settlement_items enable row level security;
 alter table public.rental_collections enable row level security;
 alter table public.owner_transfers enable row level security;
 alter table public.cash_movements enable row level security;
@@ -476,7 +525,9 @@ drop trigger if exists agencies_set_updated_at on public.agencies;
 drop trigger if exists properties_set_updated_at on public.properties;
 drop trigger if exists marketplace_conversations_set_updated_at on public.marketplace_conversations;
 drop trigger if exists rental_contracts_set_updated_at on public.rental_contracts;
+drop trigger if exists rental_contract_owners_set_updated_at on public.rental_contract_owners;
 drop trigger if exists owner_settlements_set_updated_at on public.owner_settlements;
+drop trigger if exists owner_settlement_items_set_updated_at on public.owner_settlement_items;
 drop trigger if exists rental_collections_set_updated_at on public.rental_collections;
 drop trigger if exists owner_transfers_set_updated_at on public.owner_transfers;
 drop trigger if exists cash_movements_set_updated_at on public.cash_movements;
@@ -508,8 +559,16 @@ create trigger rental_contracts_set_updated_at
   before update on public.rental_contracts
   for each row execute procedure public.touch_updated_at();
 
+create trigger rental_contract_owners_set_updated_at
+  before update on public.rental_contract_owners
+  for each row execute procedure public.touch_updated_at();
+
 create trigger owner_settlements_set_updated_at
   before update on public.owner_settlements
+  for each row execute procedure public.touch_updated_at();
+
+create trigger owner_settlement_items_set_updated_at
+  before update on public.owner_settlement_items
   for each row execute procedure public.touch_updated_at();
 
 create trigger rental_collections_set_updated_at
@@ -563,6 +622,8 @@ drop policy if exists "Service role manages marketplace conversations" on public
 drop policy if exists "Service role manages marketplace messages" on public.marketplace_messages;
 drop policy if exists "Service role manages rental contracts" on public.rental_contracts;
 drop policy if exists "Service role manages rental adjustments" on public.rental_adjustments;
+drop policy if exists "Service role manages rental contract owners" on public.rental_contract_owners;
+drop policy if exists "Service role manages owner settlement items" on public.owner_settlement_items;
 drop policy if exists "Service role manages crm leads" on public.crm_leads;
 drop policy if exists "Service role manages visit appointments" on public.visit_appointments;
 drop policy if exists "Service role manages employee tasks" on public.employee_tasks;
@@ -632,6 +693,18 @@ with check (auth.role() = 'service_role');
 
 create policy "Service role manages rental adjustments"
 on public.rental_adjustments
+for all
+using (auth.role() = 'service_role')
+with check (auth.role() = 'service_role');
+
+create policy "Service role manages rental contract owners"
+on public.rental_contract_owners
+for all
+using (auth.role() = 'service_role')
+with check (auth.role() = 'service_role');
+
+create policy "Service role manages owner settlement items"
+on public.owner_settlement_items
 for all
 using (auth.role() = 'service_role')
 with check (auth.role() = 'service_role');

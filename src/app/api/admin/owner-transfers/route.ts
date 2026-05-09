@@ -14,6 +14,7 @@ export async function POST(request: Request) {
     | {
         settlementId?: string | null;
         contractId?: string;
+        contractOwnerId?: string | null;
         amount?: number;
         destinationLabel?: string;
         transferDate?: string | null;
@@ -23,6 +24,7 @@ export async function POST(request: Request) {
     | null;
 
   const contractId = String(body?.contractId ?? "").trim();
+  const contractOwnerId = String(body?.contractOwnerId ?? "").trim() || null;
   if (!contractId) {
     return NextResponse.json({ error: "Falta el contrato." }, { status: 400 });
   }
@@ -46,27 +48,49 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No puedes transferir a otra inmobiliaria." }, { status: 403 });
   }
 
-  if (!contract.owner_name?.trim()) {
+  const { data: contractOwner, error: contractOwnerError } = contractOwnerId
+    ? await admin
+        .from("rental_contract_owners")
+        .select("id, full_name, email, phone, participation_percent")
+        .eq("id", contractOwnerId)
+        .eq("contract_id", contractId)
+        .maybeSingle()
+    : { data: null, error: null };
+
+  if (contractOwnerError && !/rental_contract_owners/i.test(contractOwnerError.message ?? "")) {
+    return NextResponse.json({ error: "No se pudo leer el propietario del contrato." }, { status: 400 });
+  }
+
+  if (!contract.owner_name?.trim() && !contractOwner?.full_name?.trim()) {
     return NextResponse.json({ error: "El contrato no tiene propietario configurado." }, { status: 400 });
   }
 
+  const ratio = contractOwner ? Number(contractOwner.participation_percent ?? 0) / 100 : 1;
   const amount =
     Number(body?.amount) ||
     Math.max(
       0,
-      Number(contract.current_rent ?? 0) -
-        Number(contract.monthly_owner_costs ?? 0) -
-        Number(contract.current_rent ?? 0) * (Number(contract.management_fee_percent ?? 0) / 100)
+      Number(contract.current_rent ?? 0) * ratio -
+        Number(contract.monthly_owner_costs ?? 0) * ratio -
+        Number(contract.current_rent ?? 0) * ratio * (Number(contract.management_fee_percent ?? 0) / 100)
     );
 
   const { error: insertError } = await admin.from("owner_transfers").insert({
     settlement_id: body?.settlementId || null,
     contract_id: contract.id,
+    contract_owner_id: contractOwnerId,
     property_id: contract.property_id,
     agency_id: contract.agency_id,
-    owner_name: contract.owner_name,
+    owner_name: contractOwner?.full_name ?? contract.owner_name,
     amount,
-    destination_label: String(body?.destinationLabel ?? contract.owner_email ?? contract.owner_phone ?? "Cuenta informada").trim(),
+    destination_label: String(
+      body?.destinationLabel ??
+        contractOwner?.email ??
+        contractOwner?.phone ??
+        contract.owner_email ??
+        contract.owner_phone ??
+        "Cuenta informada"
+    ).trim(),
     transfer_date: body?.transferDate ? String(body.transferDate).slice(0, 10) : null,
     status: body?.status ?? "Programada",
     notes: String(body?.notes ?? "").trim(),

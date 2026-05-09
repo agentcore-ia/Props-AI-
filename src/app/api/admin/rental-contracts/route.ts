@@ -9,10 +9,112 @@ import type { UploadedRentalContractFile } from "@/lib/rental-contract-files";
 import { uploadRentalContractFile } from "@/lib/rental-contract-files";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+type ContractOwnerPayload = {
+  id?: string;
+  fullName?: string;
+  phone?: string | null;
+  email?: string | null;
+  participationPercent?: number;
+  bankAlias?: string | null;
+  bankAccount?: string | null;
+  notes?: string;
+  displayOrder?: number;
+};
+
 function normalizeOptionalString(value: string | null | undefined) {
   if (!value) return null;
   const trimmed = value.trim();
   return trimmed || null;
+}
+
+function parseOwnersPayload(value: FormDataEntryValue | string | null | undefined) {
+  if (!value) return [] as ContractOwnerPayload[];
+  const raw = typeof value === "string" ? value : String(value);
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as ContractOwnerPayload[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function sanitizeOwners(rawOwners: ContractOwnerPayload[]) {
+  return rawOwners
+    .map((owner, index) => ({
+      id: owner.id,
+      full_name: String(owner.fullName ?? "").trim(),
+      phone: normalizeOptionalString(owner.phone),
+      email: normalizeOptionalString(owner.email),
+      participation_percent: Math.max(0, Number(owner.participationPercent ?? 0) || 0),
+      bank_alias: normalizeOptionalString(owner.bankAlias),
+      bank_account: normalizeOptionalString(owner.bankAccount),
+      notes: String(owner.notes ?? "").trim(),
+      display_order: Number.isFinite(Number(owner.displayOrder)) ? Number(owner.displayOrder) : index,
+    }))
+    .filter((owner) => owner.full_name);
+}
+
+async function syncContractOwners({
+  admin,
+  contractId,
+  propertyId,
+  agencyId,
+  owners,
+}: {
+  admin: ReturnType<typeof createAdminClient>;
+  contractId: string;
+  propertyId: string;
+  agencyId: string;
+  owners: ReturnType<typeof sanitizeOwners>;
+}) {
+  const { data: existingOwners, error: existingOwnersError } = await admin
+    .from("rental_contract_owners")
+    .select("id")
+    .eq("contract_id", contractId);
+
+  if (existingOwnersError && !/rental_contract_owners/i.test(existingOwnersError.message ?? "")) {
+    throw existingOwnersError;
+  }
+
+  const existingIds = new Set(((existingOwners ?? []) as Array<{ id: string }>).map((owner) => owner.id));
+  const keepIds = new Set(owners.map((owner) => owner.id).filter(Boolean) as string[]);
+  const idsToDelete = Array.from(existingIds).filter((id) => !keepIds.has(id));
+
+  if (idsToDelete.length > 0) {
+    const { error: deleteError } = await admin
+      .from("rental_contract_owners")
+      .delete()
+      .in("id", idsToDelete);
+
+    if (deleteError) {
+      throw deleteError;
+    }
+  }
+
+  if (owners.length > 0) {
+    const payload = owners.map((owner) => ({
+      id: owner.id,
+      contract_id: contractId,
+      property_id: propertyId,
+      agency_id: agencyId,
+      full_name: owner.full_name,
+      phone: owner.phone,
+      email: owner.email,
+      participation_percent: owner.participation_percent,
+      bank_alias: owner.bank_alias,
+      bank_account: owner.bank_account,
+      notes: owner.notes,
+      display_order: owner.display_order,
+    }));
+
+    const { error: upsertOwnersError } = await admin
+      .from("rental_contract_owners")
+      .upsert(payload, { onConflict: "id" });
+
+    if (upsertOwnersError) {
+      throw upsertOwnersError;
+    }
+  }
 }
 
 export async function POST(request: Request) {
@@ -40,6 +142,7 @@ export async function POST(request: Request) {
   const managementFeePercentRaw = String(formData.get("managementFeePercent") ?? "").trim();
   const monthlyOwnerCostsRaw = String(formData.get("monthlyOwnerCosts") ?? "").trim();
   const ownerNotes = String(formData.get("ownerNotes") ?? "").trim();
+  const ownersPayloadRaw = formData.get("ownersPayload");
   const currentRentRaw = String(formData.get("currentRent") ?? "").trim();
   const indexType = String(formData.get("indexType") ?? "").trim();
   const adjustmentFrequencyMonths = Number(formData.get("adjustmentFrequencyMonths") ?? 0);
@@ -51,6 +154,7 @@ export async function POST(request: Request) {
   const contractFileEntry = formData.get("contractFile");
   const contractFile =
     contractFileEntry instanceof File && contractFileEntry.size > 0 ? contractFileEntry : null;
+  const sanitizedOwners = sanitizeOwners(parseOwnersPayload(ownersPayloadRaw));
 
   if (!propertyId) {
     return NextResponse.json(
@@ -160,6 +264,7 @@ export async function POST(request: Request) {
       : Number(existingContract?.monthly_owner_costs ?? 0)
   );
   const resolvedOwnerNotes = ownerNotes || existingContract?.owner_notes || "";
+  const primaryOwner = sanitizedOwners[0] ?? null;
   const resolvedCurrentRent =
     analyzedContract?.currentRent ??
     existingContract?.current_rent ??
@@ -245,18 +350,22 @@ export async function POST(request: Request) {
       uploadedContract?.extractedText ??
       existingContract?.contract_text ??
       "",
-    owner_name: resolvedOwnerName,
-    owner_phone: resolvedOwnerPhone,
-    owner_email: resolvedOwnerEmail,
+    owner_name: primaryOwner?.full_name ?? resolvedOwnerName,
+    owner_phone: primaryOwner?.phone ?? resolvedOwnerPhone,
+    owner_email: primaryOwner?.email ?? resolvedOwnerEmail,
     management_fee_percent: resolvedManagementFeePercent,
     monthly_owner_costs: resolvedMonthlyOwnerCosts,
-    owner_notes: resolvedOwnerNotes,
+    owner_notes: primaryOwner?.notes ?? resolvedOwnerNotes,
     created_by: current.user.id,
   };
 
-  const { error } = await admin.from("rental_contracts").upsert(upsertPayload, {
-    onConflict: "property_id",
-  });
+  const { data: savedContract, error } = await admin
+    .from("rental_contracts")
+    .upsert(upsertPayload, {
+      onConflict: "property_id",
+    })
+    .select("id")
+    .single();
 
   if (error) {
     console.error("[rental-contract] upsert failed", {
@@ -280,6 +389,24 @@ export async function POST(request: Request) {
       { error: "No se pudo guardar el contrato." },
       { status: 400 }
     );
+  }
+
+  if (savedContract) {
+    try {
+      await syncContractOwners({
+        admin,
+        contractId: savedContract.id,
+        propertyId: property.id,
+        agencyId: property.agency_id,
+        owners: sanitizedOwners,
+      });
+    } catch (ownersError) {
+      console.error("[rental-contract] owners sync failed", ownersError);
+      return NextResponse.json(
+        { error: "Guardamos el contrato, pero no se pudieron actualizar los propietarios." },
+        { status: 400 }
+      );
+    }
   }
 
   return NextResponse.json({
@@ -318,6 +445,7 @@ export async function PATCH(request: Request) {
         managementFeePercent?: number;
         monthlyOwnerCosts?: number;
         ownerNotes?: string;
+        owners?: ContractOwnerPayload[];
         currentRent?: number;
         indexType?: "IPC" | "ICL";
         adjustmentFrequencyMonths?: number;
@@ -336,7 +464,7 @@ export async function PATCH(request: Request) {
   const admin = createAdminClient();
   const { data: contract, error } = await admin
     .from("rental_contracts")
-    .select("id, agency_id, tenant_name, tenant_phone, tenant_email, owner_name, owner_phone, owner_email, management_fee_percent, monthly_owner_costs, owner_notes, current_rent, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, auto_notify, notes, agencies!inner(slug)")
+    .select("id, property_id, agency_id, tenant_name, tenant_phone, tenant_email, owner_name, owner_phone, owner_email, management_fee_percent, monthly_owner_costs, owner_notes, current_rent, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, auto_notify, notes, agencies!inner(slug)")
     .eq("id", contractId)
     .maybeSingle();
 
@@ -364,6 +492,8 @@ export async function PATCH(request: Request) {
   const ownerName = body?.ownerName?.trim?.() || contract.owner_name || null;
   const ownerPhone = body?.ownerPhone?.trim?.() || contract.owner_phone || null;
   const ownerEmail = body?.ownerEmail?.trim?.() || contract.owner_email || null;
+  const sanitizedOwners = sanitizeOwners(body?.owners ?? []);
+  const primaryOwner = sanitizedOwners[0] ?? null;
   const managementFeePercent = Math.max(
     0,
     Number.isFinite(Number(body?.managementFeePercent))
@@ -414,12 +544,12 @@ export async function PATCH(request: Request) {
       tenant_name: tenantName,
       tenant_phone: tenantPhone,
       tenant_email: tenantEmail,
-      owner_name: ownerName,
-      owner_phone: ownerPhone,
-      owner_email: ownerEmail,
+      owner_name: primaryOwner?.full_name ?? ownerName,
+      owner_phone: primaryOwner?.phone ?? ownerPhone,
+      owner_email: primaryOwner?.email ?? ownerEmail,
       management_fee_percent: managementFeePercent,
       monthly_owner_costs: monthlyOwnerCosts,
-      owner_notes: ownerNotes,
+      owner_notes: primaryOwner?.notes ?? ownerNotes,
       current_rent: currentRent,
       index_type: indexType,
       adjustment_frequency_months: adjustmentFrequencyMonths,
@@ -434,6 +564,22 @@ export async function PATCH(request: Request) {
 
   if (updateError) {
     return NextResponse.json({ error: "No se pudo confirmar el contrato." }, { status: 400 });
+  }
+
+  try {
+    await syncContractOwners({
+      admin,
+      contractId,
+      propertyId: contract.property_id,
+      agencyId: contract.agency_id,
+      owners: sanitizedOwners,
+    });
+  } catch (ownersError) {
+    console.error("[rental-contract] owners sync failed on patch", ownersError);
+    return NextResponse.json(
+      { error: "Se confirmo el contrato, pero no se pudieron actualizar los propietarios." },
+      { status: 400 }
+    );
   }
 
   return NextResponse.json({ ok: true });

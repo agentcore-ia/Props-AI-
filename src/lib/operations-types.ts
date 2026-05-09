@@ -10,9 +10,11 @@ export type OwnerRosterSummary = {
   agencySlug: string;
   propertyId: string;
   contractId: string;
+  contractOwnerId: string | null;
   ownerName: string;
   ownerPhone: string | null;
   ownerEmail: string | null;
+  participationPercent: number;
   propertyTitle: string;
   propertyLocation: string;
   currentRent: number;
@@ -61,6 +63,7 @@ export type OwnerTransferSummary = {
   id: string;
   settlementId: string | null;
   contractId: string;
+  contractOwnerId: string | null;
   propertyId: string;
   agencyId: string;
   ownerName: string;

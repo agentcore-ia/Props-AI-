@@ -20,7 +20,9 @@ import type {
   OwnerRosterSummary,
 } from "@/lib/operations-types";
 import type {
+  ContractOwnerSummary,
   OwnerSettlementSummary,
+  OwnerSettlementItemSummary,
   RentalAdjustmentSummary,
   RentalContractSummary,
   RentalDashboardSummary,
@@ -114,6 +116,23 @@ type RentalContractRow = {
   updated_at: string;
 };
 
+type ContractOwnerRow = {
+  id: string;
+  contract_id: string;
+  property_id: string;
+  agency_id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  participation_percent: number;
+  bank_alias: string | null;
+  bank_account: string | null;
+  notes: string | null;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 type RentalAdjustmentRow = {
   id: string;
   contract_id: string;
@@ -135,12 +154,14 @@ type RentalAdjustmentRow = {
 type OwnerSettlementRow = {
   id: string;
   contract_id: string;
+  contract_owner_id: string | null;
   property_id: string;
   agency_id: string;
   settlement_month: string;
   owner_name: string;
   owner_email: string | null;
   owner_phone: string | null;
+  participation_percent: number | null;
   rent_collected: number;
   management_fee_percent: number;
   management_fee_amount: number;
@@ -156,6 +177,20 @@ type OwnerSettlementRow = {
     | { title: string; location: string }
     | { title: string; location: string }[]
     | null;
+};
+
+type OwnerSettlementItemRow = {
+  id: string;
+  settlement_id: string;
+  contract_id: string;
+  contract_owner_id: string | null;
+  agency_id: string;
+  label: string;
+  amount: number;
+  effect: "Suma" | "Descuento" | "Informativo";
+  apply_management_fee: boolean;
+  notes: string | null;
+  created_at: string;
 };
 
 type RentalCollectionRow = {
@@ -185,6 +220,7 @@ type OwnerTransferRow = {
   id: string;
   settlement_id: string | null;
   contract_id: string;
+  contract_owner_id: string | null;
   property_id: string;
   agency_id: string;
   owner_name: string;
@@ -637,7 +673,28 @@ function mapAgency(row: AgencyRow): Agency {
   };
 }
 
-function mapRentalContract(row: RentalContractRow, agencyMessagingInstance = "agentcore"): RentalContractSummary {
+function mapContractOwner(row: ContractOwnerRow): ContractOwnerSummary {
+  return {
+    id: row.id,
+    contractId: row.contract_id,
+    propertyId: row.property_id,
+    agencyId: row.agency_id,
+    fullName: row.full_name,
+    email: row.email,
+    phone: row.phone,
+    participationPercent: Number(row.participation_percent ?? 0),
+    bankAlias: row.bank_alias,
+    bankAccount: row.bank_account,
+    notes: row.notes ?? "",
+    displayOrder: Number(row.display_order ?? 0),
+  };
+}
+
+function mapRentalContract(
+  row: RentalContractRow,
+  agencyMessagingInstance = "agentcore",
+  owners: ContractOwnerSummary[] = []
+): RentalContractSummary {
   return {
     id: row.id,
     propertyId: row.property_id,
@@ -669,6 +726,7 @@ function mapRentalContract(row: RentalContractRow, agencyMessagingInstance = "ag
     managementFeePercent: Number(row.management_fee_percent ?? 0),
     monthlyOwnerCosts: Number(row.monthly_owner_costs ?? 0),
     ownerNotes: row.owner_notes ?? "",
+    owners,
   };
 }
 
@@ -695,18 +753,20 @@ function mapRentalAdjustment(row: RentalAdjustmentRow): RentalAdjustmentSummary 
 function mapOwnerSettlement(row: OwnerSettlementRow): OwnerSettlementSummary {
   const property = Array.isArray(row.properties) ? row.properties[0] : row.properties;
 
-  return {
-    id: row.id,
-    contractId: row.contract_id,
-    propertyId: row.property_id,
-    agencyId: row.agency_id,
-    ownerName: row.owner_name,
-    ownerEmail: row.owner_email,
-    ownerPhone: row.owner_phone,
-    propertyTitle: property?.title ?? "",
-    propertyLocation: property?.location ?? "",
-    settlementMonth: row.settlement_month,
-    rentCollected: Number(row.rent_collected ?? 0),
+    return {
+      id: row.id,
+      contractId: row.contract_id,
+      contractOwnerId: row.contract_owner_id,
+      propertyId: row.property_id,
+      agencyId: row.agency_id,
+      ownerName: row.owner_name,
+      ownerEmail: row.owner_email,
+      ownerPhone: row.owner_phone,
+      propertyTitle: property?.title ?? "",
+      propertyLocation: property?.location ?? "",
+      settlementMonth: row.settlement_month,
+      participationPercent: Number(row.participation_percent ?? 100),
+      rentCollected: Number(row.rent_collected ?? 0),
     managementFeePercent: Number(row.management_fee_percent ?? 0),
     managementFeeAmount: Number(row.management_fee_amount ?? 0),
     monthlyOwnerCosts: Number(row.monthly_owner_costs ?? 0),
@@ -716,6 +776,21 @@ function mapOwnerSettlement(row: OwnerSettlementRow): OwnerSettlementSummary {
     status: row.status,
     sentAt: row.sent_at,
     paidAt: row.paid_at,
+    createdAt: row.created_at,
+  };
+}
+
+function mapOwnerSettlementItem(row: OwnerSettlementItemRow): OwnerSettlementItemSummary {
+  return {
+    id: row.id,
+    settlementId: row.settlement_id,
+    contractId: row.contract_id,
+    contractOwnerId: row.contract_owner_id,
+    label: row.label,
+    amount: Number(row.amount ?? 0),
+    effect: row.effect,
+    applyManagementFee: Boolean(row.apply_management_fee),
+    notes: row.notes ?? "",
     createdAt: row.created_at,
   };
 }
@@ -750,6 +825,7 @@ function mapOwnerTransfer(row: OwnerTransferRow): OwnerTransferSummary {
     id: row.id,
     settlementId: row.settlement_id,
     contractId: row.contract_id,
+    contractOwnerId: row.contract_owner_id,
     propertyId: row.property_id,
     agencyId: row.agency_id,
     ownerName: row.owner_name,
@@ -828,6 +904,38 @@ function mapContractRescission(row: ContractRescissionRow): ContractRescissionSu
     status: row.status,
     createdAt: row.created_at,
   };
+}
+
+async function fetchContractOwnersByContractId(
+  admin: ReturnType<typeof createAdminClient>,
+  contractIds: string[]
+) {
+  if (contractIds.length === 0) {
+    return new Map<string, ContractOwnerSummary[]>();
+  }
+
+  const { data, error } = await admin
+    .from("rental_contract_owners")
+    .select("*")
+    .in("contract_id", contractIds)
+    .order("display_order", { ascending: true });
+
+  if (error) {
+    if (/rental_contract_owners/i.test(error.message ?? "")) {
+      return new Map<string, ContractOwnerSummary[]>();
+    }
+    throw error;
+  }
+
+  const grouped = new Map<string, ContractOwnerSummary[]>();
+  for (const row of (data ?? []) as ContractOwnerRow[]) {
+    const mapped = mapContractOwner(row);
+    const current = grouped.get(mapped.contractId) ?? [];
+    current.push(mapped);
+    grouped.set(mapped.contractId, current);
+  }
+
+  return grouped;
 }
 
 function mapProperty(
@@ -1007,11 +1115,11 @@ export async function listProperties(options?: { tenantSlug?: string }) {
   const agencyIds = Array.from(new Set(rows.map((row) => row.agency_id)));
 
   const [contractsResult, agenciesResult] = await Promise.all([
-    propertyIds.length > 0
-      ? admin
-          .from("rental_contracts")
-          .select("*")
-          .in("property_id", propertyIds)
+      propertyIds.length > 0
+        ? admin
+            .from("rental_contracts")
+            .select("*")
+            .in("property_id", propertyIds)
           .in("agency_id", agencyIds)
       : Promise.resolve({ data: [], error: null }),
     agencyIds.length > 0
@@ -1034,13 +1142,23 @@ export async function listProperties(options?: { tenantSlug?: string }) {
     ])
   );
 
+  const contractRows = (contractsResult.data ?? []) as RentalContractRow[];
+  const ownersByContractId = await fetchContractOwnersByContractId(
+    admin,
+    contractRows.map((contract) => contract.id)
+  );
+
   const rentalByPropertyId = new Map<string, RentalContractSummary>();
 
-  for (const contract of (contractsResult.data ?? []) as RentalContractRow[]) {
-    rentalByPropertyId.set(
-      contract.property_id,
-      mapRentalContract(contract, messagingInstanceByAgency.get(contract.agency_id) ?? "agentcore")
-    );
+  for (const contract of contractRows) {
+      rentalByPropertyId.set(
+        contract.property_id,
+        mapRentalContract(
+          contract,
+          messagingInstanceByAgency.get(contract.agency_id) ?? "agentcore",
+          ownersByContractId.get(contract.id) ?? []
+        )
+      );
   }
 
   return rows.map((row) => mapProperty(row, rentalByPropertyId.get(row.id) ?? null));
@@ -1079,8 +1197,8 @@ export async function getPropertyBySlugAndId(slug: string, propertyId: string) {
   }
 
   const [contractResult, agencyResult] = await Promise.all([
-    admin.from("rental_contracts").select("*").eq("property_id", propertyId).maybeSingle(),
-    admin.from("agencies").select("id, messaging_instance").eq("slug", slug).maybeSingle(),
+      admin.from("rental_contracts").select("*").eq("property_id", propertyId).maybeSingle(),
+      admin.from("agencies").select("id, messaging_instance").eq("slug", slug).maybeSingle(),
   ]);
 
   if (contractResult.error) {
@@ -1091,14 +1209,20 @@ export async function getPropertyBySlugAndId(slug: string, propertyId: string) {
     throw agencyResult.error;
   }
 
+  const ownersByContractId = await fetchContractOwnersByContractId(
+    admin,
+    contractResult.data ? [(contractResult.data as RentalContractRow).id] : []
+  );
+
   return mapProperty(
     data as unknown as PropertyRow,
     contractResult.data
       ? mapRentalContract(
-          contractResult.data as RentalContractRow,
-          agencyResult.data?.messaging_instance ?? "agentcore"
-        )
-      : null
+            contractResult.data as RentalContractRow,
+            agencyResult.data?.messaging_instance ?? "agentcore",
+            ownersByContractId.get((contractResult.data as RentalContractRow).id) ?? []
+          )
+        : null
   );
 }
 
@@ -1132,12 +1256,22 @@ export async function listRentalContracts(options?: { agencySlug?: string }) {
     throw contractsResult.error;
   }
 
-  const instanceByAgency = new Map(
-    agencies.map((agency) => [agency.id, agency.messaging_instance])
+  const contractRows = (contractsResult.data ?? []) as RentalContractRow[];
+  const ownersByContractId = await fetchContractOwnersByContractId(
+    admin,
+    contractRows.map((contract) => contract.id)
   );
 
-  return ((contractsResult.data ?? []) as RentalContractRow[]).map((contract) =>
-    mapRentalContract(contract, instanceByAgency.get(contract.agency_id) ?? "agentcore")
+  const instanceByAgency = new Map(
+      agencies.map((agency) => [agency.id, agency.messaging_instance])
+  );
+
+  return contractRows.map((contract) =>
+      mapRentalContract(
+        contract,
+        instanceByAgency.get(contract.agency_id) ?? "agentcore",
+        ownersByContractId.get(contract.id) ?? []
+      )
   );
 }
 
@@ -1178,7 +1312,7 @@ export async function listLeaseRoster(options?: { agencySlug?: string }) {
     throw error;
   }
 
-  return ((data ?? []) as unknown as Array<{
+  const leaseRows = (data ?? []) as unknown as Array<{
     id: string;
     property_id: string;
     agency_id: string;
@@ -1205,9 +1339,18 @@ export async function listLeaseRoster(options?: { agencySlug?: string }) {
       | { title: string; location: string; exact_address: string; requirements: string | null }
       | { title: string; location: string; exact_address: string; requirements: string | null }[]
       | null;
-  }>).map((item) => {
+  }>;
+  const ownersByContractId = await fetchContractOwnersByContractId(
+    admin,
+    leaseRows.map((item) => item.id)
+  );
+
+  return leaseRows.map((item) => {
     const agency = Array.isArray(item.agencies) ? item.agencies[0] : item.agencies;
     const property = Array.isArray(item.properties) ? item.properties[0] : item.properties;
+    const owners = ownersByContractId.get(item.id) ?? [];
+    const primaryOwner = owners[0] ?? null;
+    const rosterOwnerName = primaryOwner?.fullName ?? item.owner_name ?? null;
 
     return {
       contractId: item.id,
@@ -1231,9 +1374,12 @@ export async function listLeaseRoster(options?: { agencySlug?: string }) {
       status: item.status,
       autoNotify: item.auto_notify,
       requirements: property?.requirements ?? "",
-      ownerName: item.owner_name,
-      ownerPhone: item.owner_phone,
-      ownerEmail: item.owner_email,
+      ownerName:
+        owners.length > 1
+          ? `${primaryOwner?.fullName ?? "Propietario principal"} + ${owners.length - 1} copropietario${owners.length > 2 ? "s" : ""}`
+          : rosterOwnerName,
+      ownerPhone: primaryOwner?.phone ?? item.owner_phone,
+      ownerEmail: primaryOwner?.email ?? item.owner_email,
       managementFeePercent: Number(item.management_fee_percent ?? 0),
       monthlyOwnerCosts: Number(item.monthly_owner_costs ?? 0),
       ownerNotes: item.owner_notes ?? "",
@@ -1246,7 +1392,7 @@ export async function listOwnerSettlements(options?: { agencySlug?: string; limi
   let query = admin
     .from("owner_settlements")
     .select(
-      "id, contract_id, property_id, agency_id, settlement_month, owner_name, owner_email, owner_phone, rent_collected, management_fee_percent, management_fee_amount, monthly_owner_costs, other_charges_amount, other_charges_detail, owner_payout_amount, status, sent_at, paid_at, created_at, agencies!inner(slug), properties!inner(title, location)"
+      "id, contract_id, contract_owner_id, property_id, agency_id, settlement_month, owner_name, owner_email, owner_phone, participation_percent, rent_collected, management_fee_percent, management_fee_amount, monthly_owner_costs, other_charges_amount, other_charges_detail, owner_payout_amount, status, sent_at, paid_at, created_at, agencies!inner(slug), properties!inner(title, location)"
     )
     .order("created_at", { ascending: false })
     .limit(options?.limit ?? 16);
@@ -1267,6 +1413,44 @@ export async function listOwnerSettlements(options?: { agencySlug?: string; limi
   return ((data ?? []) as Array<OwnerSettlementRow & {
     agencies: { slug: string } | { slug: string }[] | null;
   }>).map(mapOwnerSettlement);
+}
+
+export async function listOwnerSettlementItems(options?: {
+  settlementId?: string;
+  contractId?: string;
+  agencySlug?: string;
+  limit?: number;
+}) {
+  const admin = createAdminClient();
+  let query = admin
+    .from("owner_settlement_items")
+    .select("id, settlement_id, contract_id, contract_owner_id, agency_id, label, amount, effect, apply_management_fee, notes, created_at, agencies!inner(slug)")
+    .order("created_at", { ascending: false })
+    .limit(options?.limit ?? 100);
+
+  if (options?.settlementId) {
+    query = query.eq("settlement_id", options.settlementId);
+  }
+
+  if (options?.contractId) {
+    query = query.eq("contract_id", options.contractId);
+  }
+
+  if (options?.agencySlug) {
+    query = query.eq("agencies.slug", options.agencySlug);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    if (/owner_settlement_items/i.test(error.message ?? "")) {
+      return [] as OwnerSettlementItemSummary[];
+    }
+    throw error;
+  }
+
+  return ((data ?? []) as Array<OwnerSettlementItemRow & {
+    agencies: { slug: string } | { slug: string }[] | null;
+  }>).map(mapOwnerSettlementItem);
 }
 
 export async function listRentalCollections(options?: { agencySlug?: string; limit?: number }) {
@@ -1301,7 +1485,7 @@ export async function listOwnerTransfers(options?: { agencySlug?: string; limit?
   let query = admin
     .from("owner_transfers")
     .select(
-      "id, settlement_id, contract_id, property_id, agency_id, owner_name, amount, destination_label, transfer_date, status, notes, created_at, agencies!inner(slug), properties!inner(title)"
+      "id, settlement_id, contract_id, contract_owner_id, property_id, agency_id, owner_name, amount, destination_label, transfer_date, status, notes, created_at, agencies!inner(slug), properties!inner(title)"
     )
     .order("created_at", { ascending: false })
     .limit(options?.limit ?? 24);
@@ -1428,30 +1612,77 @@ export async function listContractRescissions(options?: { agencySlug?: string; l
 }
 
 export async function listOwnerRoster(options?: { agencySlug?: string }): Promise<OwnerRosterSummary[]> {
-  const leases = await listLeaseRoster(options);
-  const settlements = await listOwnerSettlements({ agencySlug: options?.agencySlug, limit: 100 });
+  const [leases, contracts, settlements] = await Promise.all([
+    listLeaseRoster(options),
+    listRentalContracts(options),
+    listOwnerSettlements({ agencySlug: options?.agencySlug, limit: 100 }),
+  ]);
 
-  return leases
-    .filter((lease) => lease.ownerName)
-    .map((lease) => {
-      const latestSettlement = settlements.find((settlement) => settlement.contractId === lease.contractId) ?? null;
-      return {
-        agencyId: lease.agencyId,
-        agencySlug: lease.agencySlug,
-        propertyId: lease.propertyId,
-        contractId: lease.contractId,
-        ownerName: lease.ownerName ?? "",
-        ownerPhone: lease.ownerPhone,
-        ownerEmail: lease.ownerEmail,
-        propertyTitle: lease.propertyTitle,
-        propertyLocation: lease.propertyLocation,
-        currentRent: lease.currentRent,
-        managementFeePercent: lease.managementFeePercent,
-        monthlyOwnerCosts: lease.monthlyOwnerCosts,
-        latestSettlementMonth: latestSettlement?.settlementMonth ?? null,
-        latestOwnerPayoutAmount: latestSettlement?.ownerPayoutAmount ?? null,
-      };
+  const contractById = new Map(contracts.map((contract) => [contract.id, contract]));
+  const roster: OwnerRosterSummary[] = [];
+
+  for (const lease of leases) {
+    const contract = contractById.get(lease.contractId);
+    const owners = contract?.owners ?? [];
+
+    if (owners.length > 0) {
+      for (const owner of owners) {
+        const latestSettlement =
+          settlements.find((settlement) => settlement.contractOwnerId === owner.id) ??
+          settlements.find(
+            (settlement) =>
+              settlement.contractId === lease.contractId && settlement.ownerName === owner.fullName
+          ) ??
+          null;
+
+        roster.push({
+          agencyId: lease.agencyId,
+          agencySlug: lease.agencySlug,
+          propertyId: lease.propertyId,
+          contractId: lease.contractId,
+          contractOwnerId: owner.id,
+          ownerName: owner.fullName,
+          ownerPhone: owner.phone,
+          ownerEmail: owner.email,
+          participationPercent: owner.participationPercent,
+          propertyTitle: lease.propertyTitle,
+          propertyLocation: lease.propertyLocation,
+          currentRent: lease.currentRent,
+          managementFeePercent: lease.managementFeePercent,
+          monthlyOwnerCosts: lease.monthlyOwnerCosts,
+          latestSettlementMonth: latestSettlement?.settlementMonth ?? null,
+          latestOwnerPayoutAmount: latestSettlement?.ownerPayoutAmount ?? null,
+        });
+      }
+      continue;
+    }
+
+    if (!lease.ownerName) {
+      continue;
+    }
+
+    const latestSettlement = settlements.find((settlement) => settlement.contractId === lease.contractId) ?? null;
+    roster.push({
+      agencyId: lease.agencyId,
+      agencySlug: lease.agencySlug,
+      propertyId: lease.propertyId,
+      contractId: lease.contractId,
+      contractOwnerId: null,
+      ownerName: lease.ownerName,
+      ownerPhone: lease.ownerPhone,
+      ownerEmail: lease.ownerEmail,
+      participationPercent: 100,
+      propertyTitle: lease.propertyTitle,
+      propertyLocation: lease.propertyLocation,
+      currentRent: lease.currentRent,
+      managementFeePercent: lease.managementFeePercent,
+      monthlyOwnerCosts: lease.monthlyOwnerCosts,
+      latestSettlementMonth: latestSettlement?.settlementMonth ?? null,
+      latestOwnerPayoutAmount: latestSettlement?.ownerPayoutAmount ?? null,
     });
+  }
+
+  return roster;
 }
 
 export async function listTenantRoster(options?: { agencySlug?: string }): Promise<TenantRosterSummary[]> {

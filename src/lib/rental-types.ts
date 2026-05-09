@@ -7,6 +7,22 @@ export type RentalNotificationStatus = "Pendiente" | "Enviado" | "Fallido";
 export type RentalNotificationChannel = "whatsapp";
 
 export type OwnerSettlementStatus = "Borrador" | "Emitida" | "Pagada";
+export type OwnerSettlementItemEffect = "Suma" | "Descuento" | "Informativo";
+
+export type ContractOwnerSummary = {
+  id: string;
+  contractId: string;
+  propertyId: string;
+  agencyId: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  participationPercent: number;
+  bankAlias: string | null;
+  bankAccount: string | null;
+  notes: string;
+  displayOrder: number;
+};
 
 export type RentalContractSummary = {
   id: string;
@@ -39,6 +55,7 @@ export type RentalContractSummary = {
   managementFeePercent: number;
   monthlyOwnerCosts: number;
   ownerNotes: string;
+  owners: ContractOwnerSummary[];
 };
 
 export type RentalAdjustmentSummary = {
@@ -71,6 +88,7 @@ export type RentalDashboardSummary = {
 export type OwnerSettlementSummary = {
   id: string;
   contractId: string;
+  contractOwnerId: string | null;
   propertyId: string;
   agencyId: string;
   ownerName: string;
@@ -79,6 +97,7 @@ export type OwnerSettlementSummary = {
   propertyTitle: string;
   propertyLocation: string;
   settlementMonth: string;
+  participationPercent: number;
   rentCollected: number;
   managementFeePercent: number;
   managementFeeAmount: number;
@@ -89,5 +108,18 @@ export type OwnerSettlementSummary = {
   status: OwnerSettlementStatus;
   sentAt: string | null;
   paidAt: string | null;
+  createdAt: string;
+};
+
+export type OwnerSettlementItemSummary = {
+  id: string;
+  settlementId: string;
+  contractId: string;
+  contractOwnerId: string | null;
+  label: string;
+  amount: number;
+  effect: OwnerSettlementItemEffect;
+  applyManagementFee: boolean;
+  notes: string;
   createdAt: string;
 };

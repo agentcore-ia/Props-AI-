@@ -41,7 +41,10 @@ export function OwnersWorkspace({
           <CardContent className="space-y-3">
             {owners.length > 0 ? (
               owners.map((owner) => (
-                <div key={owner.contractId} className="rounded-2xl border bg-background p-4">
+                <div
+                  key={`${owner.contractId}-${owner.contractOwnerId ?? owner.ownerName}`}
+                  className="rounded-2xl border bg-background p-4"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold">{owner.ownerName}</p>
@@ -50,6 +53,7 @@ export function OwnersWorkspace({
                       </p>
                     </div>
                     <div className="text-right text-sm text-muted-foreground">
+                      <p>Participacion {owner.participationPercent}%</p>
                       <p>Comision {owner.managementFeePercent}%</p>
                       <p>Gastos fijos {formatMoney(owner.monthlyOwnerCosts, "ARS")}</p>
                     </div>

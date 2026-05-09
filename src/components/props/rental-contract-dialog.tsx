@@ -9,7 +9,9 @@ import {
   CircleDollarSign,
   FileText,
   Loader2,
+  Plus,
   Sparkles,
+  Trash2,
   UploadCloud,
 } from "lucide-react";
 
@@ -28,17 +30,72 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatArsCurrency, formatMoney, formatShortDate } from "@/lib/utils";
 
+type OwnerFormRow = {
+  id?: string;
+  fullName: string;
+  phone: string;
+  email: string;
+  participationPercent: string;
+  bankAlias: string;
+  bankAccount: string;
+  notes: string;
+};
+
+function getInitialOwners(property: Property): OwnerFormRow[] {
+  if (property.rentalContract?.owners?.length) {
+    return property.rentalContract.owners.map((owner) => ({
+      id: owner.id,
+      fullName: owner.fullName,
+      phone: owner.phone ?? "",
+      email: owner.email ?? "",
+      participationPercent: String(owner.participationPercent),
+      bankAlias: owner.bankAlias ?? "",
+      bankAccount: owner.bankAccount ?? "",
+      notes: owner.notes ?? "",
+    }));
+  }
+
+  if (property.rentalContract?.ownerName) {
+    return [
+      {
+        fullName: property.rentalContract.ownerName,
+        phone: property.rentalContract.ownerPhone ?? "",
+        email: property.rentalContract.ownerEmail ?? "",
+        participationPercent: "100",
+        bankAlias: "",
+        bankAccount: "",
+        notes: property.rentalContract.ownerNotes ?? "",
+      },
+    ];
+  }
+
+  return [
+    {
+      fullName: "",
+      phone: "",
+      email: "",
+      participationPercent: "100",
+      bankAlias: "",
+      bankAccount: "",
+      notes: "",
+    },
+  ];
+}
+
 function getInitialForm(property: Property) {
+  const initialOwners = getInitialOwners(property);
+  const primaryOwner = initialOwners[0];
   return {
     tenantName: property.rentalContract?.tenantName ?? "",
     tenantPhone: property.rentalContract?.tenantPhone ?? "",
     tenantEmail: property.rentalContract?.tenantEmail ?? "",
-    ownerName: property.rentalContract?.ownerName ?? "",
-    ownerPhone: property.rentalContract?.ownerPhone ?? "",
-    ownerEmail: property.rentalContract?.ownerEmail ?? "",
     managementFeePercent: String(property.rentalContract?.managementFeePercent ?? 8),
     monthlyOwnerCosts: String(property.rentalContract?.monthlyOwnerCosts ?? 0),
-    ownerNotes: property.rentalContract?.ownerNotes ?? "",
+    ownerName: primaryOwner?.fullName ?? "",
+    ownerPhone: primaryOwner?.phone ?? "",
+    ownerEmail: primaryOwner?.email ?? "",
+    ownerNotes: primaryOwner?.notes ?? property.rentalContract?.ownerNotes ?? "",
+    owners: initialOwners,
     currentRent: property.rentalContract?.currentRent
       ? String(property.rentalContract.currentRent)
       : String(property.price),
@@ -110,21 +167,90 @@ export function RentalContractDialog({ property }: { property: Property }) {
     []
   );
 
+  function updateOwner(index: number, patch: Partial<OwnerFormRow>) {
+    setForm((prev) => ({
+      ...prev,
+      owners: prev.owners.map((owner, ownerIndex) =>
+        ownerIndex === index ? { ...owner, ...patch } : owner
+      ),
+    }));
+  }
+
+  function addOwner() {
+    setForm((prev) => ({
+      ...prev,
+      owners: [
+        ...prev.owners,
+        {
+          fullName: "",
+          phone: "",
+          email: "",
+          participationPercent: "0",
+          bankAlias: "",
+          bankAccount: "",
+          notes: "",
+        },
+      ],
+    }));
+  }
+
+  function removeOwner(index: number) {
+    setForm((prev) => ({
+      ...prev,
+      owners:
+        prev.owners.length === 1
+          ? [
+              {
+                fullName: "",
+                phone: "",
+                email: "",
+                participationPercent: "100",
+                bankAlias: "",
+                bankAccount: "",
+                notes: "",
+              },
+            ]
+          : prev.owners.filter((_, ownerIndex) => ownerIndex !== index),
+    }));
+  }
+
   async function handleSave() {
     setSubmitting(true);
     setError(null);
 
+    const sanitizedOwners = form.owners
+      .map((owner, index) => ({
+        id: owner.id,
+        fullName: owner.fullName.trim(),
+        phone: owner.phone.trim() || null,
+        email: owner.email.trim() || null,
+        participationPercent: Number(owner.participationPercent || 0),
+        bankAlias: owner.bankAlias.trim() || null,
+        bankAccount: owner.bankAccount.trim() || null,
+        notes: owner.notes.trim(),
+        displayOrder: index,
+      }))
+      .filter((owner) => owner.fullName);
+
+    if (sanitizedOwners.length === 0) {
+      setSubmitting(false);
+      setError("Carga al menos un propietario para poder liquidar el alquiler.");
+      return;
+    }
+
     const body = new FormData();
+    const primaryOwner = sanitizedOwners[0];
     body.set("propertyId", property.id);
     body.set("tenantName", form.tenantName);
     body.set("tenantPhone", form.tenantPhone);
     body.set("tenantEmail", form.tenantEmail);
-    body.set("ownerName", form.ownerName);
-    body.set("ownerPhone", form.ownerPhone);
-    body.set("ownerEmail", form.ownerEmail);
+    body.set("ownerName", primaryOwner.fullName);
+    body.set("ownerPhone", primaryOwner.phone ?? "");
+    body.set("ownerEmail", primaryOwner.email ?? "");
     body.set("managementFeePercent", form.managementFeePercent);
     body.set("monthlyOwnerCosts", form.monthlyOwnerCosts);
-    body.set("ownerNotes", form.ownerNotes);
+    body.set("ownerNotes", primaryOwner.notes ?? "");
+    body.set("ownersPayload", JSON.stringify(sanitizedOwners));
     body.set("currentRent", form.currentRent);
     body.set("indexType", form.indexType);
     body.set("adjustmentFrequencyMonths", form.adjustmentFrequencyMonths);
@@ -166,6 +292,20 @@ export function RentalContractDialog({ property }: { property: Property }) {
     setError(null);
     setWarning(null);
 
+    const sanitizedOwners = form.owners
+      .map((owner, index) => ({
+        id: owner.id,
+        fullName: owner.fullName.trim(),
+        phone: owner.phone.trim() || null,
+        email: owner.email.trim() || null,
+        participationPercent: Number(owner.participationPercent || 0),
+        bankAlias: owner.bankAlias.trim() || null,
+        bankAccount: owner.bankAccount.trim() || null,
+        notes: owner.notes.trim(),
+        displayOrder: index,
+      }))
+      .filter((owner) => owner.fullName);
+
     const response = await fetch("/api/admin/rental-contracts", {
       method: "PATCH",
       headers: {
@@ -176,12 +316,13 @@ export function RentalContractDialog({ property }: { property: Property }) {
         tenantName: form.tenantName,
         tenantPhone: form.tenantPhone,
         tenantEmail: form.tenantEmail || null,
-        ownerName: form.ownerName || null,
-        ownerPhone: form.ownerPhone || null,
-        ownerEmail: form.ownerEmail || null,
+        ownerName: sanitizedOwners[0]?.fullName || null,
+        ownerPhone: sanitizedOwners[0]?.phone || null,
+        ownerEmail: sanitizedOwners[0]?.email || null,
         managementFeePercent: Number(form.managementFeePercent),
         monthlyOwnerCosts: Number(form.monthlyOwnerCosts),
-        ownerNotes: form.ownerNotes,
+        ownerNotes: sanitizedOwners[0]?.notes || "",
+        owners: sanitizedOwners,
         currentRent: Number(form.currentRent),
         indexType: form.indexType,
         adjustmentFrequencyMonths: Number(form.adjustmentFrequencyMonths),
@@ -372,36 +513,99 @@ export function RentalContractDialog({ property }: { property: Property }) {
               <section className="rounded-[28px] border bg-card p-5">
                 <SectionTitle
                   eyebrow="Propietario"
-                  title="Liquidacion al propietario"
-                  description="Define a quien se le liquida y que retencion aplica la inmobiliaria cada mes."
+                  title="Copropietarios y liquidacion"
+                  description="Props reparte la liquidacion por porcentaje de participacion y permite seguir el neto de cada propietario."
                 />
 
-                <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-12">
-                  <div className="space-y-2 xl:col-span-4">
-                    <label className="text-sm font-medium">Nombre del propietario</label>
-                    <Input
-                      placeholder="Carlos Perez"
-                      value={form.ownerName}
-                      onChange={(event) => setForm((prev) => ({ ...prev, ownerName: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2 xl:col-span-4">
-                    <label className="text-sm font-medium">WhatsApp del propietario</label>
-                    <Input
-                      placeholder="+54 11 5555 8888"
-                      value={form.ownerPhone}
-                      onChange={(event) => setForm((prev) => ({ ...prev, ownerPhone: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2 xl:col-span-4">
-                    <label className="text-sm font-medium">Email del propietario</label>
-                    <Input
-                      placeholder="propietario@email.com"
-                      value={form.ownerEmail}
-                      onChange={(event) => setForm((prev) => ({ ...prev, ownerEmail: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2 xl:col-span-3">
+                <div className="mt-5 space-y-4">
+                  {form.owners.map((owner, index) => (
+                    <div key={`${owner.id ?? "owner"}-${index}`} className="rounded-[24px] border bg-background p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold">Propietario {index + 1}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Define contacto, porcentaje y cuenta de cobro.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="rounded-2xl"
+                          onClick={() => removeOwner(index)}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+
+                      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-12">
+                        <div className="space-y-2 xl:col-span-4">
+                          <label className="text-sm font-medium">Nombre</label>
+                          <Input
+                            placeholder="Carlos Perez"
+                            value={owner.fullName}
+                            onChange={(event) => updateOwner(index, { fullName: event.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2 xl:col-span-3">
+                          <label className="text-sm font-medium">WhatsApp</label>
+                          <Input
+                            placeholder="+54 11 5555 8888"
+                            value={owner.phone}
+                            onChange={(event) => updateOwner(index, { phone: event.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2 xl:col-span-3">
+                          <label className="text-sm font-medium">Email</label>
+                          <Input
+                            placeholder="propietario@email.com"
+                            value={owner.email}
+                            onChange={(event) => updateOwner(index, { email: event.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2 xl:col-span-2">
+                          <label className="text-sm font-medium">% participacion</label>
+                          <Input
+                            placeholder="50"
+                            value={owner.participationPercent}
+                            onChange={(event) => updateOwner(index, { participationPercent: event.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2 xl:col-span-3">
+                          <label className="text-sm font-medium">Alias bancario</label>
+                          <Input
+                            placeholder="alias.propietario"
+                            value={owner.bankAlias}
+                            onChange={(event) => updateOwner(index, { bankAlias: event.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2 xl:col-span-3">
+                          <label className="text-sm font-medium">Cuenta / CBU</label>
+                          <Input
+                            placeholder="CBU o referencia"
+                            value={owner.bankAccount}
+                            onChange={(event) => updateOwner(index, { bankAccount: event.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2 xl:col-span-6">
+                          <label className="text-sm font-medium">Notas del propietario</label>
+                          <Input
+                            placeholder="Ej: retencion especial, condicion comercial o instruccion de pago."
+                            value={owner.notes}
+                            onChange={(event) => updateOwner(index, { notes: event.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <Button type="button" variant="outline" className="rounded-2xl" onClick={addOwner}>
+                    <Plus className="size-4" />
+                    Agregar propietario
+                  </Button>
+
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-12">
+                    <div className="space-y-2 xl:col-span-3">
                     <label className="text-sm font-medium">Comision (%)</label>
                     <Input
                       placeholder="8"
@@ -421,13 +625,10 @@ export function RentalContractDialog({ property }: { property: Property }) {
                       }
                     />
                   </div>
-                  <div className="space-y-2 xl:col-span-6">
-                    <label className="text-sm font-medium">Notas para liquidacion</label>
-                    <Input
-                      placeholder="Ej: sumar seguro, administracion y gastos bancarios."
-                      value={form.ownerNotes}
-                      onChange={(event) => setForm((prev) => ({ ...prev, ownerNotes: event.target.value }))}
-                    />
+                    <div className="xl:col-span-6 rounded-[20px] border bg-muted/20 p-4 text-sm text-muted-foreground">
+                      Props toma estos datos para repartir el alquiler cobrado, descontar comision y generar una
+                      liquidacion por cada propietario.
+                    </div>
                   </div>
                 </div>
               </section>

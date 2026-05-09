@@ -20,6 +20,7 @@ export function TransfersWorkspace({
   const router = useRouter();
   const [form, setForm] = useState({
     contractId: owners[0]?.contractId ?? "",
+    contractOwnerId: owners[0]?.contractOwnerId ?? "",
     amount: owners[0]?.latestOwnerPayoutAmount ? String(owners[0].latestOwnerPayoutAmount) : "",
     destinationLabel: owners[0]?.ownerEmail || owners[0]?.ownerPhone || "",
     transferDate: new Date().toISOString().slice(0, 10),
@@ -33,6 +34,7 @@ export function TransfersWorkspace({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         contractId: form.contractId,
+        contractOwnerId: form.contractOwnerId || null,
         amount: Number(form.amount),
         destinationLabel: form.destinationLabel,
         transferDate: form.transferDate,
@@ -49,41 +51,75 @@ export function TransfersWorkspace({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Transferencias" description="Programa y controla giros a propietarios desde las liquidaciones emitidas." />
+      <PageHeader
+        title="Transferencias"
+        description="Programa y controla giros a propietarios desde las liquidaciones emitidas."
+      />
 
       <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
         <Card className="rounded-[28px] border-0 shadow-sm">
-          <CardHeader><CardTitle>Nueva transferencia</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Nueva transferencia</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3">
             <select
               className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
-              value={form.contractId}
-              onChange={(e) => {
-                const owner = owners.find((item) => item.contractId === e.target.value);
+              value={`${form.contractId}:${form.contractOwnerId || "legacy"}`}
+              onChange={(event) => {
+                const [nextContractId, nextContractOwnerId] = event.target.value.split(":");
+                const owner = owners.find(
+                  (item) =>
+                    item.contractId === nextContractId &&
+                    (item.contractOwnerId ?? "legacy") === nextContractOwnerId
+                );
                 setForm((prev) => ({
                   ...prev,
-                  contractId: e.target.value,
-                  amount: owner?.latestOwnerPayoutAmount ? String(owner.latestOwnerPayoutAmount) : prev.amount,
+                  contractId: nextContractId,
+                  contractOwnerId: owner?.contractOwnerId ?? "",
+                  amount: owner?.latestOwnerPayoutAmount
+                    ? String(owner.latestOwnerPayoutAmount)
+                    : prev.amount,
                   destinationLabel: owner?.ownerEmail || owner?.ownerPhone || prev.destinationLabel,
                 }));
               }}
             >
               {owners.map((owner) => (
-                <option key={owner.contractId} value={owner.contractId}>
-                  {owner.ownerName} · {owner.propertyTitle}
+                <option
+                  key={`${owner.contractId}-${owner.contractOwnerId ?? owner.ownerName}`}
+                  value={`${owner.contractId}:${owner.contractOwnerId ?? "legacy"}`}
+                >
+                  {owner.ownerName} ({owner.participationPercent}%) · {owner.propertyTitle}
                 </option>
               ))}
             </select>
-            <Input placeholder="Monto" value={form.amount} onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))} />
-            <Input placeholder="Destino" value={form.destinationLabel} onChange={(e) => setForm((p) => ({ ...p, destinationLabel: e.target.value }))} />
-            <Input type="date" value={form.transferDate} onChange={(e) => setForm((p) => ({ ...p, transferDate: e.target.value }))} />
-            <Button className="rounded-2xl" disabled={!form.contractId} onClick={createTransfer}>Registrar transferencia</Button>
+            <Input
+              placeholder="Monto"
+              value={form.amount}
+              onChange={(event) => setForm((prev) => ({ ...prev, amount: event.target.value }))}
+            />
+            <Input
+              placeholder="Destino"
+              value={form.destinationLabel}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, destinationLabel: event.target.value }))
+              }
+            />
+            <Input
+              type="date"
+              value={form.transferDate}
+              onChange={(event) => setForm((prev) => ({ ...prev, transferDate: event.target.value }))}
+            />
+            <Button className="rounded-2xl" disabled={!form.contractId} onClick={createTransfer}>
+              Registrar transferencia
+            </Button>
             {feedback ? <p className="text-sm text-muted-foreground">{feedback}</p> : null}
           </CardContent>
         </Card>
 
         <Card className="rounded-[28px] border-0 shadow-sm">
-          <CardHeader><CardTitle>Transferencias recientes</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Transferencias recientes</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3">
             {transfers.length > 0 ? (
               transfers.map((transfer) => (
@@ -113,5 +149,9 @@ export function TransfersWorkspace({
 }
 
 function EmptyBox({ text }: { text: string }) {
-  return <div className="rounded-2xl border border-dashed bg-background p-4 text-sm text-muted-foreground">{text}</div>;
+  return (
+    <div className="rounded-2xl border border-dashed bg-background p-4 text-sm text-muted-foreground">
+      {text}
+    </div>
+  );
 }
