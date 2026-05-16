@@ -36,6 +36,21 @@ type AssistantActionResult = {
   details: string;
 };
 
+type AssistantPlan = {
+  action: AssistantAction;
+  confidence: number;
+  needsClarification: boolean;
+  clarificationQuestion: string | null;
+  contractId: string | null;
+  contractQuery: string | null;
+  amount: number | null;
+  paymentMethod: string | null;
+  settlementMonth: string | null;
+  cashKind: "Ingreso" | "Egreso" | null;
+  cashCategory: string | null;
+  notes: string | null;
+};
+
 type AssistantContractContext = {
   contractId: string;
   propertyId: string;
@@ -87,6 +102,52 @@ function currentMonthLabel() {
   return new Date().toISOString().slice(0, 7);
 }
 
+function safeJsonParse<T>(value: string): T | null {
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    const match = value.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]) as T;
+    } catch {
+      return null;
+    }
+  }
+}
+
+function sanitizeAssistantAction(value: unknown): AssistantAction {
+  const allowed: AssistantAction[] = [
+    "answer",
+    "register_collection",
+    "generate_settlement",
+    "record_transfer",
+    "record_cash_movement",
+    "start_rescission",
+  ];
+  return allowed.includes(value as AssistantAction) ? (value as AssistantAction) : "answer";
+}
+
+function sanitizeAssistantPlan(value: Partial<AssistantPlan> | null, fallbackAction: AssistantAction): AssistantPlan {
+  return {
+    action: sanitizeAssistantAction(value?.action ?? fallbackAction),
+    confidence: Math.max(0, Math.min(1, Number(value?.confidence ?? 0))),
+    needsClarification: Boolean(value?.needsClarification),
+    clarificationQuestion: typeof value?.clarificationQuestion === "string" ? value.clarificationQuestion.trim() || null : null,
+    contractId: typeof value?.contractId === "string" ? value.contractId.trim() || null : null,
+    contractQuery: typeof value?.contractQuery === "string" ? value.contractQuery.trim() || null : null,
+    amount: Number.isFinite(Number(value?.amount)) && Number(value?.amount) > 0 ? Number(value?.amount) : null,
+    paymentMethod: typeof value?.paymentMethod === "string" ? value.paymentMethod.trim() || null : null,
+    settlementMonth:
+      typeof value?.settlementMonth === "string" && /^\d{4}-\d{2}$/.test(value.settlementMonth)
+        ? value.settlementMonth
+        : null,
+    cashKind: value?.cashKind === "Ingreso" || value?.cashKind === "Egreso" ? value.cashKind : null,
+    cashCategory: typeof value?.cashCategory === "string" ? value.cashCategory.trim() || null : null,
+    notes: typeof value?.notes === "string" ? value.notes.trim() || null : null,
+  };
+}
+
 function inferAssistantAction(prompt: string): AssistantAction {
   const normalized = normalizeText(prompt);
 
@@ -115,41 +176,6 @@ function inferAssistantAction(prompt: string): AssistantAction {
   }
 
   return "answer";
-}
-
-function getDeterministicHelp(prompt: string) {
-  const normalized = normalizeText(prompt);
-
-  if (normalized.includes("liquidacion") && normalized.includes("propiet")) {
-    return [
-      "Para generar una liquidacion al propietario:",
-      "1. Primero registra la cobranza del inquilino en Cobranzas.",
-      "2. Anda a Alquileres y verifica que el contrato tenga propietario, porcentaje y comision.",
-      "3. Toca Generar liquidaciones del mes o Liquidar propietario en ese contrato.",
-      "4. Si hace falta, agrega conceptos particulares como arreglos, honorarios o descuentos.",
-      "5. Luego podes registrar la transferencia al propietario desde Transferencias.",
-      "",
-      "Tambien podes pedirmelo directo, por ejemplo: genera la liquidacion del propietario de Maria Gomez.",
-    ].join("\n");
-  }
-
-  if (normalized.includes("cobranza") || normalized.includes("pago") || normalized.includes("alquiler")) {
-    return [
-      "Para registrar un pago de alquiler podes hacerlo desde Cobranzas o pedirmelo aca.",
-      "Ejemplo: ya pago Maria Gomez el alquiler de este mes.",
-      "Si no indicas monto, uso el alquiler actual del contrato. Si hay mas de un contrato parecido, te voy a pedir que aclares cual es.",
-    ].join("\n");
-  }
-
-  if (normalized.includes("caja")) {
-    return [
-      "Para registrar caja, decime si es ingreso o egreso, el monto y el motivo.",
-      "Ejemplo: registra un gasto de caja de 25000 por cerrajeria.",
-      "Eso queda asentado en la seccion Caja como movimiento operativo.",
-    ].join("\n");
-  }
-
-  return null;
 }
 
 function buildSectionGuide() {
@@ -223,6 +249,18 @@ function resolveContractFromPrompt(prompt: string, contracts: AssistantContractC
   return { contract: scored[0].contract, alternatives };
 }
 
+function resolveContractFromPlan(plan: AssistantPlan, prompt: string, contracts: AssistantContractContext[]) {
+  if (plan.contractId) {
+    const selected = contracts.find((contract) => contract.contractId === plan.contractId);
+    if (selected) {
+      return { contract: selected, alternatives: [selected] };
+    }
+  }
+
+  const query = [plan.contractQuery, prompt].filter(Boolean).join(" ");
+  return resolveContractFromPrompt(query, contracts);
+}
+
 async function callInternalAction(request: Request, path: string, body: Record<string, unknown>, method = "POST") {
   const origin = new URL(request.url).origin;
   const response = await fetch(`${origin}${path}`, {
@@ -237,6 +275,104 @@ async function callInternalAction(request: Request, path: string, body: Record<s
 
   const payload = await response.json().catch(() => null);
   return { ok: response.ok, payload, status: response.status };
+}
+
+async function planWithOpenAI(input: {
+  openAI: ReturnType<typeof getOpenAIEnv>;
+  prompt: string;
+  history: AssistantHistoryItem[];
+  contracts: AssistantContractContext[];
+  sectionGuide: string;
+}) {
+  const historyContext = input.history
+    .slice(-8)
+    .map((item) => `${item.role === "assistant" ? "Props AI" : "Equipo"}: ${clip(item.content, 500)}`)
+    .join("\n");
+
+  const contractsContext =
+    input.contracts.length > 0
+      ? input.contracts
+          .slice(0, 30)
+          .map(
+            (contract) =>
+              `- id=${contract.contractId} | inquilino=${contract.tenantName} | propiedad=${contract.propertyTitle} | ubicacion=${contract.propertyLocation} | alquiler=${contract.currentRent} | propietario=${contract.ownerName ?? "sin definir"}`
+          )
+          .join("\n")
+      : "No hay contratos cargados.";
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${input.openAI.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: input.openAI.model,
+      input: [
+        {
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text: [
+                "Sos el planificador interno de Props AI para un CRM inmobiliario.",
+                "Tu tarea NO es responder al usuario final, sino decidir si la consulta es una pregunta o una accion real del sistema.",
+                "Usa solamente los contratos listados. Nunca inventes contratos, propiedades, propietarios, montos ni IDs.",
+                "Si el usuario pregunta como hacer algo, la accion es answer.",
+                "Si el usuario pide ejecutar algo o informa un hecho operativo, elegi la accion real correspondiente.",
+                "Si falta un dato critico para ejecutar sin riesgo, marca needsClarification=true y escribe una pregunta concreta.",
+                "Devolve solo JSON valido, sin markdown.",
+              ].join(" "),
+            },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: [
+                "Acciones permitidas:",
+                "- answer: responder una duda, explicar una seccion o analizar informacion.",
+                "- register_collection: registrar que un inquilino pago alquiler.",
+                "- generate_settlement: generar liquidacion al propietario.",
+                "- record_transfer: registrar transferencia al propietario.",
+                "- record_cash_movement: registrar ingreso/egreso de caja.",
+                "- start_rescission: iniciar rescision de contrato.",
+                "",
+                "Formato JSON exacto:",
+                '{"action":"answer","confidence":0.0,"needsClarification":false,"clarificationQuestion":null,"contractId":null,"contractQuery":null,"amount":null,"paymentMethod":null,"settlementMonth":null,"cashKind":null,"cashCategory":null,"notes":null}',
+                "",
+                "Reglas:",
+                "- Para pagos de alquiler, si el contrato esta claro pero no hay monto, amount=null para usar el alquiler actual.",
+                "- Para caja, no pidas contrato. Extrae cashKind Ingreso/Egreso, amount y cashCategory.",
+                "- Para liquidaciones, transferencias y rescisiones, intenta elegir contractId si el contrato aparece en la lista.",
+                "- settlementMonth debe ser YYYY-MM o null.",
+                "- contractQuery puede ser nombre de inquilino, propiedad, direccion o barrio mencionado.",
+                "",
+                `Guia de secciones:\n${input.sectionGuide}`,
+                "",
+                `Contratos disponibles:\n${contractsContext}`,
+                "",
+                `Historial reciente:\n${historyContext || "Sin historial previo."}`,
+                "",
+                `Consulta actual:\n${input.prompt}`,
+              ].join("\n"),
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    console.error("[dashboard-assistant] planning failed", { detail });
+    return null;
+  }
+
+  const payload = (await response.json()) as { output_text?: string };
+  return sanitizeAssistantPlan(safeJsonParse<Partial<AssistantPlan>>(payload.output_text ?? ""), inferAssistantAction(input.prompt));
 }
 
 async function answerWithOpenAI(input: {
@@ -367,18 +503,36 @@ export async function POST(request: Request) {
     .join("\n");
 
   const openAI = getOpenAIEnv();
-  const inferredAction = inferAssistantAction(prompt);
-  const deterministicHelp = inferredAction === "answer" ? getDeterministicHelp(prompt) : null;
+  const fallbackAction = inferAssistantAction(prompt);
+  const plan = openAI.configured
+    ? await planWithOpenAI({
+        openAI,
+        prompt,
+        history,
+        contracts: assistantContracts,
+        sectionGuide: buildSectionGuide(),
+      })
+    : sanitizeAssistantPlan(null, fallbackAction);
+  const inferredAction = plan?.action ?? fallbackAction;
 
-  if (deterministicHelp) {
+  if (plan?.needsClarification && plan.clarificationQuestion) {
     return NextResponse.json({
-      reply: deterministicHelp,
+      reply: plan.clarificationQuestion,
       configured: openAI.configured,
+      actionResult:
+        inferredAction === "answer"
+          ? null
+          : ({
+              type: inferredAction,
+              status: "clarify",
+              title: "Falta un dato para avanzar",
+              details: plan.clarificationQuestion,
+            } satisfies AssistantActionResult),
     });
   }
 
   if (current.profile.role !== "superadmin" && inferredAction === "record_cash_movement") {
-    const amount = extractAmount(prompt);
+    const amount = plan?.amount ?? extractAmount(prompt);
     if (!amount) {
       return NextResponse.json({
         reply: "Para registrar un movimiento de caja necesito al menos el monto. Ejemplo: registra un gasto de caja de 25000 por cerrajeria.",
@@ -393,16 +547,18 @@ export async function POST(request: Request) {
     }
 
     const normalized = normalizeText(prompt);
-    const kind = normalized.includes("egreso") || normalized.includes("gasto") ? "Egreso" : "Ingreso";
-    const category = normalized.includes("cerrajer")
-      ? "Cerrajeria"
-      : normalized.includes("luz") || normalized.includes("edenor")
-        ? "Servicios"
-        : normalized.includes("gas")
+    const kind = plan?.cashKind ?? (normalized.includes("egreso") || normalized.includes("gasto") ? "Egreso" : "Ingreso");
+    const category =
+      plan?.cashCategory ??
+      (normalized.includes("cerrajer")
+        ? "Cerrajeria"
+        : normalized.includes("luz") || normalized.includes("edenor")
           ? "Servicios"
-          : normalized.includes("honorario")
-            ? "Honorarios"
-            : "Movimiento manual";
+          : normalized.includes("gas")
+            ? "Servicios"
+            : normalized.includes("honorario")
+              ? "Honorarios"
+              : "Movimiento manual");
 
     const admin = createAdminClient();
     const { data: agency, error: agencyError } = await admin
@@ -431,7 +587,7 @@ export async function POST(request: Request) {
       category,
       amount,
       reference: prompt,
-      notes: `Registrado por Props AI desde dashboard: ${prompt}`,
+      notes: plan?.notes ?? `Registrado por Props AI desde dashboard: ${prompt}`,
       created_by: current.user.id,
     });
 
@@ -461,7 +617,7 @@ export async function POST(request: Request) {
   }
 
   if (current.profile.role !== "superadmin" && inferredAction !== "answer") {
-    const { contract, alternatives } = resolveContractFromPrompt(prompt, assistantContracts);
+    const { contract, alternatives } = resolveContractFromPlan(plan ?? sanitizeAssistantPlan(null, inferredAction), prompt, assistantContracts);
 
     if (!contract) {
       const alternativesLabel =
@@ -482,8 +638,8 @@ export async function POST(request: Request) {
     }
 
     if (inferredAction === "register_collection") {
-      const collectedAmount = extractAmount(prompt) ?? contract.currentRent;
-      const paymentMethod = extractPaymentMethod(prompt);
+      const collectedAmount = plan?.amount ?? extractAmount(prompt) ?? contract.currentRent;
+      const paymentMethod = plan?.paymentMethod ?? extractPaymentMethod(prompt);
       const status = collectedAmount >= contract.currentRent ? "Cobrada" : collectedAmount > 0 ? "Parcial" : "Pendiente";
       const admin = createAdminClient();
       const { error: upsertError } = await admin.from("rental_collections").upsert(
@@ -491,13 +647,13 @@ export async function POST(request: Request) {
           contract_id: contract.contractId,
           property_id: contract.propertyId,
           agency_id: contract.agencyId,
-          collection_month: currentMonthLabel(),
+          collection_month: plan?.settlementMonth ?? currentMonthLabel(),
           expected_rent: contract.currentRent,
           collected_amount: collectedAmount,
           payment_method: paymentMethod,
           payment_date: new Date().toISOString().slice(0, 10),
           status,
-          notes: `Registrado por Props AI desde dashboard: ${prompt}`,
+          notes: plan?.notes ?? `Registrado por Props AI desde dashboard: ${prompt}`,
           created_by: current.user.id,
         },
         { onConflict: "contract_id,collection_month" }
@@ -534,6 +690,7 @@ export async function POST(request: Request) {
         "/api/admin/owner-settlements",
         {
           contractId: contract.contractId,
+          settlementMonth: plan?.settlementMonth ?? undefined,
         },
         "POST"
       );
@@ -564,14 +721,14 @@ export async function POST(request: Request) {
     }
 
     if (inferredAction === "record_transfer") {
-      const amount = extractAmount(prompt) ?? null;
+      const amount = plan?.amount ?? extractAmount(prompt) ?? null;
       const result = await callInternalAction(
         request,
         "/api/admin/owner-transfers",
         {
           contractId: contract.contractId,
           amount,
-          notes: `Registrado por Props AI desde dashboard: ${prompt}`,
+          notes: plan?.notes ?? `Registrado por Props AI desde dashboard: ${prompt}`,
         },
         "POST"
       );
