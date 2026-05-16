@@ -13,6 +13,7 @@ import {
   listRentalContracts,
   listVisitAppointments,
 } from "@/lib/props-data";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { formatMoney } from "@/lib/utils";
 
 type AssistantHistoryItem = {
@@ -37,6 +38,8 @@ type AssistantActionResult = {
 
 type AssistantContractContext = {
   contractId: string;
+  propertyId: string;
+  agencyId: string;
   tenantName: string;
   propertyTitle: string;
   propertyLocation: string;
@@ -80,6 +83,10 @@ function extractPaymentMethod(prompt: string) {
   return "Transferencia";
 }
 
+function currentMonthLabel() {
+  return new Date().toISOString().slice(0, 7);
+}
+
 function inferAssistantAction(prompt: string): AssistantAction {
   const normalized = normalizeText(prompt);
 
@@ -110,6 +117,41 @@ function inferAssistantAction(prompt: string): AssistantAction {
   return "answer";
 }
 
+function getDeterministicHelp(prompt: string) {
+  const normalized = normalizeText(prompt);
+
+  if (normalized.includes("liquidacion") && normalized.includes("propiet")) {
+    return [
+      "Para generar una liquidacion al propietario:",
+      "1. Primero registra la cobranza del inquilino en Cobranzas.",
+      "2. Anda a Alquileres y verifica que el contrato tenga propietario, porcentaje y comision.",
+      "3. Toca Generar liquidaciones del mes o Liquidar propietario en ese contrato.",
+      "4. Si hace falta, agrega conceptos particulares como arreglos, honorarios o descuentos.",
+      "5. Luego podes registrar la transferencia al propietario desde Transferencias.",
+      "",
+      "Tambien podes pedirmelo directo, por ejemplo: genera la liquidacion del propietario de Maria Gomez.",
+    ].join("\n");
+  }
+
+  if (normalized.includes("cobranza") || normalized.includes("pago") || normalized.includes("alquiler")) {
+    return [
+      "Para registrar un pago de alquiler podes hacerlo desde Cobranzas o pedirmelo aca.",
+      "Ejemplo: ya pago Maria Gomez el alquiler de este mes.",
+      "Si no indicas monto, uso el alquiler actual del contrato. Si hay mas de un contrato parecido, te voy a pedir que aclares cual es.",
+    ].join("\n");
+  }
+
+  if (normalized.includes("caja")) {
+    return [
+      "Para registrar caja, decime si es ingreso o egreso, el monto y el motivo.",
+      "Ejemplo: registra un gasto de caja de 25000 por cerrajeria.",
+      "Eso queda asentado en la seccion Caja como movimiento operativo.",
+    ].join("\n");
+  }
+
+  return null;
+}
+
 function buildSectionGuide() {
   return [
     "Dashboard: muestra urgencias, tareas, visitas, seguimientos automaticos y actividad reciente.",
@@ -134,6 +176,8 @@ function buildContractsForAssistant(input: {
     const lease = leaseById.get(contract.id);
     return {
       contractId: contract.id,
+      propertyId: contract.propertyId,
+      agencyId: contract.agencyId,
       tenantName: contract.tenantName,
       propertyTitle: lease?.propertyTitle ?? "Propiedad",
       propertyLocation: lease?.propertyLocation ?? "",
@@ -324,6 +368,14 @@ export async function POST(request: Request) {
 
   const openAI = getOpenAIEnv();
   const inferredAction = inferAssistantAction(prompt);
+  const deterministicHelp = inferredAction === "answer" ? getDeterministicHelp(prompt) : null;
+
+  if (deterministicHelp) {
+    return NextResponse.json({
+      reply: deterministicHelp,
+      configured: openAI.configured,
+    });
+  }
 
   if (current.profile.role !== "superadmin" && inferredAction === "record_cash_movement") {
     const amount = extractAmount(prompt);
@@ -352,28 +404,46 @@ export async function POST(request: Request) {
             ? "Honorarios"
             : "Movimiento manual";
 
-    const result = await callInternalAction(
-      request,
-      "/api/admin/cash-movements",
-      {
-        kind,
-        category,
-        amount,
-        reference: prompt,
-        notes: `Registrado por Props AI desde dashboard: ${prompt}`,
-      },
-      "POST"
-    );
+    const admin = createAdminClient();
+    const { data: agency, error: agencyError } = await admin
+      .from("agencies")
+      .select("id")
+      .eq("slug", current.profile.agency_slug)
+      .maybeSingle();
 
-    if (!result.ok) {
+    if (agencyError || !agency) {
       return NextResponse.json({
-        reply: result.payload?.error ?? "No pude registrar el movimiento de caja.",
+        reply: "No pude registrar el movimiento porque no encontre la inmobiliaria de esta cuenta.",
         configured: openAI.configured,
         actionResult: {
           type: inferredAction,
           status: "error",
           title: "No se pudo registrar el movimiento",
-          details: result.payload?.error ?? "Revisa la configuracion de caja.",
+          details: "Revisa que tu usuario tenga una inmobiliaria asignada.",
+        } satisfies AssistantActionResult,
+      });
+    }
+
+    const { error: insertError } = await admin.from("cash_movements").insert({
+      agency_id: agency.id,
+      occurred_on: new Date().toISOString().slice(0, 10),
+      kind,
+      category,
+      amount,
+      reference: prompt,
+      notes: `Registrado por Props AI desde dashboard: ${prompt}`,
+      created_by: current.user.id,
+    });
+
+    if (insertError) {
+      return NextResponse.json({
+        reply: insertError.message,
+        configured: openAI.configured,
+        actionResult: {
+          type: inferredAction,
+          status: "error",
+          title: "No se pudo registrar el movimiento",
+          details: insertError.message,
         } satisfies AssistantActionResult,
       });
     }
@@ -414,27 +484,34 @@ export async function POST(request: Request) {
     if (inferredAction === "register_collection") {
       const collectedAmount = extractAmount(prompt) ?? contract.currentRent;
       const paymentMethod = extractPaymentMethod(prompt);
-      const result = await callInternalAction(
-        request,
-        "/api/admin/rental-collections",
+      const status = collectedAmount >= contract.currentRent ? "Cobrada" : collectedAmount > 0 ? "Parcial" : "Pendiente";
+      const admin = createAdminClient();
+      const { error: upsertError } = await admin.from("rental_collections").upsert(
         {
-          contractId: contract.contractId,
-          collectedAmount,
-          paymentMethod,
+          contract_id: contract.contractId,
+          property_id: contract.propertyId,
+          agency_id: contract.agencyId,
+          collection_month: currentMonthLabel(),
+          expected_rent: contract.currentRent,
+          collected_amount: collectedAmount,
+          payment_method: paymentMethod,
+          payment_date: new Date().toISOString().slice(0, 10),
+          status,
           notes: `Registrado por Props AI desde dashboard: ${prompt}`,
+          created_by: current.user.id,
         },
-        "POST"
+        { onConflict: "contract_id,collection_month" }
       );
 
-      if (!result.ok) {
+      if (upsertError) {
         return NextResponse.json({
-          reply: result.payload?.error ?? "No pude registrar la cobranza.",
+          reply: upsertError.message,
           configured: openAI.configured,
           actionResult: {
             type: inferredAction,
             status: "error",
             title: "No se pudo registrar el pago",
-            details: result.payload?.error ?? "Revisa el contrato o intenta desde Cobranzas.",
+            details: upsertError.message,
           } satisfies AssistantActionResult,
         });
       }
