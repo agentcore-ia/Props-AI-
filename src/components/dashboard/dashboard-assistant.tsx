@@ -194,7 +194,8 @@ export function DashboardAssistant() {
         content:
           response.ok
             ? payload?.reply ?? "No pude responder esta vez."
-            : payload?.error ?? "No se pudo completar la consulta al asistente.",
+            : [payload?.error, payload?.detail].filter(Boolean).join("\n") ||
+              "No se pudo completar la consulta al asistente.",
         actionResult: payload?.actionResult ?? null,
       };
 

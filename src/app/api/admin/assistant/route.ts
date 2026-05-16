@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
 import { getAgencyScopeFromUser } from "@/lib/crm-automation";
-import { suggestAssistantFallback } from "@/lib/crm-insights";
 import { getOpenAIEnv } from "@/lib/openai-env";
 import {
   getTodayWorkspaceSnapshot,
@@ -19,6 +18,16 @@ import { formatMoney } from "@/lib/utils";
 type AssistantHistoryItem = {
   role: "assistant" | "user";
   content: string;
+};
+
+type OpenAIResponsePayload = {
+  output_text?: string;
+  output?: Array<{
+    content?: Array<{
+      text?: string;
+      type?: string;
+    }>;
+  }>;
 };
 
 type AssistantAction =
@@ -146,6 +155,20 @@ function sanitizeAssistantPlan(value: Partial<AssistantPlan> | null, fallbackAct
     cashCategory: typeof value?.cashCategory === "string" ? value.cashCategory.trim() || null : null,
     notes: typeof value?.notes === "string" ? value.notes.trim() || null : null,
   };
+}
+
+function extractOpenAIText(payload: OpenAIResponsePayload) {
+  if (payload.output_text?.trim()) {
+    return payload.output_text.trim();
+  }
+
+  return (
+    payload.output
+      ?.flatMap((item) => item.content ?? [])
+      .map((item) => item.text ?? "")
+      .join("\n")
+      .trim() ?? ""
+  );
 }
 
 function inferAssistantAction(prompt: string): AssistantAction {
@@ -371,8 +394,8 @@ async function planWithOpenAI(input: {
     return null;
   }
 
-  const payload = (await response.json()) as { output_text?: string };
-  return sanitizeAssistantPlan(safeJsonParse<Partial<AssistantPlan>>(payload.output_text ?? ""), inferAssistantAction(input.prompt));
+  const payload = (await response.json()) as OpenAIResponsePayload;
+  return sanitizeAssistantPlan(safeJsonParse<Partial<AssistantPlan>>(extractOpenAIText(payload)), inferAssistantAction(input.prompt));
 }
 
 async function answerWithOpenAI(input: {
@@ -429,8 +452,8 @@ async function answerWithOpenAI(input: {
     return { ok: false, error: detail };
   }
 
-  const payload = (await response.json()) as { output_text?: string };
-  return { ok: true, reply: payload.output_text?.trim() ?? "" };
+  const payload = (await response.json()) as OpenAIResponsePayload;
+  return { ok: true, reply: extractOpenAIText(payload) };
 }
 
 export async function POST(request: Request) {
@@ -503,16 +526,27 @@ export async function POST(request: Request) {
     .join("\n");
 
   const openAI = getOpenAIEnv();
+
+  if (!openAI.configured) {
+    console.error("[dashboard-assistant] OpenAI is not configured");
+    return NextResponse.json(
+      {
+        error: "OpenAI no esta configurado para el asistente del dashboard.",
+        detail: "Falta OPENAI_API_KEY en el entorno de produccion. El asistente no va a responder con textos genericos porque podria confundir al equipo.",
+        configured: false,
+      },
+      { status: 503 }
+    );
+  }
+
   const fallbackAction = inferAssistantAction(prompt);
-  const plan = openAI.configured
-    ? await planWithOpenAI({
-        openAI,
-        prompt,
-        history,
-        contracts: assistantContracts,
-        sectionGuide: buildSectionGuide(),
-      })
-    : sanitizeAssistantPlan(null, fallbackAction);
+  const plan = await planWithOpenAI({
+    openAI,
+    prompt,
+    history,
+    contracts: assistantContracts,
+    sectionGuide: buildSectionGuide(),
+  });
   const inferredAction = plan?.action ?? fallbackAction;
 
   if (plan?.needsClarification && plan.clarificationQuestion) {
@@ -797,19 +831,6 @@ export async function POST(request: Request) {
     }
   }
 
-  if (!openAI.configured) {
-    return NextResponse.json({
-      reply: suggestAssistantFallback({
-        prompt,
-        leads,
-        tasks,
-        visits,
-        properties,
-      }),
-      configured: false,
-    });
-  }
-
   const answer = await answerWithOpenAI({
     openAI,
     prompt,
@@ -827,16 +848,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No se pudo consultar OpenAI.", detail: answer.error }, { status: 502 });
   }
 
+  if (!answer.reply) {
+    console.error("[dashboard-assistant] OpenAI returned empty answer", { prompt });
+    return NextResponse.json(
+      {
+        error: "OpenAI devolvio una respuesta vacia.",
+        detail: "El asistente no va a usar respuestas genericas. Revisa el modelo OPENAI_MODEL o los logs de la API.",
+      },
+      { status: 502 }
+    );
+  }
+
   return NextResponse.json({
-    reply:
-      answer.reply ||
-      suggestAssistantFallback({
-        prompt,
-        leads,
-        tasks,
-        visits,
-        properties,
-      }),
+    reply: answer.reply,
     configured: true,
   });
 }
