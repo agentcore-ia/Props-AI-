@@ -106,7 +106,7 @@ export function CollectionsWorkspace({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Cobranzas"
+        title="Cobros de alquiler"
         description="Un flujo simple: registras el pago del inquilino y Props deja lista la liquidacion del propietario."
       />
 

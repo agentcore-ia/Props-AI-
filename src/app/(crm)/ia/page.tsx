@@ -5,8 +5,8 @@ export default function IAPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Centro IA"
-        description="Un espacio estilo copiloto para ensayar prompts, automatizaciones y respuestas comerciales antes de conectar modelos reales."
+        title="Asistente Props"
+        description="Un espacio para resolver dudas del equipo, preparar respuestas, resumir contratos y ejecutar tareas operativas sin buscar en varias secciones."
       />
       <AIChat />
     </div>

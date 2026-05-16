@@ -311,7 +311,7 @@ export function AgencySettingsWorkspace({
     }
 
     setSaving(false);
-    setSaveSuccess("Configuracion guardada.");
+    setSaveSuccess("Ajustes guardados.");
     setForm((prev) => ({
       ...prev,
       messagingInstance: payload?.agency?.messaging_instance ?? prev.messagingInstance,
@@ -355,7 +355,7 @@ export function AgencySettingsWorkspace({
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Configuracion"
+        title="Ajustes"
         description="Ajusta los datos operativos de la inmobiliaria y deja conectado su WhatsApp para responder consultas y enviar avisos."
       />
 

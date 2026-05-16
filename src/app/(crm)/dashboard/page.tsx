@@ -51,7 +51,7 @@ const adminQuickActions = [
   },
   {
     href: "/configuracion",
-    title: "Configuracion",
+    title: "Ajustes",
     description: "Ajustar integraciones, WhatsApp y parametros generales de la plataforma.",
     icon: Settings,
   },

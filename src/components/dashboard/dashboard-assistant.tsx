@@ -57,14 +57,14 @@ const sectionPresets: Array<{
   },
   {
     match: (pathname) => pathname.startsWith("/transferencias"),
-    title: "Asistente de transferencias",
-    description: "Sirve para registrar pagos a propietarios y seguir lo que falta transferir.",
-    placeholder: "Ej. registra la transferencia al propietario de Caballito por 450000...",
+    title: "Asistente de pagos a propietarios",
+    description: "Sirve para registrar pagos a propietarios y seguir lo que falta abonar.",
+    placeholder: "Ej. registra el pago al propietario de Caballito por 450000...",
     prompts: [
-      "Registra una transferencia al propietario del depto de Caballito",
-      "Que transferencias tengo pendientes?",
-      "Como confirmo una transferencia enviada?",
-      "Explicame que diferencia hay entre programada y confirmada",
+      "Registra un pago al propietario del depto de Caballito",
+      "Que pagos a propietarios tengo pendientes?",
+      "Como confirmo un pago enviado?",
+      "Explicame que diferencia hay entre programado y confirmado",
     ],
   },
   {
@@ -130,7 +130,7 @@ const sectionPresets: Array<{
   {
     match: () => true,
     title: "Asistente de Props",
-    description: "Responde dudas y puede ejecutar acciones operativas del CRM.",
+    description: "Responde dudas y puede ejecutar acciones operativas del panel.",
     placeholder: "Ej. ya pago Lucas el alquiler, como genero una liquidacion o que tengo pendiente hoy...",
     prompts: [
       "Que tengo que hacer hoy?",
@@ -151,7 +151,7 @@ export function DashboardAssistant() {
       id: "dashboard-assistant-welcome",
       role: "assistant",
       content:
-        "Soy el asistente de Props. Puedo explicarte cualquier seccion del dashboard y ejecutar acciones como registrar un pago, una transferencia, una liquidacion o un movimiento de caja.",
+        "Soy el asistente de Props. Puedo explicarte cualquier seccion del panel y ejecutar acciones como registrar un cobro, un pago a propietario, una liquidacion o un movimiento de caja.",
     },
   ]);
 
@@ -223,7 +223,7 @@ export function DashboardAssistant() {
         id: "dashboard-assistant-welcome",
         role: "assistant",
         content:
-          "Soy el asistente de Props. Puedo explicarte cualquier seccion del dashboard y ejecutar acciones como registrar un pago, una transferencia, una liquidacion o un movimiento de caja.",
+          "Soy el asistente de Props. Puedo explicarte cualquier seccion del panel y ejecutar acciones como registrar un cobro, un pago a propietario, una liquidacion o un movimiento de caja.",
       },
     ]);
     setInput("");

@@ -42,41 +42,82 @@ import { cn } from "@/lib/utils";
 
 type AppRole = "superadmin" | "agency_admin" | "agent" | "customer";
 
-const defaultNavigation = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/propiedades", label: "Propiedades", icon: Building2 },
-  { href: "/alquileres", label: "Alquileres", icon: KeyRound },
-  { href: "/propietarios", label: "Propietarios", icon: UserRound },
-  { href: "/inquilinos", label: "Inquilinos", icon: Users },
-  { href: "/cobranzas", label: "Cobranzas", icon: Wallet },
-  { href: "/morosos", label: "Morosos", icon: CircleAlert },
-  { href: "/caja", label: "Caja", icon: Landmark },
-  { href: "/proveedores", label: "Proveedores", icon: Shield },
-  { href: "/facturacion", label: "Facturacion", icon: Receipt },
-  { href: "/transferencias", label: "Transferencias", icon: Wallet },
-  { href: "/leads", label: "Leads", icon: Users },
-  { href: "/agenda", label: "Agenda", icon: CalendarDays },
-  { href: "/mensajes", label: "Mensajes", icon: MessageSquareText },
-  { href: "/ia", label: "IA", icon: Bot },
-  { href: "/llamadas", label: "Llamadas", icon: Phone },
-  { href: "/configuracion", label: "Configuracion", icon: Settings },
+type NavigationItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+};
+
+type NavigationGroup = {
+  label: string;
+  items: NavigationItem[];
+};
+
+const defaultNavigation: NavigationGroup[] = [
+  {
+    label: "Trabajo diario",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/propiedades", label: "Propiedades", icon: Building2 },
+      { href: "/mensajes", label: "Mensajes", icon: MessageSquareText },
+      { href: "/leads", label: "Leads", icon: Users },
+      { href: "/agenda", label: "Agenda", icon: CalendarDays },
+    ],
+  },
+  {
+    label: "Administracion",
+    items: [
+      { href: "/alquileres", label: "Alquileres", icon: KeyRound },
+      { href: "/propietarios", label: "Propietarios", icon: UserRound },
+      { href: "/inquilinos", label: "Inquilinos", icon: Users },
+      { href: "/cobranzas", label: "Cobros", icon: Wallet },
+      { href: "/morosos", label: "Morosos", icon: CircleAlert },
+      { href: "/caja", label: "Caja", icon: Landmark },
+      { href: "/transferencias", label: "Pagos propietarios", icon: Wallet },
+    ],
+  },
+  {
+    label: "Gestion",
+    items: [
+      { href: "/proveedores", label: "Proveedores", icon: Shield },
+      { href: "/facturacion", label: "Facturas", icon: Receipt },
+      { href: "/ia", label: "Asistente", icon: Bot },
+      { href: "/llamadas", label: "Llamadas", icon: Phone },
+      { href: "/configuracion", label: "Ajustes", icon: Settings },
+    ],
+  },
 ];
 
-const adminNavigation = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/inmobiliarias", label: "Inmobiliarias", icon: Users },
-  { href: "/propiedades", label: "Propiedades", icon: Building2 },
-  { href: "/alquileres", label: "Alquileres", icon: KeyRound },
-  { href: "/propietarios", label: "Propietarios", icon: UserRound },
-  { href: "/inquilinos", label: "Inquilinos", icon: Users },
-  { href: "/cobranzas", label: "Cobranzas", icon: Wallet },
-  { href: "/morosos", label: "Morosos", icon: CircleAlert },
-  { href: "/caja", label: "Caja", icon: Landmark },
-  { href: "/proveedores", label: "Proveedores", icon: Shield },
-  { href: "/facturacion", label: "Facturacion", icon: Receipt },
-  { href: "/transferencias", label: "Transferencias", icon: Wallet },
-  { href: "/mensajes", label: "Mensajes", icon: MessageSquareText },
-  { href: "/configuracion", label: "Configuracion", icon: Settings },
+const adminNavigation: NavigationGroup[] = [
+  {
+    label: "Admin",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/inmobiliarias", label: "Inmobiliarias", icon: Users },
+      { href: "/configuracion", label: "Ajustes", icon: Settings },
+    ],
+  },
+  {
+    label: "Operacion",
+    items: [
+      { href: "/propiedades", label: "Propiedades", icon: Building2 },
+      { href: "/alquileres", label: "Alquileres", icon: KeyRound },
+      { href: "/propietarios", label: "Propietarios", icon: UserRound },
+      { href: "/inquilinos", label: "Inquilinos", icon: Users },
+      { href: "/cobranzas", label: "Cobros", icon: Wallet },
+      { href: "/morosos", label: "Morosos", icon: CircleAlert },
+      { href: "/caja", label: "Caja", icon: Landmark },
+      { href: "/transferencias", label: "Pagos propietarios", icon: Wallet },
+    ],
+  },
+  {
+    label: "Soporte",
+    items: [
+      { href: "/proveedores", label: "Proveedores", icon: Shield },
+      { href: "/facturacion", label: "Facturas", icon: Receipt },
+      { href: "/mensajes", label: "Mensajes", icon: MessageSquareText },
+    ],
+  },
 ];
 
 function SidebarContent({ userRole = "agency_admin" }: { userRole?: AppRole | null }) {
@@ -95,26 +136,35 @@ function SidebarContent({ userRole = "agency_admin" }: { userRole?: AppRole | nu
       </div>
 
       <div className="flex-1 overflow-y-auto px-2">
-        <nav className="space-y-0.5 pb-3">
-          {navigation.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href;
+        <nav className="space-y-3 pb-3">
+          {navigation.map((group) => (
+            <div key={group.label}>
+              <p className="px-2.5 pb-1 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map(({ href, label, icon: Icon }) => {
+                  const active = pathname === href;
 
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  "flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium transition-all",
-                  active
-                    ? "bg-primary text-primary-foreground shadow-soft"
-                    : "text-muted-foreground hover:bg-sidebar-muted hover:text-foreground"
-                )}
-              >
-                <Icon className="size-4" />
-                {label}
-              </Link>
-            );
-          })}
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={cn(
+                        "flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium transition-all",
+                        active
+                          ? "bg-primary text-primary-foreground shadow-soft"
+                          : "text-muted-foreground hover:bg-sidebar-muted hover:text-foreground"
+                      )}
+                    >
+                      <Icon className="size-4" />
+                      {label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
       </div>
     </div>

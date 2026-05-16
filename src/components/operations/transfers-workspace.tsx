@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import type { OwnerTransferSummary, OwnerRosterSummary } from "@/lib/operations-types";
+import type { OwnerRosterSummary, OwnerTransferSummary } from "@/lib/operations-types";
 import { formatMoney } from "@/lib/utils";
 
 export function TransfersWorkspace({
@@ -42,24 +42,24 @@ export function TransfersWorkspace({
     });
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
-      setFeedback(payload?.error ?? "No se pudo registrar la transferencia.");
+      setFeedback(payload?.error ?? "No se pudo registrar el pago.");
       return;
     }
-    setFeedback("Transferencia registrada.");
+    setFeedback("Pago registrado.");
     router.refresh();
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Transferencias"
-        description="Programa y controla giros a propietarios desde las liquidaciones emitidas."
+        title="Pagos a propietarios"
+        description="Registra cuando se le paga al propietario y deja trazabilidad del importe, destino y estado."
       />
 
       <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
         <Card className="rounded-[28px] border-0 shadow-sm">
           <CardHeader>
-            <CardTitle>Nueva transferencia</CardTitle>
+            <CardTitle>Registrar pago</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <select
@@ -98,7 +98,7 @@ export function TransfersWorkspace({
               onChange={(event) => setForm((prev) => ({ ...prev, amount: event.target.value }))}
             />
             <Input
-              placeholder="Destino"
+              placeholder="Destino o comprobante"
               value={form.destinationLabel}
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, destinationLabel: event.target.value }))
@@ -110,7 +110,7 @@ export function TransfersWorkspace({
               onChange={(event) => setForm((prev) => ({ ...prev, transferDate: event.target.value }))}
             />
             <Button className="rounded-2xl" disabled={!form.contractId} onClick={createTransfer}>
-              Registrar transferencia
+              Registrar pago
             </Button>
             {feedback ? <p className="text-sm text-muted-foreground">{feedback}</p> : null}
           </CardContent>
@@ -118,7 +118,7 @@ export function TransfersWorkspace({
 
         <Card className="rounded-[28px] border-0 shadow-sm">
           <CardHeader>
-            <CardTitle>Transferencias recientes</CardTitle>
+            <CardTitle>Pagos recientes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {transfers.length > 0 ? (
@@ -139,7 +139,7 @@ export function TransfersWorkspace({
                 </div>
               ))
             ) : (
-              <EmptyBox text="Todavia no hay transferencias registradas." />
+              <EmptyBox text="Todavia no hay pagos registrados." />
             )}
           </CardContent>
         </Card>

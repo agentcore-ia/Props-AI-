@@ -210,11 +210,11 @@ function buildSectionGuide() {
     "Propiedades: alta y edicion de publicaciones, fotos, requisitos, direccion exacta y estado comercial.",
     "Alquileres: contratos, ajustes, liquidaciones, rescisiones y documentacion.",
     "Propietarios: relacion por propietario, participacion, liquidaciones emitidas y netos.",
-    "Cobranzas: registrar cobros de inquilinos y controlar estado del periodo.",
+    "Cobros: registrar pagos de inquilinos y controlar estado del periodo.",
     "Morosos: ver alquileres pendientes, deuda por inquilino, prioridad IA y avisos por WhatsApp.",
-    "Transferencias: registrar pagos al propietario y dejar trazabilidad.",
+    "Pagos a propietarios: registrar pagos al propietario y dejar trazabilidad.",
     "Caja: ingresos, egresos y movimientos operativos.",
-    "Proveedores y Facturacion: alta de proveedores, facturas y gastos administrativos.",
+    "Proveedores y Facturas: alta de proveedores, facturas y gastos administrativos.",
   ].join("\n");
 }
 

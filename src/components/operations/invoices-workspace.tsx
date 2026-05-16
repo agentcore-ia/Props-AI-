@@ -51,7 +51,7 @@ export function InvoicesWorkspace({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Facturacion" description="Controla facturas de proveedores y obligaciones operativas pendientes de pago." />
+      <PageHeader title="Facturas" description="Controla facturas de proveedores y obligaciones operativas pendientes de pago." />
 
       <section className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
         <Card className="rounded-[28px] border-0 shadow-sm">

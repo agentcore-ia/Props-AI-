@@ -219,7 +219,7 @@ export function OperationsOverview({
     },
     {
       href: "/transferencias",
-      title: "Transferencias",
+      title: "Pagos a propietarios",
       value: "Controlar",
       description: "Pagos a propietarios y comprobantes.",
       icon: Landmark,
