@@ -37,6 +37,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { DashboardAssistant } from "@/components/dashboard/dashboard-assistant";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { cn } from "@/lib/utils";
 
 type AppRole = "superadmin" | "agency_admin" | "agent" | "customer";
@@ -169,6 +170,8 @@ export function AppShell({
               <Button variant="outline" size="icon" className="rounded-2xl">
                 <Bell className="size-4" />
               </Button>
+
+              <ThemeToggle />
 
               <Separator orientation="vertical" className="hidden h-10 sm:block" />
 
