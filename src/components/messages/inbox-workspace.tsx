@@ -103,6 +103,7 @@ export function InboxWorkspace({
   const [compareSelection, setCompareSelection] = useState<string[]>([]);
   const [visitLead, setVisitLead] = useState<CrmLeadSummary | null>(null);
   const [visitForm, setVisitForm] = useState({ scheduledFor: "", notes: "" });
+  const messageScrollRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const messagesByLead = useMemo(() => {
@@ -200,7 +201,12 @@ export function InboxWorkspace({
   }, [relatedLeadsByPerson, selectedLead, selectedMessages, visits]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const container = messageScrollRef.current;
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
   }, [selectedId, selectedMessages.length]);
 
   if (!selectedLead) {
@@ -315,15 +321,15 @@ export function InboxWorkspace({
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
-        <div className="overflow-hidden rounded-[30px] border bg-card shadow-sm">
+      <div className="grid gap-6 xl:h-[calc(100vh-150px)] xl:min-h-[640px] xl:grid-cols-[320px_minmax(0,1fr)_360px] xl:overflow-hidden">
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-[30px] border bg-card shadow-sm">
           <div className="border-b px-5 py-4">
             <h3 className="font-semibold">Conversaciones</h3>
             <p className="mt-1 text-sm text-muted-foreground">
               WhatsApp, web e ingresos del CRM en una sola cola operativa.
             </p>
           </div>
-          <ScrollArea className="h-[760px]">
+          <ScrollArea className="min-h-[360px] flex-1">
             <div className="space-y-2 p-3">
               {filteredLeads.map((lead) => {
                 const thread = messagesByLead.get(lead.id) ?? [];
@@ -372,7 +378,7 @@ export function InboxWorkspace({
           </ScrollArea>
         </div>
 
-        <div className="flex h-[760px] min-w-0 flex-col overflow-hidden rounded-[30px] border bg-card shadow-sm">
+        <div className="flex min-h-[620px] min-w-0 flex-col overflow-hidden rounded-[30px] border bg-card shadow-sm xl:min-h-0">
           <div className="flex items-center justify-between border-b px-6 py-4">
             <div className="flex min-w-0 items-center gap-3">
               <Avatar className="rounded-2xl">
@@ -393,7 +399,7 @@ export function InboxWorkspace({
             </Badge>
           </div>
 
-          <ScrollArea className="flex-1 px-6 py-5">
+          <div ref={messageScrollRef} className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             <div className="space-y-4">
               <div className="rounded-[24px] border bg-background p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-primary/75">
@@ -446,7 +452,7 @@ export function InboxWorkspace({
 
               <div ref={bottomRef} />
             </div>
-          </ScrollArea>
+          </div>
 
           <div className="border-t px-4 py-4">
             <div className="mb-3 flex flex-wrap gap-2">
@@ -501,7 +507,7 @@ export function InboxWorkspace({
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="min-h-0 space-y-4 xl:overflow-y-auto xl:pr-1">
           <section className="rounded-[30px] border bg-card p-5 shadow-sm">
             <div className="flex items-center gap-2">
               <Sparkles className="size-4 text-primary" />

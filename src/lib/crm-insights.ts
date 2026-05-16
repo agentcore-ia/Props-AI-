@@ -282,6 +282,78 @@ function extractObjections(texts: string[]) {
     .map((item) => item.label);
 }
 
+function hasAny(text: string, patterns: RegExp[]) {
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+function summarizeCustomerThread(messages: string[]) {
+  const joined = messages.join(" \n ").toLowerCase();
+  const summary: string[] = [];
+
+  if (hasAny(joined, [/visita|visitar|ver la propiedad|coordinar/])) {
+    summary.push("Quiere avanzar con una visita.");
+  }
+
+  if (hasAny(joined, [/viernes|sabado|sábado|domingo|semana|mañana|manana|tarde|horario|hora/])) {
+    summary.push("Compartio disponibilidad o pregunto por horarios.");
+  }
+
+  if (hasAny(joined, [/mascota|mascotas|perro|gato|caniche/])) {
+    summary.push("Consulto por politica de mascotas.");
+  }
+
+  if (hasAny(joined, [/subte|colectivo|ubicacion|ubicación|barrio|zona|cerca/])) {
+    summary.push("Pidio referencias de ubicacion o transporte.");
+  }
+
+  if (hasAny(joined, [/requisito|garantia|garantía|deposito|depósito|ingreso|expensas/])) {
+    summary.push("Tiene dudas sobre requisitos o costo de ingreso.");
+  }
+
+  if (hasAny(joined, [/\b\d{8,}\b/, /mi numero|mi número|celular|telefono|teléfono/])) {
+    summary.push("Ya dejo datos de contacto.");
+  }
+
+  if (summary.length > 0) {
+    return Array.from(new Set(summary)).slice(0, 3);
+  }
+
+  const last = messages[messages.length - 1]?.trim();
+  return last ? [`Ultima consulta: ${last.slice(0, 140)}${last.length > 140 ? "..." : ""}`] : [];
+}
+
+function summarizeOutboundThread(messages: string[]) {
+  const joined = messages.join(" \n ").toLowerCase();
+  const summary: string[] = [];
+
+  if (hasAny(joined, [/pasame tu nombre|pasame.*celular|telefono|teléfono|datos/])) {
+    summary.push("Se pidieron datos de contacto para avanzar.");
+  }
+
+  if (hasAny(joined, [/contactar|coordinar|agendar|visita|viernes|horario/])) {
+    summary.push("Se confirmo intencion de coordinar visita.");
+  }
+
+  if (hasAny(joined, [/mascota|mascotas|perro|gato|caniche/])) {
+    summary.push("Se respondio la consulta sobre mascotas.");
+  }
+
+  if (hasAny(joined, [/requisito|garantia|garantía|deposito|depósito|ingreso|expensas/])) {
+    summary.push("Se explicaron requisitos o costos relevantes.");
+  }
+
+  if (hasAny(joined, [/retomo|seguimiento|semana/])) {
+    summary.push("Hubo seguimiento comercial para retomar la conversacion.");
+  }
+
+  if (summary.length > 0) {
+    return Array.from(new Set(summary)).slice(0, 3);
+  }
+
+  const last = messages[messages.length - 1]?.trim();
+  return last ? [`Ultima respuesta enviada: ${last.slice(0, 140)}${last.length > 140 ? "..." : ""}`] : [];
+}
+
 export function buildLeadProfileSnapshot(input: {
   lead: CrmLeadSummary;
   messages: CrmLeadMessageSummary[];
@@ -315,8 +387,8 @@ export function buildLeadProfileSnapshot(input: {
   return {
     whatTheySeek: whatTheySeek || "Todavia falta precisar mejor la necesidad del cliente.",
     viewedProperties,
-    whatTheyAsked: customerMessages.slice(-4),
-    whatWeAnswered: outboundMessages.slice(-4),
+    whatTheyAsked: summarizeCustomerThread(customerMessages),
+    whatWeAnswered: summarizeOutboundThread(outboundMessages),
     objections,
     closeProbability: deriveCloseProbability(input.lead),
     nextAction: nextVisit
