@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
 import { getAgencyScopeFromUser } from "@/lib/crm-automation";
-import { sendEvolutionTextMessage } from "@/lib/evolution";
+import { normalizeEvolutionRecipient, sendEvolutionTextMessage } from "@/lib/evolution";
 import { getOpenAIEnv } from "@/lib/openai-env";
 import { listDelinquentTenants } from "@/lib/props-data";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
 
   for (const item of selected) {
     const instanceName = instanceBySlug.get(item.agencySlug);
-    const number = item.tenantPhone.replace(/[^\d]/g, "");
+    const number = normalizeEvolutionRecipient(item.tenantPhone);
 
     if (!instanceName) {
       failed.push({ tenantName: item.tenantName, error: "Sin instancia de WhatsApp" });

@@ -46,6 +46,29 @@ type EvolutionInstanceRecord = {
   };
 };
 
+export function normalizeEvolutionRecipient(phone: string | null | undefined) {
+  const raw = String(phone ?? "")
+    .trim()
+    .replace(/@s\.whatsapp\.net$/i, "");
+  let digits = raw.replace(/[^\d]/g, "");
+
+  if (!digits) return "";
+  if (digits.startsWith("00")) digits = digits.slice(2);
+
+  if (digits.startsWith("549")) return digits;
+
+  if (digits.startsWith("54")) {
+    const nationalNumber = digits.slice(2).replace(/^0+/, "").replace(/^15/, "");
+    return nationalNumber ? `549${nationalNumber}` : digits;
+  }
+
+  digits = digits.replace(/^0+/, "");
+  digits = digits.replace(/^15/, "");
+
+  if (!digits) return "";
+  return `549${digits}`;
+}
+
 function getEvolutionEnv() {
   const apiUrl = process.env.EVOLUTION_API_URL ?? EVOLUTION_API_URL_FALLBACK;
   const apiKey = process.env.EVOLUTION_API_KEY ?? EVOLUTION_API_KEY_FALLBACK;
@@ -215,7 +238,7 @@ export async function sendEvolutionTextMessage(payload: {
   number: string;
   text: string;
 }) {
-  const number = String(payload.number).replace(/[^\d]/g, "");
+  const number = normalizeEvolutionRecipient(payload.number);
   const text = String(payload.text ?? "").trim();
 
   if (!number || !text) {
@@ -245,7 +268,7 @@ export async function sendEvolutionMediaMessage(payload: {
   mediaType?: "image" | "video" | "document";
   fileName?: string;
 }) {
-  const number = String(payload.number).replace(/[^\d]/g, "");
+  const number = normalizeEvolutionRecipient(payload.number);
   const media = String(payload.mediaUrl ?? "").trim();
   const caption = String(payload.caption ?? "").trim();
 
