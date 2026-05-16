@@ -9,6 +9,7 @@ import {
 
 import { AgencyList, CreateAgencyDialog } from "@/components/admin/agency-manager";
 import { MetricCard } from "@/components/dashboard/metric-card";
+import { OperationsOverview } from "@/components/dashboard/operations-overview";
 import { PipelineChart } from "@/components/dashboard/pipeline-chart";
 import { TodayPanel } from "@/components/dashboard/today-panel";
 import { PageHeader } from "@/components/layout/page-header";
@@ -19,6 +20,12 @@ import {
   getAdminDashboardSnapshot,
   getDashboardSnapshot,
   getTodayWorkspaceSnapshot,
+  listDelinquentTenants,
+  listLeaseRoster,
+  listOwnerRoster,
+  listOwnerSettlements,
+  listRentalCollections,
+  listTenantRoster,
 } from "@/lib/props-data";
 
 export const dynamic = "force-dynamic";
@@ -145,9 +152,24 @@ export default async function DashboardPage() {
   }
 
   const scope = getAgencyScopeFromUser(currentUser);
-  const [snapshot, todaySnapshot] = await Promise.all([
+  const [
+    snapshot,
+    todaySnapshot,
+    leases,
+    owners,
+    tenants,
+    collections,
+    settlements,
+    delinquencies,
+  ] = await Promise.all([
     getDashboardSnapshot(scope),
     getTodayWorkspaceSnapshot(scope),
+    listLeaseRoster(scope),
+    listOwnerRoster(scope),
+    listTenantRoster(scope),
+    listRentalCollections({ agencySlug: scope?.agencySlug, limit: 80 }),
+    listOwnerSettlements({ agencySlug: scope?.agencySlug, limit: 80 }),
+    listDelinquentTenants({ agencySlug: scope?.agencySlug }),
   ]);
 
   return (
@@ -162,6 +184,15 @@ export default async function DashboardPage() {
           <MetricCard key={metric.label} metric={metric} />
         ))}
       </section>
+
+      <OperationsOverview
+        leases={leases}
+        owners={owners}
+        tenants={tenants}
+        collections={collections}
+        settlements={settlements}
+        delinquentCount={delinquencies.length}
+      />
 
       <TodayPanel snapshot={todaySnapshot} />
 
