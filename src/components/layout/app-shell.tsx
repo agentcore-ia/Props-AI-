@@ -86,8 +86,8 @@ function SidebarContent({ userRole = "agency_admin" }: { userRole?: AppRole | nu
     <div className="flex h-full flex-col">
       <div className="px-3 py-3">
         <Link href="/dashboard" className="block transition-opacity hover:opacity-80">
-          <span className="block text-lg font-semibold tracking-tight text-slate-950">PROPS</span>
-          <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          <span className="block text-xl font-semibold tracking-tight text-slate-950">PROPS</span>
+          <span className="mt-0.5 block text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
             Control inmobiliario
           </span>
         </Link>
@@ -109,7 +109,7 @@ function SidebarContent({ userRole = "agency_admin" }: { userRole?: AppRole | nu
                     : "text-muted-foreground hover:bg-sidebar-muted hover:text-foreground"
                 )}
               >
-                <Icon className="size-3.5" />
+                <Icon className="size-4" />
                 {label}
               </Link>
             );
@@ -135,8 +135,8 @@ export function AppShell({
 }) {
   return (
     <div className="min-h-screen">
-      <div className="flex min-h-screen w-full xl:pl-56">
-        <aside className="glass-panel hidden border-r border-sidebar-border xl:fixed xl:inset-y-0 xl:left-0 xl:flex xl:h-screen xl:w-56 xl:flex-col">
+      <div className="flex min-h-screen w-full xl:pl-48">
+        <aside className="glass-panel hidden border-r border-sidebar-border xl:fixed xl:inset-y-0 xl:left-0 xl:flex xl:h-screen xl:w-48 xl:flex-col">
           <SidebarContent userRole={userRole} />
         </aside>
 
@@ -148,7 +148,7 @@ export function AppShell({
                   <SheetTrigger render={<Button variant="outline" size="icon" />}>
                     <Menu className="size-4" />
                   </SheetTrigger>
-                  <SheetContent side="left" className="w-[248px] border-r bg-sidebar p-0">
+                  <SheetContent side="left" className="w-[224px] border-r bg-sidebar p-0">
                     <SheetHeader className="sr-only">
                       <SheetTitle>Menu principal</SheetTitle>
                       <SheetDescription>Navegacion del CRM Props</SheetDescription>
