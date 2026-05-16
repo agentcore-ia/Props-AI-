@@ -39,7 +39,6 @@ type ControlTab = "contratos" | "propiedades" | "inquilinos" | "propietarios";
 
 type ControlRow = {
   id: string;
-  badge: string;
   dueLabel: string;
   dueHint: string;
   primary: string;
@@ -229,12 +228,11 @@ export function OperationsOverview({
 
   const rows = useMemo<ControlRow[]>(() => {
     if (activeTab === "propiedades") {
-      return propertyRows.map((lease, index) => {
+      return propertyRows.map((lease) => {
         const collection = latestCollectionByContract.get(lease.contractId);
         const settlement = latestSettlementByContract.get(lease.contractId);
         return {
           id: `property-${lease.propertyId}`,
-          badge: String(index + 1),
           dueLabel: lease.status,
           dueHint: `Ajuste ${formatShortDate(lease.nextAdjustmentDate)}`,
           primary: lease.propertyTitle,
@@ -250,11 +248,10 @@ export function OperationsOverview({
     }
 
     if (activeTab === "inquilinos") {
-      return tenants.map((tenant, index) => {
+      return tenants.map((tenant) => {
         const collection = latestCollectionByContract.get(tenant.contractId);
         return {
           id: `tenant-${tenant.contractId}-${tenant.tenantName}`,
-          badge: String(index + 1),
           dueLabel: tenant.latestCollectionStatus ?? "Sin estado",
           dueHint: tenant.latestCollectionMonth ?? "Sin periodo cargado",
           primary: tenant.tenantName,
@@ -274,7 +271,6 @@ export function OperationsOverview({
         const settlement = latestSettlementByContract.get(owner.contractId);
         return {
           id: `owner-${owner.contractOwnerId ?? owner.contractId}-${owner.ownerName}`,
-          badge: `${owner.participationPercent}%`,
           dueLabel: owner.latestSettlementMonth ?? "Sin liquidar",
           dueHint: owner.latestOwnerPayoutAmount ? formatMoney(owner.latestOwnerPayoutAmount, "ARS") : "Sin pago registrado",
           primary: owner.ownerName,
@@ -289,7 +285,7 @@ export function OperationsOverview({
       });
     }
 
-    return activeLeases.map((lease, index) => {
+    return activeLeases.map((lease) => {
       const collection = latestCollectionByContract.get(lease.contractId);
       const settlement = latestSettlementByContract.get(lease.contractId);
       const days = getDaysUntil(lease.nextAdjustmentDate);
@@ -302,7 +298,6 @@ export function OperationsOverview({
 
       return {
         id: `lease-${lease.contractId}`,
-        badge: String(index + 1),
         dueLabel: formatShortDate(lease.nextAdjustmentDate),
         dueHint,
         primary: lease.propertyTitle,
@@ -389,8 +384,7 @@ export function OperationsOverview({
           </div>
 
           <div className="overflow-hidden rounded-[24px] border">
-            <div className="hidden grid-cols-[86px_1.2fr_1.7fr_1.6fr_1.6fr_80px] bg-muted/50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground xl:grid">
-              <span>Carpeta</span>
+            <div className="hidden grid-cols-[1.2fr_1.7fr_1.6fr_1.6fr_80px] bg-muted/50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground xl:grid">
               <span>Vence</span>
               <span>Direccion</span>
               <span>Cobranza</span>
@@ -405,17 +399,8 @@ export function OperationsOverview({
                 filteredRows.slice(0, 20).map((row) => (
                   <div
                     key={row.id}
-                    className="grid gap-3 border-t bg-background p-4 first:border-t-0 xl:grid-cols-[86px_1.2fr_1.7fr_1.6fr_1.6fr_80px] xl:items-center"
+                    className="grid gap-3 border-t bg-background p-4 first:border-t-0 xl:grid-cols-[1.2fr_1.7fr_1.6fr_1.6fr_80px] xl:items-center"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                        {row.badge}
-                      </span>
-                      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground xl:hidden">
-                        {tabs.find((tab) => tab.key === activeTab)?.label}
-                      </span>
-                    </div>
-
                     <div>
                       <p className="font-medium">{row.dueLabel}</p>
                       <p className="mt-1 text-sm text-muted-foreground">{row.dueHint}</p>
