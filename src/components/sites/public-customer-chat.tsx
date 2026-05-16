@@ -14,6 +14,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { buildShortPropertyPath } from "@/lib/property-links";
 
 type ChatMessage = {
   id: string;
@@ -185,13 +186,13 @@ export function PublicCustomerChat({
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
-              href={`/cuenta/login?redirectTo=/propiedad/${tenantSlug}/${propertyId}`}
+              href={`/cuenta/login?redirectTo=${encodeURIComponent(buildShortPropertyPath(tenantSlug, propertyId))}`}
               className="inline-flex h-11 items-center rounded-2xl border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700"
             >
               Ingresar
             </Link>
             <Link
-              href={`/cuenta/registro?redirectTo=/propiedad/${tenantSlug}/${propertyId}`}
+              href={`/cuenta/registro?redirectTo=${encodeURIComponent(buildShortPropertyPath(tenantSlug, propertyId))}`}
               className="inline-flex h-11 items-center rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white"
             >
               Crear cuenta

@@ -3,6 +3,7 @@ import "server-only";
 import type { Agency, Property } from "@/lib/mock-data";
 import type { CrmLeadMessageSummary, CrmLeadSummary } from "@/lib/crm-types";
 import { getEffectiveMessagingInstance } from "@/lib/agency-access";
+import { buildShortPropertyUrl } from "@/lib/property-links";
 import { listProperties } from "@/lib/props-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -16,9 +17,6 @@ type MessagingAgencyRow = {
   tagline: string;
   messaging_instance: string;
 };
-
-const PUBLIC_MARKETPLACE_URL =
-  process.env.PUBLIC_MARKETPLACE_URL?.replace(/\/+$/, "") || "https://props.com.ar";
 
 export type MessagingAgency = Pick<
   Agency,
@@ -134,7 +132,7 @@ export function matchPropertyFromMessage(
 }
 
 function summarizeProperty(property: Property) {
-  const publicUrl = `${PUBLIC_MARKETPLACE_URL}/propiedad/${property.tenantSlug}/${property.id}`;
+  const publicUrl = buildShortPropertyUrl(property.tenantSlug, property.id);
   const imageCount = property.images.filter(Boolean).length;
   const blocks = [
     property.title,
@@ -241,7 +239,7 @@ export function buildWhatsappSystemPrompt(input: {
     ? summarizeProperty(input.selectedProperty)
     : "No hay una propiedad puntual asociada todavia; puedes guiarte por el portafolio y por lo que pida el cliente.";
   const selectedPropertyPublicUrl = input.selectedProperty
-    ? `${PUBLIC_MARKETPLACE_URL}/propiedad/${input.selectedProperty.tenantSlug}/${input.selectedProperty.id}`
+    ? buildShortPropertyUrl(input.selectedProperty.tenantSlug, input.selectedProperty.id)
     : "";
   const selectedPropertyImages = input.selectedProperty?.images
     .filter(Boolean)

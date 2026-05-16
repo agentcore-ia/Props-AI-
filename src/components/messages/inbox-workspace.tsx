@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import type { Property } from "@/lib/mock-data";
+import { buildShortPropertyPath } from "@/lib/property-links";
 import type {
   AgencyMessageTemplateSummary,
   CrmLeadMessageSummary,
@@ -498,7 +499,7 @@ export function InboxWorkspace({
                   </div>
                   {selectedLead.propertyId ? (
                     <Link
-                      href={`/propiedad/${selectedLead.agencySlug}/${selectedLead.propertyId}`}
+                      href={buildShortPropertyPath(selectedLead.agencySlug, selectedLead.propertyId)}
                       target="_blank"
                       className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border bg-background"
                     >
@@ -597,7 +598,7 @@ export function InboxWorkspace({
                         </p>
                       </div>
                       <Link
-                        href={`/propiedad/${selectedLead.agencySlug}/${property.id}`}
+                        href={buildShortPropertyPath(selectedLead.agencySlug, property.id)}
                         target="_blank"
                         className="inline-flex size-10 items-center justify-center rounded-full border bg-background"
                       >

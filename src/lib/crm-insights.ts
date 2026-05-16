@@ -7,6 +7,7 @@ import type {
   EmployeeTaskSummary,
   VisitAppointmentSummary,
 } from "@/lib/crm-types";
+import { buildShortPropertyUrl } from "@/lib/property-links";
 import { buildGoogleMapsExternalUrl, formatMoney } from "@/lib/utils";
 
 export type ConversationStatus = "Nuevo" | "Esperando respuesta" | "Visita" | "Cerrado";
@@ -398,7 +399,7 @@ export function buildLeadProfileSnapshot(input: {
 }
 
 function propertyPublicUrl(lead: CrmLeadSummary, property: Property) {
-  return `https://props.com.ar/propiedad/${lead.agencySlug}/${property.id}`;
+  return buildShortPropertyUrl(lead.agencySlug, property.id);
 }
 
 export function buildPropertyComparisonMessage(

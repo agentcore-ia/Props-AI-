@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isAutomationRequest } from "@/lib/automation-auth";
+import { buildShortPropertyUrl } from "@/lib/property-links";
 import { getCrmLeadById, listCrmLeadMessages } from "@/lib/props-data";
 import {
   buildAgencyCatalogContext,
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
     selectedPropertyId: catalog.selectedProperty?.id ?? null,
     selectedPropertyTitle: catalog.selectedProperty?.title ?? null,
     selectedPropertyUrl: catalog.selectedProperty
-      ? `https://props.com.ar/propiedad/${catalog.selectedProperty.tenantSlug}/${catalog.selectedProperty.id}`
+      ? buildShortPropertyUrl(catalog.selectedProperty.tenantSlug, catalog.selectedProperty.id)
       : null,
     recentMessagesCount: recentMessages.length,
   });

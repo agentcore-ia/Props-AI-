@@ -1,4 +1,5 @@
 import type { Agency, Property } from "@/lib/mock-data";
+import { buildShortPropertyPath } from "@/lib/property-links";
 
 export type MarketplaceSection =
   | "explorar"
@@ -104,7 +105,7 @@ export function buildPublicListings(
       agencyName: agency?.name ?? property.tenantSlug,
       agencyCity: agency?.city ?? "Buenos Aires",
       agencyTagline: agency?.tagline ?? "Propiedades seleccionadas para comprar o alquilar.",
-      routeHref: `/propiedad/${property.tenantSlug}/${property.id}`,
+      routeHref: buildShortPropertyPath(property.tenantSlug, property.id),
       catalogHref: `https://${property.tenantSlug}.props.com.ar`,
       bedrooms,
       bathrooms,

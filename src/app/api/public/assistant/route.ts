@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getOpenAIEnv } from "@/lib/openai-env";
+import { buildShortPropertyPath } from "@/lib/property-links";
 import { listProperties } from "@/lib/props-data";
 import type { Property } from "@/lib/mock-data";
 
@@ -375,7 +376,7 @@ function buildAssistantSuggestions(matches: PropertyMatch[]): AssistantSuggestio
     currency: property.currency,
     operation: property.operation,
     image: property.image,
-    routeHref: `/propiedad/${property.tenantSlug}/${property.id}`,
+    routeHref: buildShortPropertyPath(property.tenantSlug, property.id),
     bedrooms: property.bedrooms,
     bathrooms: property.bathrooms,
     area: property.area,

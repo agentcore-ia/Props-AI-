@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { isAutomationRequest } from "@/lib/automation-auth";
 import { ensureLeadTask, recordCrmLeadMessage } from "@/lib/crm-automation";
 import { sendEvolutionMediaMessage, sendEvolutionTextMessage } from "@/lib/evolution";
+import { buildShortPropertyUrl } from "@/lib/property-links";
 import { getCrmLeadById, getPropertyBySlugAndId, listProperties } from "@/lib/props-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { matchPropertyFromMessage } from "@/lib/whatsapp-agent";
@@ -10,9 +11,6 @@ import { matchPropertyFromMessage } from "@/lib/whatsapp-agent";
 function addHoursIso(hours: number) {
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 }
-
-const PUBLIC_MARKETPLACE_URL =
-  process.env.PUBLIC_MARKETPLACE_URL?.replace(/\/+$/, "") || "https://props.com.ar";
 
 function wantsPropertyImages(text: string) {
   return /\b(foto|fotos|imagen|imagenes|ver\s+mas|como\s+es|muestrame|mostrame|manda(?:me)?\s+fotos?)\b/i.test(
@@ -36,7 +34,7 @@ function stripImageLinksFromReply(text: string) {
 }
 
 function buildPublicPropertyUrl(tenantSlug: string, propertyId: string) {
-  return `${PUBLIC_MARKETPLACE_URL}/propiedad/${tenantSlug}/${propertyId}`;
+  return buildShortPropertyUrl(tenantSlug, propertyId);
 }
 
 export const dynamic = "force-dynamic";

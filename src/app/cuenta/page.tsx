@@ -5,6 +5,7 @@ import { MessageSquareText, UserRound } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { buildShortPropertyPath } from "@/lib/property-links";
 import { buildAppUrl, buildMarketplaceUrl } from "@/lib/request-url";
 import { listMarketplaceConversationSummaries } from "@/lib/props-data";
 
@@ -130,7 +131,7 @@ export default async function CustomerAccountPage() {
                     {conversation.property ? (
                       <div className="mt-4">
                         <Link
-                          href={`/propiedad/${conversation.agency?.slug ?? ""}/${conversation.property.id}`}
+                          href={buildShortPropertyPath(conversation.agency?.slug ?? "", conversation.property.id)}
                           className="text-sm font-semibold text-blue-700"
                         >
                           Volver a la propiedad
