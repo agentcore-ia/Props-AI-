@@ -93,6 +93,8 @@ type RentalContractRow = {
   currency: "ARS";
   index_type: "IPC" | "ICL";
   adjustment_frequency_months: number;
+  late_fee_daily_amount: number | null;
+  late_fee_grace_days: number | null;
   contract_start_date: string;
   rent_reference_date: string;
   next_adjustment_date: string;
@@ -321,6 +323,8 @@ export type LeaseRosterItem = {
   currency: "ARS";
   indexType: "IPC" | "ICL";
   adjustmentFrequencyMonths: number;
+  lateFeeDailyAmount: number;
+  lateFeeGraceDays: number;
   contractStartDate: string;
   nextAdjustmentDate: string;
   lastAdjustmentDate: string | null;
@@ -707,6 +711,8 @@ function mapRentalContract(
     currency: row.currency,
     indexType: row.index_type,
     adjustmentFrequencyMonths: row.adjustment_frequency_months,
+    lateFeeDailyAmount: Number(row.late_fee_daily_amount ?? 0),
+    lateFeeGraceDays: Number(row.late_fee_grace_days ?? 10),
     contractStartDate: row.contract_start_date,
     rentReferenceDate: row.rent_reference_date,
     nextAdjustmentDate: row.next_adjustment_date,
@@ -1279,7 +1285,7 @@ export async function listRentalContracts(options?: { agencySlug?: string }) {
 export async function listLeaseRoster(options?: { agencySlug?: string }) {
   const admin = createAdminClient();
   const leaseRosterSelect =
-    "id, property_id, agency_id, tenant_name, tenant_phone, tenant_email, current_rent, currency, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, last_adjustment_date, auto_notify, status, owner_name, owner_phone, owner_email, management_fee_percent, monthly_owner_costs, owner_notes, agencies!inner(name, slug), properties!inner(title, location, exact_address, requirements)";
+    "id, property_id, agency_id, tenant_name, tenant_phone, tenant_email, current_rent, currency, index_type, adjustment_frequency_months, late_fee_daily_amount, late_fee_grace_days, contract_start_date, next_adjustment_date, last_adjustment_date, auto_notify, status, owner_name, owner_phone, owner_email, management_fee_percent, monthly_owner_costs, owner_notes, agencies!inner(name, slug), properties!inner(title, location, exact_address, requirements)";
   const legacyLeaseRosterSelect =
     "id, property_id, agency_id, tenant_name, tenant_phone, tenant_email, current_rent, currency, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, last_adjustment_date, auto_notify, status, agencies!inner(name, slug), properties!inner(title, location, exact_address, requirements)";
 
@@ -1300,7 +1306,7 @@ export async function listLeaseRoster(options?: { agencySlug?: string }) {
 
   if (
     error &&
-    /owner_name|owner_phone|owner_email|management_fee_percent|monthly_owner_costs|owner_notes/i.test(
+    /owner_name|owner_phone|owner_email|management_fee_percent|monthly_owner_costs|owner_notes|late_fee_daily_amount|late_fee_grace_days/i.test(
       error.message ?? ""
     )
   ) {
@@ -1324,6 +1330,8 @@ export async function listLeaseRoster(options?: { agencySlug?: string }) {
     currency: "ARS";
     index_type: "IPC" | "ICL";
     adjustment_frequency_months: number;
+    late_fee_daily_amount: number | null;
+    late_fee_grace_days: number | null;
     contract_start_date: string;
     next_adjustment_date: string;
     last_adjustment_date: string | null;
@@ -1369,6 +1377,8 @@ export async function listLeaseRoster(options?: { agencySlug?: string }) {
       currency: item.currency,
       indexType: item.index_type,
       adjustmentFrequencyMonths: item.adjustment_frequency_months,
+      lateFeeDailyAmount: Number(item.late_fee_daily_amount ?? 0),
+      lateFeeGraceDays: Number(item.late_fee_grace_days ?? 10),
       contractStartDate: item.contract_start_date,
       nextAdjustmentDate: item.next_adjustment_date,
       lastAdjustmentDate: item.last_adjustment_date,
@@ -1499,6 +1509,8 @@ function buildDelinquencyMessage(item: {
   tenantName: string;
   propertyTitle: string;
   collectionMonth: string;
+  rentDebtAmount: number;
+  lateFeeAmount: number;
   totalDebtAmount: number;
   currency: "ARS";
 }) {
@@ -1509,7 +1521,16 @@ function buildDelinquencyMessage(item: {
     maximumFractionDigits: 0,
   }).format(item.totalDebtAmount);
 
-  return `Hola ${firstName}, te escribimos por el alquiler de ${item.propertyTitle}. Tenemos pendiente el pago del periodo ${item.collectionMonth} por ${amount}. Cuando puedas, envianos el comprobante o avisame si ya fue transferido para actualizar la cuenta.`;
+  const lateFeeText =
+    item.lateFeeAmount > 0
+      ? ` Incluye punitorios por ${new Intl.NumberFormat("es-AR", {
+          style: "currency",
+          currency: item.currency,
+          maximumFractionDigits: 0,
+        }).format(item.lateFeeAmount)}.`
+      : "";
+
+  return `Hola ${firstName}, te escribimos por el alquiler de ${item.propertyTitle}. Tenemos pendiente el periodo ${item.collectionMonth} por ${amount}.${lateFeeText} Cuando puedas, envianos el comprobante o avisame si ya fue transferido para actualizar la cuenta.`;
 }
 
 export async function listDelinquentTenants(options?: {
@@ -1573,14 +1594,19 @@ export async function listDelinquentTenants(options?: {
       const dueDay = getRentDueDay(lease.contractStartDate);
       const cappedDueDay = Math.min(dueDay, daysInMonth(year || today.getFullYear(), monthIndex));
       const dueDate = new Date(year || today.getFullYear(), monthIndex, cappedDueDay);
+      const contractGraceDays = Number.isFinite(Number(lease.lateFeeGraceDays))
+        ? Math.max(0, Number(lease.lateFeeGraceDays))
+        : graceDays;
       const graceLimit = new Date(dueDate);
-      graceLimit.setDate(graceLimit.getDate() + graceDays);
+      graceLimit.setDate(graceLimit.getDate() + contractGraceDays);
       const daysLate = Math.max(
         0,
         Math.floor((referenceDate.getTime() - graceLimit.getTime()) / (24 * 60 * 60 * 1000))
       );
       const collectionStatus = collection?.status ?? (daysLate > 0 ? "Mora" : "Pendiente");
-      const totalDebtAmount = rentDebtAmount;
+      const lateFeeDailyAmount = Math.max(0, Number(lease.lateFeeDailyAmount ?? 0));
+      const lateFeeAmount = rentDebtAmount > 0 ? lateFeeDailyAmount * daysLate : 0;
+      const totalDebtAmount = rentDebtAmount + lateFeeAmount;
       const risk =
         daysLate >= 20 || totalDebtAmount >= expectedRent * 1.5
           ? "Alta"
@@ -1616,8 +1642,10 @@ export async function listDelinquentTenants(options?: {
         currency: lease.currency,
         collectionMonth: month,
         dueDay,
-        graceDays,
+        graceDays: contractGraceDays,
         daysLate,
+        lateFeeDailyAmount,
+        lateFeeAmount,
         expectedRent,
         collectedAmount,
         rentDebtAmount,
@@ -1631,6 +1659,8 @@ export async function listDelinquentTenants(options?: {
           tenantName: lease.tenantName,
           propertyTitle: lease.propertyTitle,
           collectionMonth: month,
+          rentDebtAmount,
+          lateFeeAmount,
           totalDebtAmount,
           currency: lease.currency,
         }),

@@ -20,6 +20,7 @@ async function buildAiReminder(input: {
   propertyTitle: string;
   collectionMonth: string;
   debtLabel: string;
+  lateFeeLabel: string | null;
   daysLate: number;
   risk: string;
   fallback: string;
@@ -48,7 +49,7 @@ async function buildAiReminder(input: {
           content: [
             {
               type: "input_text",
-              text: `Redacta un aviso de alquiler pendiente para ${input.tenantName}. Propiedad: ${input.propertyTitle}. Periodo: ${input.collectionMonth}. Deuda: ${input.debtLabel}. Dias de atraso despues de gracia: ${input.daysLate}. Prioridad: ${input.risk}. Pedi comprobante o fecha exacta de pago. Maximo 420 caracteres.`,
+              text: `Redacta un aviso de alquiler pendiente para ${input.tenantName}. Propiedad: ${input.propertyTitle}. Periodo: ${input.collectionMonth}. Deuda total: ${input.debtLabel}. ${input.lateFeeLabel ? `Punitorios incluidos: ${input.lateFeeLabel}.` : "Sin punitorios cargados."} Dias de atraso despues de gracia: ${input.daysLate}. Prioridad: ${input.risk}. Pedi comprobante o fecha exacta de pago. Maximo 420 caracteres.`,
             },
           ],
         },
@@ -138,6 +139,7 @@ export async function POST(request: Request) {
           propertyTitle: item.propertyTitle,
           collectionMonth: item.collectionMonth,
           debtLabel: formatMoney(item.totalDebtAmount, item.currency),
+          lateFeeLabel: item.lateFeeAmount > 0 ? formatMoney(item.lateFeeAmount, item.currency) : null,
           daysLate: item.daysLate,
           risk: item.risk,
           fallback: item.suggestedMessage,

@@ -69,13 +69,14 @@ export function DelinquenciesWorkspace({
 
   const totals = useMemo(() => {
     const debt = delinquencies.reduce((sum, item) => sum + item.totalDebtAmount, 0);
+    const lateFees = delinquencies.reduce((sum, item) => sum + item.lateFeeAmount, 0);
     const highRisk = delinquencies.filter((item) => item.risk === "Alta").length;
     const withPhone = delinquencies.filter((item) => item.tenantPhone).length;
     const avgDaysLate = delinquencies.length
       ? Math.round(delinquencies.reduce((sum, item) => sum + item.daysLate, 0) / delinquencies.length)
       : 0;
 
-    return { debt, highRisk, withPhone, avgDaysLate };
+    return { debt, lateFees, highRisk, withPhone, avgDaysLate };
   }, [delinquencies]);
 
   function downloadCsv() {
@@ -86,6 +87,7 @@ export function DelinquenciesWorkspace({
       "Periodo",
       "Alquiler esperado",
       "Cobrado",
+      "Punitorios",
       "Total pendiente",
       "Dias de atraso",
       "Riesgo IA",
@@ -98,6 +100,7 @@ export function DelinquenciesWorkspace({
       item.collectionMonth,
       item.expectedRent,
       item.collectedAmount,
+      item.lateFeeAmount,
       item.totalDebtAmount,
       item.daysLate,
       item.risk,
@@ -154,10 +157,10 @@ export function DelinquenciesWorkspace({
       />
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Deuda pendiente" value={formatMoney(totals.debt, "ARS")} hint="alquileres y saldos parciales" />
+        <MetricCard label="Deuda total" value={formatMoney(totals.debt, "ARS")} hint="alquileres pendientes + punitorios" />
+        <MetricCard label="Punitorios" value={formatMoney(totals.lateFees, "ARS")} hint="calculados segun contrato" />
         <MetricCard label="Inquilinos en mora" value={String(delinquencies.length)} hint={`${totals.withPhone} con WhatsApp cargado`} />
         <MetricCard label="Prioridad alta" value={String(totals.highRisk)} hint="requieren contacto humano" />
-        <MetricCard label="Atraso promedio" value={`${totals.avgDaysLate} dias`} hint="despues del periodo de gracia" />
       </section>
 
       <Card className="rounded-[28px] border-0 shadow-sm">
@@ -240,10 +243,19 @@ export function DelinquenciesWorkspace({
                       {item.propertyTitle} · {item.propertyLocation}
                     </p>
                   </div>
-                  <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
                     <DataPoint label="Alquiler" value={formatMoney(item.expectedRent, item.currency)} />
                     <DataPoint label="Cobrado" value={formatMoney(item.collectedAmount, item.currency)} />
-                    <DataPoint label="Pendiente" value={formatMoney(item.totalDebtAmount, item.currency)} strong />
+                    <DataPoint label="Saldo alquiler" value={formatMoney(item.rentDebtAmount, item.currency)} />
+                    <DataPoint
+                      label="Punitorios"
+                      value={
+                        item.lateFeeDailyAmount > 0
+                          ? `${formatMoney(item.lateFeeAmount, item.currency)} (${formatMoney(item.lateFeeDailyAmount, item.currency)}/dia)`
+                          : "Sin punitorio"
+                      }
+                    />
+                    <DataPoint label="Total" value={formatMoney(item.totalDebtAmount, item.currency)} strong />
                     <DataPoint label="Atraso" value={`${item.daysLate} dias`} />
                   </div>
                 </div>

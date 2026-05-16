@@ -79,6 +79,8 @@ export type DelinquentTenantSummary = {
   dueDay: number;
   graceDays: number;
   daysLate: number;
+  lateFeeDailyAmount: number;
+  lateFeeAmount: number;
   expectedRent: number;
   collectedAmount: number;
   rentDebtAmount: number;

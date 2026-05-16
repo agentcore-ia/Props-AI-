@@ -103,6 +103,8 @@ function getInitialForm(property: Property) {
     adjustmentFrequencyMonths: property.rentalContract?.adjustmentFrequencyMonths
       ? String(property.rentalContract.adjustmentFrequencyMonths)
       : "6",
+    lateFeeDailyAmount: String(property.rentalContract?.lateFeeDailyAmount ?? 0),
+    lateFeeGraceDays: String(property.rentalContract?.lateFeeGraceDays ?? 10),
     contractStartDate: property.rentalContract?.contractStartDate ?? "",
     nextAdjustmentDate: property.rentalContract?.nextAdjustmentDate ?? "",
     notes: property.rentalContract?.notes ?? "",
@@ -254,6 +256,8 @@ export function RentalContractDialog({ property }: { property: Property }) {
     body.set("currentRent", form.currentRent);
     body.set("indexType", form.indexType);
     body.set("adjustmentFrequencyMonths", form.adjustmentFrequencyMonths);
+    body.set("lateFeeDailyAmount", form.lateFeeDailyAmount);
+    body.set("lateFeeGraceDays", form.lateFeeGraceDays);
     body.set("contractStartDate", form.contractStartDate);
     body.set("nextAdjustmentDate", form.nextAdjustmentDate);
     body.set("notes", form.notes);
@@ -326,6 +330,8 @@ export function RentalContractDialog({ property }: { property: Property }) {
         currentRent: Number(form.currentRent),
         indexType: form.indexType,
         adjustmentFrequencyMonths: Number(form.adjustmentFrequencyMonths),
+        lateFeeDailyAmount: Number(form.lateFeeDailyAmount),
+        lateFeeGraceDays: Number(form.lateFeeGraceDays),
         contractStartDate: form.contractStartDate,
         nextAdjustmentDate: form.nextAdjustmentDate,
         autoNotify: form.autoNotify,
@@ -466,6 +472,34 @@ export function RentalContractDialog({ property }: { property: Property }) {
                         setForm((prev) => ({ ...prev, nextAdjustmentDate: event.target.value }))
                       }
                     />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-3">
+                    <label className="text-sm font-medium">Punitorio por dia (ARS)</label>
+                    <Input
+                      placeholder="10000"
+                      value={form.lateFeeDailyAmount}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, lateFeeDailyAmount: event.target.value }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Si no corresponde, dejalo en 0.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-3">
+                    <label className="text-sm font-medium">Dias de gracia</label>
+                    <Input
+                      placeholder="10"
+                      value={form.lateFeeGraceDays}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, lateFeeGraceDays: event.target.value }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Props calcula punitorios despues de ese margen.
+                    </p>
                   </div>
 
                   <div className="space-y-2 xl:col-span-3">
@@ -740,6 +774,18 @@ export function RentalContractDialog({ property }: { property: Property }) {
                         <p className="text-xs text-muted-foreground">Notificación automática</p>
                         <p className="mt-1 font-semibold">
                           {property.rentalContract.autoNotify ? "Activa" : "Pausada"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Punitorio diario</p>
+                        <p className="mt-1 font-semibold">
+                          {formatArsCurrency(property.rentalContract.lateFeeDailyAmount)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Dias de gracia</p>
+                        <p className="mt-1 font-semibold">
+                          {property.rentalContract.lateFeeGraceDays}
                         </p>
                       </div>
                     </div>

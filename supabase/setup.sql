@@ -141,6 +141,8 @@ create table if not exists public.rental_contracts (
   currency text not null default 'ARS' check (currency in ('ARS')),
   index_type text not null check (index_type in ('IPC', 'ICL')),
   adjustment_frequency_months integer not null check (adjustment_frequency_months > 0),
+  late_fee_daily_amount numeric(14, 2) not null default 0,
+  late_fee_grace_days integer not null default 10,
   contract_start_date date not null,
   rent_reference_date date not null,
   next_adjustment_date date not null,

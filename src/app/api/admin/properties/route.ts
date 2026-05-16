@@ -20,6 +20,8 @@ type RentalContractDraft = {
   currentRent: string;
   indexType: "IPC" | "ICL";
   adjustmentFrequencyMonths: string;
+  lateFeeDailyAmount?: string;
+  lateFeeGraceDays?: string;
   contractStartDate: string;
   nextAdjustmentDate: string;
   notes: string;
@@ -297,6 +299,8 @@ async function handleUpsertProperty(request: Request, mode: "create" | "update")
 
     const draftCurrentRent = Number(rentalContract.currentRent ?? 0);
     const draftFrequency = Number(rentalContract.adjustmentFrequencyMonths ?? 0);
+    const draftLateFeeDailyAmount = Number(rentalContract.lateFeeDailyAmount ?? 0);
+    const draftLateFeeGraceDays = Number(rentalContract.lateFeeGraceDays ?? 10);
     const resolvedCurrentRent =
       analyzedContract?.currentRent ??
       (draftCurrentRent > 0 ? draftCurrentRent : null) ??
@@ -309,6 +313,16 @@ async function handleUpsertProperty(request: Request, mode: "create" | "update")
       analyzedContract?.adjustmentFrequencyMonths ??
       (draftFrequency > 0 ? draftFrequency : null) ??
       6;
+    const resolvedLateFeeDailyAmount = Math.max(
+      0,
+      analyzedContract?.lateFeeDailyAmount ??
+        (Number.isFinite(draftLateFeeDailyAmount) ? draftLateFeeDailyAmount : 0)
+    );
+    const resolvedLateFeeGraceDays = Math.max(
+      0,
+      analyzedContract?.lateFeeGraceDays ??
+        (Number.isFinite(draftLateFeeGraceDays) ? Math.round(draftLateFeeGraceDays) : 10)
+    );
     const resolvedContractStartDate =
       analyzedContract?.contractStartDate ?? rentalContract.contractStartDate ?? null;
     const resolvedNextAdjustmentDate =
@@ -347,6 +361,8 @@ async function handleUpsertProperty(request: Request, mode: "create" | "update")
       currency: "ARS" as const,
       index_type: resolvedIndexType,
       adjustment_frequency_months: resolvedAdjustmentFrequencyMonths,
+      late_fee_daily_amount: resolvedLateFeeDailyAmount,
+      late_fee_grace_days: resolvedLateFeeGraceDays,
       contract_start_date: schedule.contractStartDate,
       rent_reference_date: schedule.contractStartDate,
       next_adjustment_date: schedule.nextAdjustmentDate,

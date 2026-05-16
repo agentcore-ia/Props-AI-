@@ -146,6 +146,8 @@ export async function POST(request: Request) {
   const currentRentRaw = String(formData.get("currentRent") ?? "").trim();
   const indexType = String(formData.get("indexType") ?? "").trim();
   const adjustmentFrequencyMonths = Number(formData.get("adjustmentFrequencyMonths") ?? 0);
+  const lateFeeDailyAmountRaw = String(formData.get("lateFeeDailyAmount") ?? "").trim();
+  const lateFeeGraceDaysRaw = String(formData.get("lateFeeGraceDays") ?? "").trim();
   const contractStartDateRaw = String(formData.get("contractStartDate") ?? "").trim();
   const nextAdjustmentDateRaw = String(formData.get("nextAdjustmentDate") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
@@ -200,7 +202,7 @@ export async function POST(request: Request) {
 
   const { data: existingContract, error: existingContractError } = await admin
     .from("rental_contracts")
-    .select("id, tenant_name, tenant_phone, tenant_email, current_rent, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, rent_reference_date, last_adjustment_date, contract_file_name, contract_file_path, contract_file_mime_type, contract_file_size_bytes, contract_text, owner_name, owner_phone, owner_email, management_fee_percent, monthly_owner_costs, owner_notes")
+    .select("id, tenant_name, tenant_phone, tenant_email, current_rent, index_type, adjustment_frequency_months, late_fee_daily_amount, late_fee_grace_days, contract_start_date, next_adjustment_date, rent_reference_date, last_adjustment_date, contract_file_name, contract_file_path, contract_file_mime_type, contract_file_size_bytes, contract_text, owner_name, owner_phone, owner_email, management_fee_percent, monthly_owner_costs, owner_notes")
     .eq("property_id", property.id)
     .maybeSingle();
 
@@ -282,6 +284,20 @@ export async function POST(request: Request) {
     analyzedContract?.adjustmentFrequencyMonths ??
     existingContract?.adjustment_frequency_months ??
     6;
+  const resolvedLateFeeDailyAmount = Math.max(
+    0,
+    Number.isFinite(Number(lateFeeDailyAmountRaw))
+      ? Number(lateFeeDailyAmountRaw)
+      : analyzedContract?.lateFeeDailyAmount ??
+          Number(existingContract?.late_fee_daily_amount ?? 0)
+  );
+  const resolvedLateFeeGraceDays = Math.max(
+    0,
+    Number.isFinite(Number(lateFeeGraceDaysRaw))
+      ? Math.round(Number(lateFeeGraceDaysRaw))
+      : analyzedContract?.lateFeeGraceDays ??
+          Number(existingContract?.late_fee_grace_days ?? 10)
+  );
   const resolvedContractStartDate =
     analyzedContract?.contractStartDate ??
     normalizeOptionalString(contractStartDateRaw) ??
@@ -328,6 +344,8 @@ export async function POST(request: Request) {
     currency: "ARS",
     index_type: resolvedIndexType,
     adjustment_frequency_months: resolvedAdjustmentFrequencyMonths,
+    late_fee_daily_amount: resolvedLateFeeDailyAmount,
+    late_fee_grace_days: resolvedLateFeeGraceDays,
     contract_start_date: schedule.contractStartDate,
     rent_reference_date:
       existingContract?.rent_reference_date ??
@@ -449,6 +467,8 @@ export async function PATCH(request: Request) {
         currentRent?: number;
         indexType?: "IPC" | "ICL";
         adjustmentFrequencyMonths?: number;
+        lateFeeDailyAmount?: number;
+        lateFeeGraceDays?: number;
         contractStartDate?: string;
         nextAdjustmentDate?: string;
         autoNotify?: boolean;
@@ -464,7 +484,7 @@ export async function PATCH(request: Request) {
   const admin = createAdminClient();
   const { data: contract, error } = await admin
     .from("rental_contracts")
-    .select("id, property_id, agency_id, tenant_name, tenant_phone, tenant_email, owner_name, owner_phone, owner_email, management_fee_percent, monthly_owner_costs, owner_notes, current_rent, index_type, adjustment_frequency_months, contract_start_date, next_adjustment_date, auto_notify, notes, agencies!inner(slug)")
+    .select("id, property_id, agency_id, tenant_name, tenant_phone, tenant_email, owner_name, owner_phone, owner_email, management_fee_percent, monthly_owner_costs, owner_notes, current_rent, index_type, adjustment_frequency_months, late_fee_daily_amount, late_fee_grace_days, contract_start_date, next_adjustment_date, auto_notify, notes, agencies!inner(slug)")
     .eq("id", contractId)
     .maybeSingle();
 
@@ -512,6 +532,18 @@ export async function PATCH(request: Request) {
   const adjustmentFrequencyMonths = Number(
     body?.adjustmentFrequencyMonths ?? contract.adjustment_frequency_months
   );
+  const lateFeeDailyAmount = Math.max(
+    0,
+    Number.isFinite(Number(body?.lateFeeDailyAmount))
+      ? Number(body?.lateFeeDailyAmount)
+      : Number(contract.late_fee_daily_amount ?? 0)
+  );
+  const lateFeeGraceDays = Math.max(
+    0,
+    Number.isFinite(Number(body?.lateFeeGraceDays))
+      ? Math.round(Number(body?.lateFeeGraceDays))
+      : Number(contract.late_fee_grace_days ?? 10)
+  );
   const contractStartDate = String(body?.contractStartDate ?? contract.contract_start_date).trim();
   const nextAdjustmentDate = String(body?.nextAdjustmentDate ?? contract.next_adjustment_date).trim();
   const autoNotify = Boolean(body?.autoNotify ?? contract.auto_notify);
@@ -553,6 +585,8 @@ export async function PATCH(request: Request) {
       current_rent: currentRent,
       index_type: indexType,
       adjustment_frequency_months: adjustmentFrequencyMonths,
+      late_fee_daily_amount: lateFeeDailyAmount,
+      late_fee_grace_days: lateFeeGraceDays,
       contract_start_date: contractStartDate,
       rent_reference_date: contractStartDate,
       next_adjustment_date: nextAdjustmentDate,

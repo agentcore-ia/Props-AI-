@@ -7,6 +7,8 @@ type RentalContractAnalysis = {
   currentRent: number | null;
   indexType: "IPC" | "ICL" | null;
   adjustmentFrequencyMonths: number | null;
+  lateFeeDailyAmount: number | null;
+  lateFeeGraceDays: number | null;
   contractStartDate: string | null;
   nextAdjustmentDate: string | null;
   summary: string;
@@ -99,6 +101,16 @@ function normalizePositiveInteger(value: unknown) {
       ? Number(value.replace(/[^\d.-]/g, ""))
       : NaN;
   return Number.isFinite(numeric) && numeric > 0 ? Math.round(numeric) : null;
+}
+
+function normalizeNonNegativeInteger(value: unknown) {
+  const numeric =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+      ? Number(value.replace(/[^\d.-]/g, ""))
+      : NaN;
+  return Number.isFinite(numeric) && numeric >= 0 ? Math.round(numeric) : null;
 }
 
 function normalizePositiveAmount(value: unknown) {
@@ -257,6 +269,42 @@ function inferCurrentRent(text: string) {
   return null;
 }
 
+function inferLateFeeDailyAmount(text: string) {
+  const patterns = [
+    /(?:punitorio|mora|multa|interes(?:es)?)[\s\S]{0,140}?(?:por\s+)?(?:cada\s+)?d[ií]a[\s\S]{0,80}?(?:ars\s*)?\$\s*([\d.]+(?:,\d{2})?)/i,
+    /(?:ars\s*)?\$\s*([\d.]+(?:,\d{2})?)[\s\S]{0,80}?(?:por\s+)?(?:cada\s+)?d[ií]a(?:\s+de\s+(?:atraso|mora))?/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    const amount = parseAmount(match[1]);
+    if (amount && !Number.isNaN(amount)) {
+      return amount;
+    }
+  }
+
+  return null;
+}
+
+function inferLateFeeGraceDays(text: string) {
+  const lowered = text.toLowerCase();
+  const explicit =
+    lowered.match(/(\d{1,2})\s+d[ií]as?\s+de\s+gracia/) ||
+    lowered.match(/gracia\s+de\s+(\d{1,2})\s+d[ií]as?/) ||
+    lowered.match(/vencid[oa]s?\s+(\d{1,2})\s+d[ií]as?/);
+
+  if (explicit) {
+    return Number(explicit[1]);
+  }
+
+  if (/sin\s+d[ií]as?\s+de\s+gracia|sin\s+gracia/.test(lowered)) {
+    return 0;
+  }
+
+  return null;
+}
+
 async function inferWithOpenAI(text: string): Promise<AIRentalContractAnalysis | null> {
   const openAI = getOpenAIEnv();
   if (!openAI.configured) return null;
@@ -276,7 +324,7 @@ async function inferWithOpenAI(text: string): Promise<AIRentalContractAnalysis |
             {
               type: "input_text",
               text:
-                "Lee un contrato de alquiler argentino y extrae datos estructurados. Devuelve solo JSON valido con las claves tenantName, currentRent, indexType, adjustmentFrequencyMonths, contractStartDate, nextAdjustmentDate, summary, confidence y notes. Usa null si un dato no está expresado con claridad suficiente. Las fechas deben salir como YYYY-MM-DD incluso si el contrato usa formatos legales como '01 de Abril del año 2024' o 'mes de OCTUBRE del año 2024'. indexType solo puede ser IPC o ICL. confidence solo puede ser high, medium o low. No inventes datos faltantes.",
+                "Lee un contrato de alquiler argentino y extrae datos estructurados. Devuelve solo JSON valido con las claves tenantName, currentRent, indexType, adjustmentFrequencyMonths, lateFeeDailyAmount, lateFeeGraceDays, contractStartDate, nextAdjustmentDate, summary, confidence y notes. Usa null si un dato no está expresado con claridad suficiente. lateFeeDailyAmount es el monto fijo por cada dia de atraso o mora; lateFeeGraceDays son dias de gracia antes de aplicar punitorios. Las fechas deben salir como YYYY-MM-DD incluso si el contrato usa formatos legales como '01 de Abril del año 2024' o 'mes de OCTUBRE del año 2024'. indexType solo puede ser IPC o ICL. confidence solo puede ser high, medium o low. No inventes datos faltantes.",
             },
           ],
         },
@@ -322,6 +370,8 @@ export async function analyzeRentalContractText({
   const ruleCurrentRent = inferCurrentRent(normalizedText);
   const ruleIndexType = inferIndexType(normalizedText);
   const ruleAdjustmentFrequencyMonths = inferFrequencyMonths(normalizedText);
+  const ruleLateFeeDailyAmount = inferLateFeeDailyAmount(normalizedText);
+  const ruleLateFeeGraceDays = inferLateFeeGraceDays(normalizedText);
   const ruleContractStartDate = inferContractStartDate(normalizedText);
   const ruleNextAdjustmentDate = inferNextAdjustmentDate(normalizedText, ruleContractStartDate);
 
@@ -330,6 +380,8 @@ export async function analyzeRentalContractText({
   const aiCurrentRent = normalizePositiveAmount(ai?.currentRent);
   const aiIndexType = normalizeIndexType(ai?.indexType);
   const aiAdjustmentFrequencyMonths = normalizePositiveInteger(ai?.adjustmentFrequencyMonths);
+  const aiLateFeeDailyAmount = normalizePositiveAmount(ai?.lateFeeDailyAmount);
+  const aiLateFeeGraceDays = normalizeNonNegativeInteger(ai?.lateFeeGraceDays);
   const aiContractStartDate = normalizeIsoDate(ai?.contractStartDate);
   const aiNextAdjustmentDate = normalizeIsoDate(ai?.nextAdjustmentDate);
 
@@ -338,6 +390,8 @@ export async function analyzeRentalContractText({
   const detectedIndexType = aiIndexType ?? ruleIndexType;
   const detectedAdjustmentFrequencyMonths =
     aiAdjustmentFrequencyMonths ?? ruleAdjustmentFrequencyMonths;
+  const detectedLateFeeDailyAmount = aiLateFeeDailyAmount ?? ruleLateFeeDailyAmount;
+  const detectedLateFeeGraceDays = aiLateFeeGraceDays ?? ruleLateFeeGraceDays;
   const detectedContractStartDate = aiContractStartDate ?? ruleContractStartDate;
   const detectedNextAdjustmentDate =
     aiNextAdjustmentDate ??
@@ -347,6 +401,8 @@ export async function analyzeRentalContractText({
   const currentRent = detectedCurrentRent ?? fallbackRent;
   const indexType = detectedIndexType ?? null;
   const adjustmentFrequencyMonths = detectedAdjustmentFrequencyMonths ?? null;
+  const lateFeeDailyAmount = detectedLateFeeDailyAmount ?? null;
+  const lateFeeGraceDays = detectedLateFeeGraceDays ?? null;
   const contractStartDate = detectedContractStartDate ?? null;
   const nextAdjustmentDate =
     detectedNextAdjustmentDate ??
@@ -412,6 +468,8 @@ export async function analyzeRentalContractText({
     currentRent,
     indexType,
     adjustmentFrequencyMonths,
+    lateFeeDailyAmount,
+    lateFeeGraceDays,
     contractStartDate,
     nextAdjustmentDate,
     summary:

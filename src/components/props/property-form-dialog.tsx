@@ -61,6 +61,8 @@ const initialState = {
   currentRent: "",
   indexType: "IPC" as "IPC" | "ICL",
   adjustmentFrequencyMonths: "6",
+  lateFeeDailyAmount: "0",
+  lateFeeGraceDays: "10",
   contractStartDate: "",
   nextAdjustmentDate: "",
   notes: "",
@@ -105,6 +107,8 @@ function resetRentalFields() {
     currentRent: "",
     indexType: "IPC" as "IPC" | "ICL",
     adjustmentFrequencyMonths: "6",
+    lateFeeDailyAmount: "0",
+    lateFeeGraceDays: "10",
     contractStartDate: "",
     nextAdjustmentDate: "",
     notes: "",
@@ -164,6 +168,8 @@ export function PropertyFormDialog({
     adjustmentFrequencyMonths: property?.rentalContract?.adjustmentFrequencyMonths
       ? String(property.rentalContract.adjustmentFrequencyMonths)
       : "6",
+    lateFeeDailyAmount: String(property?.rentalContract?.lateFeeDailyAmount ?? 0),
+    lateFeeGraceDays: String(property?.rentalContract?.lateFeeGraceDays ?? 10),
     contractStartDate: property?.rentalContract?.contractStartDate ?? "",
     nextAdjustmentDate: property?.rentalContract?.nextAdjustmentDate ?? "",
     notes: property?.rentalContract?.notes ?? "",
@@ -311,6 +317,8 @@ export function PropertyFormDialog({
         currentRent: form.currentRent,
         indexType: form.indexType,
         adjustmentFrequencyMonths: form.adjustmentFrequencyMonths,
+        lateFeeDailyAmount: form.lateFeeDailyAmount,
+        lateFeeGraceDays: form.lateFeeGraceDays,
         contractStartDate: form.contractStartDate,
         nextAdjustmentDate: form.nextAdjustmentDate,
         notes: form.notes,
@@ -803,6 +811,26 @@ export function PropertyFormDialog({
                             value={form.nextAdjustmentDate}
                             onChange={(event) =>
                               setForm((prev) => ({ ...prev, nextAdjustmentDate: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Punitorio por dia (ARS)</label>
+                          <Input
+                            placeholder="10000"
+                            value={form.lateFeeDailyAmount}
+                            onChange={(event) =>
+                              setForm((prev) => ({ ...prev, lateFeeDailyAmount: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Dias de gracia</label>
+                          <Input
+                            placeholder="10"
+                            value={form.lateFeeGraceDays}
+                            onChange={(event) =>
+                              setForm((prev) => ({ ...prev, lateFeeGraceDays: event.target.value }))
                             }
                           />
                         </div>

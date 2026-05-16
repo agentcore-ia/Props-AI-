@@ -35,6 +35,8 @@ export type RentalContractSummary = {
   currency: "ARS";
   indexType: RentIndexType;
   adjustmentFrequencyMonths: number;
+  lateFeeDailyAmount: number;
+  lateFeeGraceDays: number;
   contractStartDate: string;
   rentReferenceDate: string;
   nextAdjustmentDate: string;

@@ -532,7 +532,7 @@ export async function POST(request: Request) {
     .slice(0, 12)
     .map(
       (item) =>
-        `- ${item.tenantName} | ${item.propertyTitle} | deuda ${item.totalDebtAmount} ${item.currency} | atraso ${item.daysLate} dias | riesgo ${item.risk} | sugerencia ${item.suggestedAction}`
+        `- ${item.tenantName} | ${item.propertyTitle} | alquiler pendiente ${item.rentDebtAmount} ${item.currency} | punitorios ${item.lateFeeAmount} ${item.currency} | total ${item.totalDebtAmount} ${item.currency} | atraso ${item.daysLate} dias | riesgo ${item.risk} | sugerencia ${item.suggestedAction}`
     )
     .join("\n");
 
