@@ -12,6 +12,7 @@ import { getDefaultAgencyTemplates } from "@/lib/crm-insights";
 import type {
   CashMovementSummary,
   ContractRescissionSummary,
+  DelinquentTenantSummary,
   OwnerTransferSummary,
   RentalCollectionSummary,
   SupplierInvoiceSummary,
@@ -1478,6 +1479,173 @@ export async function listRentalCollections(options?: { agencySlug?: string; lim
   return ((data ?? []) as Array<RentalCollectionRow & {
     agencies: { slug: string } | { slug: string }[] | null;
   }>).map(mapRentalCollection);
+}
+
+function getMonthLabel(date = new Date()) {
+  return date.toISOString().slice(0, 7);
+}
+
+function daysInMonth(year: number, monthIndex: number) {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+function getRentDueDay(contractStartDate: string) {
+  const parsed = new Date(`${contractStartDate}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return 1;
+  return Math.min(Math.max(parsed.getDate(), 1), 28);
+}
+
+function buildDelinquencyMessage(item: {
+  tenantName: string;
+  propertyTitle: string;
+  collectionMonth: string;
+  totalDebtAmount: number;
+  currency: "ARS";
+}) {
+  const firstName = item.tenantName.split(" ")[0] || item.tenantName;
+  const amount = new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: item.currency,
+    maximumFractionDigits: 0,
+  }).format(item.totalDebtAmount);
+
+  return `Hola ${firstName}, te escribimos por el alquiler de ${item.propertyTitle}. Tenemos pendiente el pago del periodo ${item.collectionMonth} por ${amount}. Cuando puedas, envianos el comprobante o avisame si ya fue transferido para actualizar la cuenta.`;
+}
+
+export async function listDelinquentTenants(options?: {
+  agencySlug?: string;
+  month?: string;
+  graceDays?: number;
+}) {
+  const leases = await listLeaseRoster(options?.agencySlug ? { agencySlug: options.agencySlug } : undefined);
+  const month = options?.month?.slice(0, 7) || getMonthLabel();
+  const graceDays = Number.isFinite(Number(options?.graceDays)) ? Math.max(0, Number(options?.graceDays)) : 10;
+  const activeLeases = leases.filter((lease) => lease.status === "Activo");
+
+  if (activeLeases.length === 0) {
+    return [] as DelinquentTenantSummary[];
+  }
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("rental_collections")
+    .select("contract_id, collection_month, expected_rent, collected_amount, payment_date, status")
+    .eq("collection_month", month)
+    .in("contract_id", activeLeases.map((lease) => lease.contractId));
+
+  if (error) {
+    if (/rental_collections/i.test(error.message ?? "")) {
+      return [];
+    }
+    throw error;
+  }
+
+  const collectionByContractId = new Map(
+    ((data ?? []) as Array<{
+      contract_id: string;
+      collection_month: string;
+      expected_rent: number;
+      collected_amount: number;
+      payment_date: string | null;
+      status: "Pendiente" | "Parcial" | "Cobrada" | "Mora";
+    }>).map((collection) => [collection.contract_id, collection])
+  );
+
+  const [year, monthNumber] = month.split("-").map((part) => Number(part));
+  const monthIndex = Math.max(0, (monthNumber || 1) - 1);
+  const today = new Date();
+  const isCurrentMonth = getMonthLabel(today) === month;
+  const referenceDate = isCurrentMonth
+    ? today
+    : new Date(year || today.getFullYear(), monthIndex, daysInMonth(year || today.getFullYear(), monthIndex));
+
+  return activeLeases
+    .map<DelinquentTenantSummary | null>((lease) => {
+      const collection = collectionByContractId.get(lease.contractId);
+      const expectedRent = Number(collection?.expected_rent ?? lease.currentRent ?? 0);
+      const collectedAmount = Number(collection?.collected_amount ?? 0);
+      const rentDebtAmount = Math.max(0, expectedRent - collectedAmount);
+
+      if (rentDebtAmount <= 0 && collection?.status === "Cobrada") {
+        return null;
+      }
+
+      const dueDay = getRentDueDay(lease.contractStartDate);
+      const cappedDueDay = Math.min(dueDay, daysInMonth(year || today.getFullYear(), monthIndex));
+      const dueDate = new Date(year || today.getFullYear(), monthIndex, cappedDueDay);
+      const graceLimit = new Date(dueDate);
+      graceLimit.setDate(graceLimit.getDate() + graceDays);
+      const daysLate = Math.max(
+        0,
+        Math.floor((referenceDate.getTime() - graceLimit.getTime()) / (24 * 60 * 60 * 1000))
+      );
+      const collectionStatus = collection?.status ?? (daysLate > 0 ? "Mora" : "Pendiente");
+      const totalDebtAmount = rentDebtAmount;
+      const risk =
+        daysLate >= 20 || totalDebtAmount >= expectedRent * 1.5
+          ? "Alta"
+          : daysLate >= 7 || collectionStatus === "Mora"
+            ? "Media"
+            : "Baja";
+      const aiReason =
+        risk === "Alta"
+          ? "Prioridad alta: deuda vencida con varios dias de atraso. Conviene contacto humano y dejar compromiso de pago."
+          : risk === "Media"
+            ? "Mora moderada: corresponde aviso firme por WhatsApp y seguimiento en 24 horas."
+            : "Todavia esta cerca del vencimiento o dentro de margen operativo. Conviene aviso amable.";
+      const suggestedAction =
+        risk === "Alta"
+          ? "Llamar y enviar WhatsApp con pedido de comprobante o fecha exacta de pago."
+          : risk === "Media"
+            ? "Enviar WhatsApp y programar seguimiento para manana."
+            : "Enviar recordatorio amable sin escalar.";
+
+      return {
+        contractId: lease.contractId,
+        propertyId: lease.propertyId,
+        agencyId: lease.agencyId,
+        agencySlug: lease.agencySlug,
+        agencyName: lease.agencyName,
+        tenantName: lease.tenantName,
+        tenantPhone: lease.tenantPhone,
+        tenantEmail: lease.tenantEmail,
+        propertyTitle: lease.propertyTitle,
+        propertyLocation: lease.propertyLocation,
+        exactAddress: lease.exactAddress,
+        ownerName: lease.ownerName,
+        currency: lease.currency,
+        collectionMonth: month,
+        dueDay,
+        graceDays,
+        daysLate,
+        expectedRent,
+        collectedAmount,
+        rentDebtAmount,
+        extraDebtAmount: 0,
+        totalDebtAmount,
+        collectionStatus,
+        risk,
+        aiReason,
+        suggestedAction,
+        suggestedMessage: buildDelinquencyMessage({
+          tenantName: lease.tenantName,
+          propertyTitle: lease.propertyTitle,
+          collectionMonth: month,
+          totalDebtAmount,
+          currency: lease.currency,
+        }),
+        lastPaymentDate: collection?.payment_date ?? null,
+      };
+    })
+    .filter((item): item is DelinquentTenantSummary => Boolean(item))
+    .sort((left, right) => {
+      const riskWeight = { Alta: 3, Media: 2, Baja: 1 };
+      return (
+        riskWeight[right.risk] - riskWeight[left.risk] ||
+        right.daysLate - left.daysLate ||
+        right.totalDebtAmount - left.totalDebtAmount
+      );
+    });
 }
 
 export async function listOwnerTransfers(options?: { agencySlug?: string; limit?: number }) {

@@ -5,6 +5,7 @@ import { getAgencyScopeFromUser } from "@/lib/crm-automation";
 import { getOpenAIEnv } from "@/lib/openai-env";
 import {
   getTodayWorkspaceSnapshot,
+  listDelinquentTenants,
   listCrmLeads,
   listEmployeeTasks,
   listLeaseRoster,
@@ -210,6 +211,7 @@ function buildSectionGuide() {
     "Alquileres: contratos, ajustes, liquidaciones, rescisiones y documentacion.",
     "Propietarios: relacion por propietario, participacion, liquidaciones emitidas y netos.",
     "Cobranzas: registrar cobros de inquilinos y controlar estado del periodo.",
+    "Morosos: ver alquileres pendientes, deuda por inquilino, prioridad IA y avisos por WhatsApp.",
     "Transferencias: registrar pagos al propietario y dejar trazabilidad.",
     "Caja: ingresos, egresos y movimientos operativos.",
     "Proveedores y Facturacion: alta de proveedores, facturas y gastos administrativos.",
@@ -407,6 +409,7 @@ async function answerWithOpenAI(input: {
   visitsContext: string;
   tasksContext: string;
   contractsContext: string;
+  delinquenciesContext: string;
   sectionGuide: string;
   todaySnapshot: Awaited<ReturnType<typeof getTodayWorkspaceSnapshot>>;
 }) {
@@ -439,7 +442,7 @@ async function answerWithOpenAI(input: {
           content: [
             {
               type: "input_text",
-              text: `Guia de secciones:\n${input.sectionGuide}\n\nPropiedades:\n${input.propertyContext}\n\nLeads:\n${input.leadsContext}\n\nVisitas:\n${input.visitsContext}\n\nTareas:\n${input.tasksContext}\n\nContratos:\n${input.contractsContext}\n\nPanel de hoy: tareas ${input.todaySnapshot.counters.pendingTasks}, visitas ${input.todaySnapshot.counters.visitsToday}, leads urgentes ${input.todaySnapshot.counters.urgentLeads}, seguimientos ${input.todaySnapshot.counters.automaticFollowUps}.\n\nHistorial reciente:\n${historyContext || "Sin historial previo."}\n\nConsulta del equipo:\n${input.prompt}`,
+              text: `Guia de secciones:\n${input.sectionGuide}\n\nPropiedades:\n${input.propertyContext}\n\nLeads:\n${input.leadsContext}\n\nVisitas:\n${input.visitsContext}\n\nTareas:\n${input.tasksContext}\n\nContratos:\n${input.contractsContext}\n\nMorosos:\n${input.delinquenciesContext}\n\nPanel de hoy: tareas ${input.todaySnapshot.counters.pendingTasks}, visitas ${input.todaySnapshot.counters.visitsToday}, leads urgentes ${input.todaySnapshot.counters.urgentLeads}, seguimientos ${input.todaySnapshot.counters.automaticFollowUps}.\n\nHistorial reciente:\n${historyContext || "Sin historial previo."}\n\nConsulta del equipo:\n${input.prompt}`,
             },
           ],
         },
@@ -481,7 +484,7 @@ export async function POST(request: Request) {
   }
 
   const scope = getAgencyScopeFromUser(current);
-  const [properties, leads, visits, tasks, contracts, leases, today] = await Promise.all([
+  const [properties, leads, visits, tasks, contracts, leases, today, delinquencies] = await Promise.all([
     listProperties(scope?.agencySlug ? { tenantSlug: scope.agencySlug } : undefined),
     listCrmLeads(scope),
     listVisitAppointments(scope),
@@ -489,6 +492,7 @@ export async function POST(request: Request) {
     listRentalContracts(scope),
     listLeaseRoster(scope),
     getTodayWorkspaceSnapshot(scope),
+    listDelinquentTenants(scope),
   ]);
 
   const assistantContracts = buildContractsForAssistant({ leases, contracts });
@@ -522,6 +526,13 @@ export async function POST(request: Request) {
     .map(
       (contract) =>
         `- ${contract.tenantName} | ${contract.propertyTitle} | ${contract.propertyLocation} | alquiler ${contract.currentRent} | propietario ${contract.ownerName ?? "sin definir"}`
+    )
+    .join("\n");
+  const delinquenciesContext = delinquencies
+    .slice(0, 12)
+    .map(
+      (item) =>
+        `- ${item.tenantName} | ${item.propertyTitle} | deuda ${item.totalDebtAmount} ${item.currency} | atraso ${item.daysLate} dias | riesgo ${item.risk} | sugerencia ${item.suggestedAction}`
     )
     .join("\n");
 
@@ -840,6 +851,7 @@ export async function POST(request: Request) {
     visitsContext,
     tasksContext,
     contractsContext,
+    delinquenciesContext,
     sectionGuide: buildSectionGuide(),
     todaySnapshot: today,
   });

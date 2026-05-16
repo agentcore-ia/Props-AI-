@@ -44,6 +44,18 @@ const sectionPresets: Array<{
     ],
   },
   {
+    match: (pathname) => pathname.startsWith("/morosos"),
+    title: "Asistente de morosos",
+    description: "Te ayuda a priorizar deudores, redactar avisos y definir el proximo paso de cobranza.",
+    placeholder: "Ej. que morosos conviene llamar primero o redactame un aviso firme pero amable...",
+    prompts: [
+      "Que morosos tengo que contactar primero?",
+      "Como redacto un aviso de alquiler pendiente?",
+      "Que hago si un inquilino pago parcial?",
+      "Que casos requieren llamada humana?",
+    ],
+  },
+  {
     match: (pathname) => pathname.startsWith("/transferencias"),
     title: "Asistente de transferencias",
     description: "Sirve para registrar pagos a propietarios y seguir lo que falta transferir.",

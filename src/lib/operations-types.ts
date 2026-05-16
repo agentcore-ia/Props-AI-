@@ -59,6 +59,39 @@ export type RentalCollectionSummary = {
   createdAt: string;
 };
 
+export type DelinquencyRisk = "Alta" | "Media" | "Baja";
+
+export type DelinquentTenantSummary = {
+  contractId: string;
+  propertyId: string;
+  agencyId: string;
+  agencySlug: string;
+  agencyName: string;
+  tenantName: string;
+  tenantPhone: string;
+  tenantEmail: string | null;
+  propertyTitle: string;
+  propertyLocation: string;
+  exactAddress: string;
+  ownerName: string | null;
+  currency: "ARS";
+  collectionMonth: string;
+  dueDay: number;
+  graceDays: number;
+  daysLate: number;
+  expectedRent: number;
+  collectedAmount: number;
+  rentDebtAmount: number;
+  extraDebtAmount: number;
+  totalDebtAmount: number;
+  collectionStatus: RentalCollectionStatus;
+  risk: DelinquencyRisk;
+  aiReason: string;
+  suggestedAction: string;
+  suggestedMessage: string;
+  lastPaymentDate: string | null;
+};
+
 export type OwnerTransferSummary = {
   id: string;
   settlementId: string | null;
