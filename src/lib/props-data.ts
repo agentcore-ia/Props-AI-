@@ -82,6 +82,45 @@ type PropertyRow = {
   agencies: Pick<AgencyRow, "slug" | "name"> | null;
 };
 
+const PROPERTY_IMAGE_BUCKET = "property-images";
+const FALLBACK_PROPERTY_IMAGE =
+  "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80";
+
+function normalizePropertyImageUrl(value: string | null | undefined) {
+  const rawValue = String(value ?? "").trim();
+
+  if (!rawValue) {
+    return FALLBACK_PROPERTY_IMAGE;
+  }
+
+  if (/^https?:\/\//i.test(rawValue) || rawValue.startsWith("/")) {
+    return rawValue;
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) {
+    return rawValue;
+  }
+
+  const cleanPath = rawValue
+    .replace(/^\/+/, "")
+    .replace(new RegExp(`^${PROPERTY_IMAGE_BUCKET}/`), "");
+
+  return `${supabaseUrl.replace(/\/+$/, "")}/storage/v1/object/public/${PROPERTY_IMAGE_BUCKET}/${encodeURI(cleanPath)}`;
+}
+
+function normalizePropertyImages(image: string, images: string[] | null) {
+  const normalizedImages = (images && images.length > 0 ? images : [image])
+    .map((item) => normalizePropertyImageUrl(item))
+    .filter(Boolean);
+
+  if (normalizedImages.length === 0) {
+    return [FALLBACK_PROPERTY_IMAGE];
+  }
+
+  return normalizedImages;
+}
+
 type RentalContractRow = {
   id: string;
   property_id: string;
@@ -960,11 +999,8 @@ function mapProperty(
     status: row.status,
     operation: row.operation,
     description: row.description,
-    image: row.image,
-    images:
-      row.images && row.images.length > 0
-        ? row.images
-        : [row.image, row.image, row.image],
+    image: normalizePropertyImageUrl(row.image),
+    images: normalizePropertyImages(row.image, row.images),
     propertyType: row.property_type,
     bedrooms: Number(row.bedrooms ?? 0),
     bathrooms: Number(row.bathrooms ?? 0),

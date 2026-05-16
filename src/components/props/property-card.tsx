@@ -44,6 +44,7 @@ export function PropertyCard({
           src={property.image}
           alt={property.title}
           fill
+          unoptimized
           sizes="(max-width: 768px) 100vw, (max-width: 1536px) 50vw, 33vw"
           className="object-cover transition-transform duration-500 hover:scale-105"
         />
