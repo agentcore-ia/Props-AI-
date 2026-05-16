@@ -1,11 +1,72 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { Edit3, Save, X } from "lucide-react";
+
 import { PageHeader } from "@/components/layout/page-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import type { TenantRosterSummary } from "@/lib/operations-types";
 import { formatMoney, formatShortDate } from "@/lib/utils";
 
 export function TenantsWorkspace({ tenants }: { tenants: TenantRosterSummary[] }) {
+  const router = useRouter();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    tenantName: "",
+    tenantPhone: "",
+    tenantEmail: "",
+  });
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  function startEdit(tenant: TenantRosterSummary) {
+    setEditingId(tenant.contractId);
+    setForm({
+      tenantName: tenant.tenantName,
+      tenantPhone: tenant.tenantPhone,
+      tenantEmail: tenant.tenantEmail ?? "",
+    });
+    setMessage(null);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setMessage(null);
+  }
+
+  async function saveTenant(contractId: string) {
+    setSavingId(contractId);
+    setMessage(null);
+
+    const response = await fetch("/api/admin/tenants", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contractId,
+        tenantName: form.tenantName,
+        tenantPhone: form.tenantPhone,
+        tenantEmail: form.tenantEmail || null,
+      }),
+    });
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    setSavingId(null);
+
+    if (!response.ok) {
+      setMessage({
+        type: "error",
+        text: payload?.error ?? "No se pudieron guardar los datos del inquilino.",
+      });
+      return;
+    }
+
+    setEditingId(null);
+    setMessage({ type: "success", text: "Datos del inquilino actualizados." });
+    router.refresh();
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -22,8 +83,11 @@ export function TenantsWorkspace({ tenants }: { tenants: TenantRosterSummary[] }
         <MiniCard
           label="Con ajuste proximo"
           value={String(
-            tenants.filter((tenant) => new Date(tenant.nextAdjustmentDate).getTime() <= Date.now() + 15 * 24 * 60 * 60 * 1000)
-              .length
+            tenants.filter(
+              (tenant) =>
+                new Date(tenant.nextAdjustmentDate).getTime() <=
+                Date.now() + 15 * 24 * 60 * 60 * 1000
+            ).length
           )}
         />
         <MiniCard
@@ -37,21 +101,106 @@ export function TenantsWorkspace({ tenants }: { tenants: TenantRosterSummary[] }
           <CardTitle>Base de inquilinos</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {message ? (
+            <div
+              className={`rounded-2xl border px-4 py-3 text-sm ${
+                message.type === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-red-200 bg-red-50 text-red-700"
+              }`}
+            >
+              {message.text}
+            </div>
+          ) : null}
+
           {tenants.length > 0 ? (
             tenants.map((tenant) => (
               <div key={tenant.contractId} className="rounded-2xl border bg-background p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-semibold">{tenant.tenantName}</p>
                     <p className="text-sm text-muted-foreground">
-                      {tenant.propertyTitle} · {tenant.propertyLocation}
+                      {tenant.propertyTitle} - {tenant.propertyLocation}
                     </p>
                   </div>
-                  <div className="text-right text-sm text-muted-foreground">
-                    <p>{tenant.tenantPhone}</p>
-                    <p>{tenant.tenantEmail || "Sin email"}</p>
+                  <div className="flex flex-wrap items-start justify-end gap-3">
+                    <div className="text-right text-sm text-muted-foreground">
+                      <p>{tenant.tenantPhone}</p>
+                      <p>{tenant.tenantEmail || "Sin email"}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-2xl"
+                      onClick={() => startEdit(tenant)}
+                    >
+                      <Edit3 className="size-4" />
+                      Editar
+                    </Button>
                   </div>
                 </div>
+
+                {editingId === tenant.contractId ? (
+                  <div className="mt-4 rounded-2xl border bg-muted/20 p-3">
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <label className="space-y-1 text-sm">
+                        <span className="font-medium">Nombre</span>
+                        <Input
+                          value={form.tenantName}
+                          onChange={(event) =>
+                            setForm((prev) => ({ ...prev, tenantName: event.target.value }))
+                          }
+                          placeholder="Nombre del inquilino"
+                          className="rounded-2xl"
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm">
+                        <span className="font-medium">WhatsApp</span>
+                        <Input
+                          value={form.tenantPhone}
+                          onChange={(event) =>
+                            setForm((prev) => ({ ...prev, tenantPhone: event.target.value }))
+                          }
+                          placeholder="Numero de contacto"
+                          className="rounded-2xl"
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm">
+                        <span className="font-medium">Email opcional</span>
+                        <Input
+                          value={form.tenantEmail}
+                          onChange={(event) =>
+                            setForm((prev) => ({ ...prev, tenantEmail: event.target.value }))
+                          }
+                          placeholder="mail@ejemplo.com"
+                          className="rounded-2xl"
+                        />
+                      </label>
+                    </div>
+                    <div className="mt-3 flex flex-wrap justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-2xl"
+                        onClick={cancelEdit}
+                        disabled={savingId === tenant.contractId}
+                      >
+                        <X className="size-4" />
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="button"
+                        className="rounded-2xl"
+                        onClick={() => void saveTenant(tenant.contractId)}
+                        disabled={savingId === tenant.contractId}
+                      >
+                        <Save className="size-4" />
+                        {savingId === tenant.contractId ? "Guardando..." : "Guardar cambios"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="mt-3 grid gap-2 text-sm md:grid-cols-4">
                   <p>Alquiler: {formatMoney(tenant.currentRent, "ARS")}</p>
                   <p>Proximo ajuste: {formatShortDate(tenant.nextAdjustmentDate)}</p>
@@ -59,7 +208,7 @@ export function TenantsWorkspace({ tenants }: { tenants: TenantRosterSummary[] }
                   <p>
                     Cobranza:{" "}
                     {tenant.latestCollectionStatus
-                      ? `${tenant.latestCollectionStatus} · ${tenant.latestCollectionMonth ?? ""}`
+                      ? `${tenant.latestCollectionStatus} - ${tenant.latestCollectionMonth ?? ""}`
                       : "sin registrar"}
                   </p>
                 </div>
