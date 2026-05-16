@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Edit3, Save, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Edit3, Save, Search, X } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { formatMoney, formatShortDate } from "@/lib/utils";
 
 export function TenantsWorkspace({ tenants }: { tenants: TenantRosterSummary[] }) {
   const router = useRouter();
+  const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     tenantName: "",
@@ -21,6 +22,18 @@ export function TenantsWorkspace({ tenants }: { tenants: TenantRosterSummary[] }
   });
   const [savingId, setSavingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const filteredTenants = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return tenants;
+
+    return tenants.filter((tenant) =>
+      [tenant.tenantName, tenant.propertyTitle, tenant.propertyLocation]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalized)
+    );
+  }, [query, tenants]);
 
   function startEdit(tenant: TenantRosterSummary) {
     setEditingId(tenant.contractId);
@@ -98,7 +111,23 @@ export function TenantsWorkspace({ tenants }: { tenants: TenantRosterSummary[] }
 
       <Card className="rounded-[28px] border-0 shadow-sm">
         <CardHeader>
-          <CardTitle>Base de inquilinos</CardTitle>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle>Base de inquilinos</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {filteredTenants.length} de {tenants.length} inquilinos
+              </p>
+            </div>
+            <div className="relative w-full lg:max-w-sm">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar por inquilino o propiedad..."
+                className="h-11 rounded-2xl pl-10"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {message ? (
@@ -113,8 +142,8 @@ export function TenantsWorkspace({ tenants }: { tenants: TenantRosterSummary[] }
             </div>
           ) : null}
 
-          {tenants.length > 0 ? (
-            tenants.map((tenant) => (
+          {filteredTenants.length > 0 ? (
+            filteredTenants.map((tenant) => (
               <div key={tenant.contractId} className="rounded-2xl border bg-background p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -215,7 +244,13 @@ export function TenantsWorkspace({ tenants }: { tenants: TenantRosterSummary[] }
               </div>
             ))
           ) : (
-            <EmptyBox text="Todavia no hay inquilinos activos en alquileres." />
+            <EmptyBox
+              text={
+                tenants.length
+                  ? "No encontramos inquilinos con esa busqueda."
+                  : "Todavia no hay inquilinos activos en alquileres."
+              }
+            />
           )}
         </CardContent>
       </Card>

@@ -1,7 +1,11 @@
 "use client";
 
+import { useMemo, useState } from "react";
+import { Search } from "lucide-react";
+
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { formatMoney } from "@/lib/utils";
 import type { OwnerRosterSummary } from "@/lib/operations-types";
 import type { OwnerSettlementItemSummary, OwnerSettlementSummary } from "@/lib/rental-types";
@@ -15,6 +19,19 @@ export function OwnersWorkspace({
   settlements: OwnerSettlementSummary[];
   settlementItems: OwnerSettlementItemSummary[];
 }) {
+  const [query, setQuery] = useState("");
+  const filteredOwners = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return owners;
+
+    return owners.filter((owner) =>
+      [owner.ownerName, owner.propertyTitle, owner.propertyLocation]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalized)
+    );
+  }, [owners, query]);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -38,11 +55,27 @@ export function OwnersWorkspace({
       <section className="grid gap-4 2xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="rounded-[28px] border-0 shadow-sm">
           <CardHeader>
-            <CardTitle>Relacion con propietarios</CardTitle>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <CardTitle>Relacion con propietarios</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {filteredOwners.length} de {owners.length} propietarios
+                </p>
+              </div>
+              <div className="relative w-full lg:max-w-sm">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Buscar por propietario o propiedad..."
+                  className="h-11 rounded-2xl pl-10"
+                />
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {owners.length > 0 ? (
-              owners.map((owner) => (
+            {filteredOwners.length > 0 ? (
+              filteredOwners.map((owner) => (
                 <div
                   key={`${owner.contractId}-${owner.contractOwnerId ?? owner.ownerName}`}
                   className="rounded-2xl border bg-background p-4"
@@ -73,7 +106,13 @@ export function OwnersWorkspace({
                 </div>
               ))
             ) : (
-              <EmptyBox text="Todavia no hay propietarios configurados en contratos de alquiler." />
+              <EmptyBox
+                text={
+                  owners.length
+                    ? "No encontramos propietarios con esa busqueda."
+                    : "Todavia no hay propietarios configurados en contratos de alquiler."
+                }
+              />
             )}
           </CardContent>
         </Card>
