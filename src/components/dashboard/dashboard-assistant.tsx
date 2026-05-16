@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Bot, Loader2, RefreshCcw, SendHorizonal, Sparkles, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -23,14 +24,113 @@ type AssistantMessage = {
   actionResult?: AssistantActionResult | null;
 };
 
-const quickPrompts = [
-  "Que tengo que hacer hoy?",
-  "Ya pago Maria Gomez el alquiler de este mes",
-  "Como genero una liquidacion al propietario?",
-  "Registra un gasto de caja de 25000 por cerrajeria",
+const sectionPresets: Array<{
+  match: (pathname: string) => boolean;
+  title: string;
+  description: string;
+  placeholder: string;
+  prompts: string[];
+}> = [
+  {
+    match: (pathname) => pathname.startsWith("/cobranzas"),
+    title: "Asistente de cobranzas",
+    description: "Te ayuda a registrar pagos, revisar periodos y destrabar consultas de cobro.",
+    placeholder: "Ej. ya pago Maria Gomez el alquiler de mayo por transferencia...",
+    prompts: [
+      "Ya pago Maria Gomez el alquiler de este mes",
+      "Como registro una cobranza parcial?",
+      "Que alquileres siguen pendientes de cobro?",
+      "Explicame como actualizar el estado de una cobranza",
+    ],
+  },
+  {
+    match: (pathname) => pathname.startsWith("/transferencias"),
+    title: "Asistente de transferencias",
+    description: "Sirve para registrar pagos a propietarios y seguir lo que falta transferir.",
+    placeholder: "Ej. registra la transferencia al propietario de Caballito por 450000...",
+    prompts: [
+      "Registra una transferencia al propietario del depto de Caballito",
+      "Que transferencias tengo pendientes?",
+      "Como confirmo una transferencia enviada?",
+      "Explicame que diferencia hay entre programada y confirmada",
+    ],
+  },
+  {
+    match: (pathname) => pathname.startsWith("/alquileres"),
+    title: "Asistente de alquileres",
+    description: "Te ayuda con contratos, liquidaciones, rescisiones y seguimiento operativo.",
+    placeholder: "Ej. genera la liquidacion del propietario del contrato de Maria Gomez...",
+    prompts: [
+      "Genera la liquidacion del propietario de Maria Gomez",
+      "Como inicio una rescision contractual?",
+      "Que contratos ajustan esta semana?",
+      "Explicame como cargar un concepto particular en una liquidacion",
+    ],
+  },
+  {
+    match: (pathname) => pathname.startsWith("/leads"),
+    title: "Asistente de leads",
+    description: "Te orienta para priorizar contactos, entender objeciones y avanzar el seguimiento.",
+    placeholder: "Ej. que lead deberia atender primero o que le contesto a este cliente...",
+    prompts: [
+      "Que lead deberia atender primero?",
+      "Que objeciones puso este cliente?",
+      "Como sigo a un lead que pidio visita?",
+      "Que propiedades similares deberia ofrecer?",
+    ],
+  },
+  {
+    match: (pathname) => pathname.startsWith("/mensajes"),
+    title: "Asistente de mensajes",
+    description: "Ayuda a responder mejor y mas rapido usando el contexto de clientes y propiedades.",
+    placeholder: "Ej. que le respondo a este cliente o como sigo esta conversacion...",
+    prompts: [
+      "Que le puedo responder a un cliente que pide visita?",
+      "Como cierro esta conversacion con una proxima accion clara?",
+      "Que respuesta corta uso para pasar requisitos?",
+      "Ayudame a ofrecer propiedades similares",
+    ],
+  },
+  {
+    match: (pathname) => pathname.startsWith("/propiedades"),
+    title: "Asistente de propiedades",
+    description: "Te ayuda con publicaciones, mejoras del aviso y dudas del inventario.",
+    placeholder: "Ej. como mejoro esta publicacion o que propiedad tiene mas salud comercial...",
+    prompts: [
+      "Que propiedades tienen peor salud comercial?",
+      "Como mejorar una publicacion con pocas consultas?",
+      "Que le falta a esta propiedad para salir mejor publicada?",
+      "Explicame como editar una propiedad ya publicada",
+    ],
+  },
+  {
+    match: (pathname) => pathname.startsWith("/caja"),
+    title: "Asistente de caja",
+    description: "Sirve para registrar ingresos y egresos, y para explicar movimientos de caja.",
+    placeholder: "Ej. registra un gasto de caja de 25000 por cerrajeria...",
+    prompts: [
+      "Registra un gasto de caja de 25000 por cerrajeria",
+      "Como registro un ingreso manual en caja?",
+      "Que diferencia hay entre ingreso, egreso y transferencia?",
+      "Ayudame a dejar asentado un gasto operativo",
+    ],
+  },
+  {
+    match: () => true,
+    title: "Asistente de Props",
+    description: "Responde dudas y puede ejecutar acciones operativas del CRM.",
+    placeholder: "Ej. ya pago Lucas el alquiler, como genero una liquidacion o que tengo pendiente hoy...",
+    prompts: [
+      "Que tengo que hacer hoy?",
+      "Ya pago Maria Gomez el alquiler de este mes",
+      "Como genero una liquidacion al propietario?",
+      "Registra un gasto de caja de 25000 por cerrajeria",
+    ],
+  },
 ];
 
 export function DashboardAssistant() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -42,6 +142,11 @@ export function DashboardAssistant() {
         "Soy el asistente de Props. Puedo explicarte cualquier seccion del dashboard y ejecutar acciones como registrar un pago, una transferencia, una liquidacion o un movimiento de caja.",
     },
   ]);
+
+  const sectionPreset = useMemo(
+    () => sectionPresets.find((item) => item.match(pathname)) ?? sectionPresets[sectionPresets.length - 1],
+    [pathname]
+  );
 
   const historyForApi = useMemo(
     () =>
@@ -131,9 +236,9 @@ export function DashboardAssistant() {
                   <Sparkles className="size-5" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">Asistente de dashboard</p>
+                  <p className="text-sm font-semibold">{sectionPreset.title}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Responde dudas y puede ejecutar acciones operativas del CRM.
+                    {sectionPreset.description}
                   </p>
                 </div>
               </div>
@@ -196,7 +301,7 @@ export function DashboardAssistant() {
 
           <div className="border-t px-4 py-4">
             <div className="mb-3 flex flex-wrap gap-2">
-              {quickPrompts.map((prompt) => (
+              {sectionPreset.prompts.map((prompt) => (
                 <Button
                   key={prompt}
                   type="button"
@@ -215,7 +320,7 @@ export function DashboardAssistant() {
               <Textarea
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
-                placeholder="Ej. ya pago Lucas el alquiler, como genero una liquidacion o que tengo pendiente hoy..."
+                placeholder={sectionPreset.placeholder}
                 className="min-h-[104px] resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0"
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
