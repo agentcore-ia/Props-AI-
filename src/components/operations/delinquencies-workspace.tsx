@@ -224,7 +224,7 @@ export function DelinquenciesWorkspace({
         {filtered.length > 0 ? (
           filtered.map((item) => (
             <article key={item.contractId} className="rounded-[28px] border bg-card p-4 shadow-sm">
-              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr_auto] xl:items-start">
+              <div className="space-y-4">
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline" className={cn("h-6 rounded-full border", riskClass(item.risk))}>
@@ -243,7 +243,7 @@ export function DelinquenciesWorkspace({
                       {item.propertyTitle} · {item.propertyLocation}
                     </p>
                   </div>
-                  <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                     <DataPoint label="Alquiler" value={formatMoney(item.expectedRent, item.currency)} />
                     <DataPoint label="Cobrado" value={formatMoney(item.collectedAmount, item.currency)} />
                     <DataPoint label="Saldo alquiler" value={formatMoney(item.rentDebtAmount, item.currency)} />
@@ -269,7 +269,7 @@ export function DelinquenciesWorkspace({
                   <p className="mt-3 text-sm font-medium">{item.suggestedAction}</p>
                 </div>
 
-                <div className="flex flex-col gap-2 xl:w-56">
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                   <Button
                     className="rounded-2xl"
                     disabled={!item.tenantPhone || sendingIds.includes(item.contractId)}
@@ -326,9 +326,18 @@ function MetricCard({ label, value, hint }: { label: string; value: string; hint
 
 function DataPoint({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="rounded-2xl border bg-background px-3 py-2">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
-      <p className={cn("mt-1 text-sm", strong ? "font-semibold text-foreground" : "text-muted-foreground")}>{value}</p>
+    <div className="min-w-0 rounded-2xl border bg-background px-3 py-2">
+      <p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        {label}
+      </p>
+      <p
+        className={cn(
+          "mt-1 break-words text-sm leading-5",
+          strong ? "font-semibold text-foreground" : "text-muted-foreground"
+        )}
+      >
+        {value}
+      </p>
     </div>
   );
 }

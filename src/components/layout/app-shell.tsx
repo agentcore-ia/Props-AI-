@@ -84,17 +84,17 @@ function SidebarContent({ userRole = "agency_admin" }: { userRole?: AppRole | nu
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-4 py-4">
+      <div className="px-3 py-3">
         <Link href="/dashboard" className="block transition-opacity hover:opacity-80">
-          <span className="block text-xl font-semibold tracking-tight text-slate-950">PROPS</span>
-          <span className="mt-0.5 block text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+          <span className="block text-lg font-semibold tracking-tight text-slate-950">PROPS</span>
+          <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
             Control inmobiliario
           </span>
         </Link>
       </div>
 
       <div className="flex-1 overflow-y-auto px-2">
-        <nav className="space-y-0.5 pb-4">
+        <nav className="space-y-0.5 pb-3">
           {navigation.map(({ href, label, icon: Icon }) => {
             const active = pathname === href;
 
@@ -103,13 +103,13 @@ function SidebarContent({ userRole = "agency_admin" }: { userRole?: AppRole | nu
                 key={href}
                 href={href}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
+                  "flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium transition-all",
                   active
                     ? "bg-primary text-primary-foreground shadow-soft"
                     : "text-muted-foreground hover:bg-sidebar-muted hover:text-foreground"
                 )}
               >
-                <Icon className="size-4" />
+                <Icon className="size-3.5" />
                 {label}
               </Link>
             );
@@ -135,8 +135,8 @@ export function AppShell({
 }) {
   return (
     <div className="min-h-screen">
-      <div className="flex min-h-screen w-full xl:pl-64">
-        <aside className="glass-panel hidden border-r border-sidebar-border xl:fixed xl:inset-y-0 xl:left-0 xl:flex xl:h-screen xl:w-64 xl:flex-col">
+      <div className="flex min-h-screen w-full xl:pl-56">
+        <aside className="glass-panel hidden border-r border-sidebar-border xl:fixed xl:inset-y-0 xl:left-0 xl:flex xl:h-screen xl:w-56 xl:flex-col">
           <SidebarContent userRole={userRole} />
         </aside>
 
@@ -148,7 +148,7 @@ export function AppShell({
                   <SheetTrigger render={<Button variant="outline" size="icon" />}>
                     <Menu className="size-4" />
                   </SheetTrigger>
-                  <SheetContent side="left" className="w-[272px] border-r bg-sidebar p-0">
+                  <SheetContent side="left" className="w-[248px] border-r bg-sidebar p-0">
                     <SheetHeader className="sr-only">
                       <SheetTitle>Menu principal</SheetTitle>
                       <SheetDescription>Navegacion del CRM Props</SheetDescription>
