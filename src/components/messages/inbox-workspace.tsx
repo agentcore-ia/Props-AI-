@@ -291,22 +291,22 @@ export function InboxWorkspace({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <PageHeader
         title="Mensajes"
-        description="Bandeja unica para atender consultas, ver la propiedad al lado, responder con contexto y dejar el siguiente paso resuelto."
+        description="Consultas, contexto y seguimiento en una sola bandeja."
         action={
           <div className="flex flex-wrap gap-2">
             <Button
               variant={mode === "recepcion" ? "default" : "outline"}
-              className="rounded-2xl"
+              className="h-9 rounded-2xl px-4"
               onClick={() => setMode("recepcion")}
             >
               Vista rapida
             </Button>
             <Button
               variant={mode === "completo" ? "default" : "outline"}
-              className="rounded-2xl"
+              className="h-9 rounded-2xl px-4"
               onClick={() => setMode("completo")}
             >
               Vista completa
@@ -321,16 +321,13 @@ export function InboxWorkspace({
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:h-[calc(100vh-150px)] xl:min-h-[640px] xl:grid-cols-[320px_minmax(0,1fr)_360px] xl:overflow-hidden">
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-[30px] border bg-card shadow-sm">
-          <div className="border-b px-5 py-4">
+      <div className="grid gap-4 xl:h-[calc(100vh-132px)] xl:min-h-[640px] xl:grid-cols-[280px_minmax(430px,1fr)_300px] xl:overflow-hidden">
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-[26px] border bg-card shadow-sm">
+          <div className="border-b px-4 py-3">
             <h3 className="font-semibold">Conversaciones</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              WhatsApp, web e ingresos del CRM en una sola cola operativa.
-            </p>
           </div>
           <ScrollArea className="min-h-[360px] flex-1">
-            <div className="space-y-2 p-3">
+            <div className="space-y-2 p-2.5">
               {filteredLeads.map((lead) => {
                 const thread = messagesByLead.get(lead.id) ?? [];
                 const lastMessage = thread[thread.length - 1];
@@ -342,17 +339,17 @@ export function InboxWorkspace({
                   <button
                     key={lead.id}
                     className={cn(
-                      "w-full rounded-2xl border p-4 text-left transition-all",
+                      "w-full rounded-2xl border p-3 text-left transition-all",
                       selectedLead.id === lead.id
                         ? "border-primary bg-primary/5"
                         : "bg-background hover:bg-muted/40"
                     )}
                     onClick={() => setSelectedId(lead.id)}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium">{lead.fullName}</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{lead.fullName}</p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
                           <Badge variant="outline" className="rounded-full">
                             {channel}
                           </Badge>
@@ -367,10 +364,10 @@ export function InboxWorkspace({
                         </span>
                       ) : null}
                     </div>
-                    <p className="mt-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    <p className="mt-3 line-clamp-1 text-xs font-medium text-muted-foreground">
                       {lead.propertyTitle || "Consulta general"}
                     </p>
-                    <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{preview}</p>
+                    <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">{preview}</p>
                   </button>
                 );
               })}
@@ -378,8 +375,8 @@ export function InboxWorkspace({
           </ScrollArea>
         </div>
 
-        <div className="flex min-h-[620px] min-w-0 flex-col overflow-hidden rounded-[30px] border bg-card shadow-sm xl:min-h-0">
-          <div className="flex items-center justify-between border-b px-6 py-4">
+        <div className="flex min-h-[620px] min-w-0 flex-col overflow-hidden rounded-[26px] border bg-card shadow-sm xl:min-h-0">
+          <div className="flex items-center justify-between border-b px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
               <Avatar className="rounded-2xl">
                 <AvatarFallback className="rounded-2xl bg-primary/10 text-primary">
@@ -399,36 +396,8 @@ export function InboxWorkspace({
             </Badge>
           </div>
 
-          <div ref={messageScrollRef} className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-            <div className="space-y-4">
-              <div className="rounded-[24px] border bg-background p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-primary/75">
-                  Propiedad consultada
-                </p>
-                <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium">{selectedLead.propertyTitle || "Consulta general"}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedLead.propertyLocation || "Sin ubicacion"}
-                    </p>
-                    {selectedLead.propertyPrice && selectedLead.propertyCurrency ? (
-                      <p className="mt-2 text-sm font-medium">
-                        {formatMoney(selectedLead.propertyPrice, selectedLead.propertyCurrency)}
-                      </p>
-                    ) : null}
-                  </div>
-                  {selectedLead.propertyId ? (
-                    <Link
-                      href={`/propiedad/${selectedLead.agencySlug}/${selectedLead.propertyId}`}
-                      target="_blank"
-                      className="inline-flex size-10 items-center justify-center rounded-full border bg-background"
-                    >
-                      <ArrowRight className="size-4" />
-                    </Link>
-                  ) : null}
-                </div>
-              </div>
-
+          <div ref={messageScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+            <div className="space-y-3">
               {selectedMessages.length > 0 ? (
                 selectedMessages.map((message) => (
                   <MessageBubble
@@ -454,14 +423,14 @@ export function InboxWorkspace({
             </div>
           </div>
 
-          <div className="border-t px-4 py-4">
-            <div className="mb-3 flex flex-wrap gap-2">
+          <div className="border-t bg-card/95 px-4 py-3">
+            <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
               {quickReplies.map((reply) => (
                 <Button
                   key={reply.key}
                   variant={reply.tone ?? "outline"}
                   size="sm"
-                  className="rounded-full"
+                  className="shrink-0 rounded-full"
                   disabled={busy}
                   onClick={() => void sendMessage({ directText: reply.message })}
                 >
@@ -472,7 +441,7 @@ export function InboxWorkspace({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="rounded-full"
+                  className="shrink-0 rounded-full"
                   onClick={() => setCompareOpen(true)}
                 >
                   Comparar propiedades
@@ -480,12 +449,12 @@ export function InboxWorkspace({
               ) : null}
             </div>
 
-            <div className="rounded-[24px] border bg-background p-3">
-              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <div className="rounded-[22px] border bg-background p-2.5">
+              <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Bot className="size-4 text-primary" />
-                Respuesta asistida por IA y contexto comercial
+                Respuesta asistida
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <Input
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
@@ -507,24 +476,48 @@ export function InboxWorkspace({
           </div>
         </div>
 
-        <div className="min-h-0 space-y-4 xl:overflow-y-auto xl:pr-1">
-          <section className="rounded-[30px] border bg-card p-5 shadow-sm">
+        <div className="min-h-0 space-y-3 xl:overflow-y-auto xl:pr-1">
+          <section className="rounded-[26px] border bg-card p-4 shadow-sm">
             <div className="flex items-center gap-2">
               <Sparkles className="size-4 text-primary" />
               <h3 className="font-semibold">Ficha del cliente</h3>
             </div>
-            <div className="mt-4 space-y-4 text-sm text-muted-foreground">
+            <div className="mt-4 space-y-3 text-sm text-muted-foreground">
+              <div className="rounded-2xl border bg-muted/20 p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Propiedad
+                </p>
+                <div className="mt-2 flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="line-clamp-2 font-medium text-foreground">
+                      {selectedLead.propertyTitle || "Consulta general"}
+                    </p>
+                    <p className="mt-1 line-clamp-1 text-xs">
+                      {selectedLead.propertyLocation || "Sin ubicacion"}
+                    </p>
+                  </div>
+                  {selectedLead.propertyId ? (
+                    <Link
+                      href={`/propiedad/${selectedLead.agencySlug}/${selectedLead.propertyId}`}
+                      target="_blank"
+                      className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border bg-background"
+                    >
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
               <div>
                 <p className="font-medium text-foreground">Que busca</p>
-                <p className="mt-2">{selectedProfile?.whatTheySeek}</p>
+                <p className="mt-1 line-clamp-2">{selectedProfile?.whatTheySeek}</p>
               </div>
               <div>
                 <p className="font-medium text-foreground">Propiedades vistas</p>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap gap-1.5">
                   {selectedProfile?.viewedProperties.length ? (
-                    selectedProfile.viewedProperties.map((item) => (
-                      <Badge key={item} variant="outline" className="rounded-full">
-                        {item}
+                    selectedProfile.viewedProperties.slice(0, 2).map((item) => (
+                      <Badge key={item} variant="outline" className="max-w-full rounded-full">
+                        <span className="truncate">{item}</span>
                       </Badge>
                     ))
                   ) : (
@@ -534,9 +527,11 @@ export function InboxWorkspace({
               </div>
               <div>
                 <p className="font-medium text-foreground">Que pregunto</p>
-                <ul className="mt-2 space-y-1">
+                <ul className="mt-1 space-y-1.5">
                   {selectedProfile?.whatTheyAsked.length ? (
-                    selectedProfile.whatTheyAsked.map((item) => <li key={item}>- {item}</li>)
+                    selectedProfile.whatTheyAsked.map((item) => (
+                      <li key={item} className="line-clamp-2">- {item}</li>
+                    ))
                   ) : (
                     <li>- Todavia no tenemos preguntas anteriores guardadas.</li>
                   )}
@@ -544,9 +539,11 @@ export function InboxWorkspace({
               </div>
               <div>
                 <p className="font-medium text-foreground">Que le respondimos</p>
-                <ul className="mt-2 space-y-1">
+                <ul className="mt-1 space-y-1.5">
                   {selectedProfile?.whatWeAnswered.length ? (
-                    selectedProfile.whatWeAnswered.map((item) => <li key={item}>- {item}</li>)
+                    selectedProfile.whatWeAnswered.map((item) => (
+                      <li key={item} className="line-clamp-2">- {item}</li>
+                    ))
                   ) : (
                     <li>- Todavia no hay respuestas salientes registradas.</li>
                   )}
@@ -554,15 +551,17 @@ export function InboxWorkspace({
               </div>
               <div>
                 <p className="font-medium text-foreground">Objeciones</p>
-                <ul className="mt-2 space-y-1">
+                <ul className="mt-1 space-y-1.5">
                   {selectedProfile?.objections.length ? (
-                    selectedProfile.objections.map((item) => <li key={item}>- {item}</li>)
+                    selectedProfile.objections.map((item) => (
+                      <li key={item} className="line-clamp-2">- {item}</li>
+                    ))
                   ) : (
                     <li>- No detecte objeciones fuertes por ahora.</li>
                   )}
                 </ul>
               </div>
-              <div className="rounded-2xl border bg-muted/20 p-4">
+              <div className="rounded-2xl border bg-muted/20 p-3">
                 <p className="font-medium text-foreground">
                   Probabilidad de cierre: {selectedProfile?.closeProbability.label}
                 </p>
@@ -571,9 +570,9 @@ export function InboxWorkspace({
                   {selectedProfile?.closeProbability.detail}
                 </p>
               </div>
-              <div className="rounded-2xl border bg-primary/5 p-4 text-primary">
+              <div className="rounded-2xl border bg-primary/5 p-3 text-primary">
                 <p className="font-medium">Siguiente accion sugerida</p>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">
                   {selectedProfile?.nextAction}
                 </p>
               </div>
@@ -816,7 +815,7 @@ function MessageBubble({
     <div className={cn("flex", role === "assistant" ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[82%] rounded-[24px] px-4 py-3 text-sm leading-6 shadow-sm",
+          "max-w-[78%] rounded-[22px] px-4 py-3 text-sm leading-6 shadow-sm",
           role === "assistant"
             ? "bg-primary text-primary-foreground"
             : "border bg-background"
