@@ -83,7 +83,7 @@ function extractPaymentMethod(prompt: string) {
 function inferAssistantAction(prompt: string): AssistantAction {
   const normalized = normalizeText(prompt);
 
-  if (/(como hago|donde|que hace|que puedo|ayuda|explicame)/.test(normalized)) {
+  if (/(como hago|como genero|como registro|como cargo|como puedo|donde|que hace|que puedo|ayuda|explicame)/.test(normalized)) {
     return "answer";
   }
 
@@ -325,6 +325,71 @@ export async function POST(request: Request) {
   const openAI = getOpenAIEnv();
   const inferredAction = inferAssistantAction(prompt);
 
+  if (current.profile.role !== "superadmin" && inferredAction === "record_cash_movement") {
+    const amount = extractAmount(prompt);
+    if (!amount) {
+      return NextResponse.json({
+        reply: "Para registrar un movimiento de caja necesito al menos el monto. Ejemplo: registra un gasto de caja de 25000 por cerrajeria.",
+        configured: openAI.configured,
+        actionResult: {
+          type: inferredAction,
+          status: "clarify",
+          title: "Falta el monto del movimiento",
+          details: "Indica monto y, si puedes, categoria o referencia.",
+        } satisfies AssistantActionResult,
+      });
+    }
+
+    const normalized = normalizeText(prompt);
+    const kind = normalized.includes("egreso") || normalized.includes("gasto") ? "Egreso" : "Ingreso";
+    const category = normalized.includes("cerrajer")
+      ? "Cerrajeria"
+      : normalized.includes("luz") || normalized.includes("edenor")
+        ? "Servicios"
+        : normalized.includes("gas")
+          ? "Servicios"
+          : normalized.includes("honorario")
+            ? "Honorarios"
+            : "Movimiento manual";
+
+    const result = await callInternalAction(
+      request,
+      "/api/admin/cash-movements",
+      {
+        kind,
+        category,
+        amount,
+        reference: prompt,
+        notes: `Registrado por Props AI desde dashboard: ${prompt}`,
+      },
+      "POST"
+    );
+
+    if (!result.ok) {
+      return NextResponse.json({
+        reply: result.payload?.error ?? "No pude registrar el movimiento de caja.",
+        configured: openAI.configured,
+        actionResult: {
+          type: inferredAction,
+          status: "error",
+          title: "No se pudo registrar el movimiento",
+          details: result.payload?.error ?? "Revisa la configuracion de caja.",
+        } satisfies AssistantActionResult,
+      });
+    }
+
+    return NextResponse.json({
+      reply: `Listo. Registre un movimiento de caja de ${formatMoney(amount, "ARS")} como ${kind.toLowerCase()} en ${category}.`,
+      configured: openAI.configured,
+      actionResult: {
+        type: inferredAction,
+        status: "success",
+        title: "Movimiento de caja registrado",
+        details: `${kind} · ${category} · ${formatMoney(amount, "ARS")}`,
+      } satisfies AssistantActionResult,
+    });
+  }
+
   if (current.profile.role !== "superadmin" && inferredAction !== "answer") {
     const { contract, alternatives } = resolveContractFromPrompt(prompt, assistantContracts);
 
@@ -496,71 +561,6 @@ export async function POST(request: Request) {
         } satisfies AssistantActionResult,
       });
     }
-  }
-
-  if (current.profile.role !== "superadmin" && inferredAction === "record_cash_movement") {
-    const amount = extractAmount(prompt);
-    if (!amount) {
-      return NextResponse.json({
-        reply: "Para registrar un movimiento de caja necesito al menos el monto. Ejemplo: registra un gasto de caja de 25000 por cerrajeria.",
-        configured: openAI.configured,
-        actionResult: {
-          type: inferredAction,
-          status: "clarify",
-          title: "Falta el monto del movimiento",
-          details: "Indica monto y, si puedes, categoria o referencia.",
-        } satisfies AssistantActionResult,
-      });
-    }
-
-    const normalized = normalizeText(prompt);
-    const kind = normalized.includes("egreso") || normalized.includes("gasto") ? "Egreso" : "Ingreso";
-    const category = normalized.includes("cerrajer")
-      ? "Cerrajeria"
-      : normalized.includes("luz") || normalized.includes("edenor")
-        ? "Servicios"
-        : normalized.includes("gas")
-          ? "Servicios"
-          : normalized.includes("honorario")
-            ? "Honorarios"
-            : "Movimiento manual";
-
-    const result = await callInternalAction(
-      request,
-      "/api/admin/cash-movements",
-      {
-        kind,
-        category,
-        amount,
-        reference: prompt,
-        notes: `Registrado por Props AI desde dashboard: ${prompt}`,
-      },
-      "POST"
-    );
-
-    if (!result.ok) {
-      return NextResponse.json({
-        reply: result.payload?.error ?? "No pude registrar el movimiento de caja.",
-        configured: openAI.configured,
-        actionResult: {
-          type: inferredAction,
-          status: "error",
-          title: "No se pudo registrar el movimiento",
-          details: result.payload?.error ?? "Revisa la configuracion de caja.",
-        } satisfies AssistantActionResult,
-      });
-    }
-
-    return NextResponse.json({
-      reply: `Listo. Registre un movimiento de caja de ${formatMoney(amount, "ARS")} como ${kind.toLowerCase()} en ${category}.`,
-      configured: openAI.configured,
-      actionResult: {
-        type: inferredAction,
-        status: "success",
-        title: "Movimiento de caja registrado",
-        details: `${kind} · ${category} · ${formatMoney(amount, "ARS")}`,
-      } satisfies AssistantActionResult,
-    });
   }
 
   if (!openAI.configured) {
