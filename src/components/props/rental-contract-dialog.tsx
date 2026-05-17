@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   BadgeInfo,
   CalendarDays,
+  CheckCircle2,
+  ChevronDown,
   CircleDollarSign,
   FileText,
   Loader2,
@@ -13,6 +15,7 @@ import {
   Sparkles,
   Trash2,
   UploadCloud,
+  type LucideIcon,
 } from "lucide-react";
 
 import type { Property } from "@/lib/mock-data";
@@ -28,7 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { formatArsCurrency, formatMoney, formatShortDate } from "@/lib/utils";
+import { cn, formatArsCurrency, formatMoney, formatShortDate } from "@/lib/utils";
 
 type OwnerFormRow = {
   id?: string;
@@ -85,6 +88,7 @@ function getInitialOwners(property: Property): OwnerFormRow[] {
 function getInitialForm(property: Property) {
   const initialOwners = getInitialOwners(property);
   const primaryOwner = initialOwners[0];
+
   return {
     tenantName: property.rentalContract?.tenantName ?? "",
     tenantPhone: property.rentalContract?.tenantPhone ?? "",
@@ -121,20 +125,68 @@ function getReviewReasons(notes: string) {
     .map((line) => line.replace("[Revision requerida]", "").trim());
 }
 
-function SectionTitle({
+function Field({
+  label,
+  children,
+  hint,
+  className,
+}: {
+  label: string;
+  children: ReactNode;
+  hint?: string;
+  className?: string;
+}) {
+  return (
+    <label className={cn("space-y-2 text-sm font-medium", className)}>
+      <span>{label}</span>
+      {children}
+      {hint ? <span className="block text-xs leading-5 text-muted-foreground">{hint}</span> : null}
+    </label>
+  );
+}
+
+function SectionCard({
   eyebrow,
   title,
   description,
+  children,
 }: {
   eyebrow: string;
   title: string;
   description: string;
+  children: ReactNode;
 }) {
   return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/70">{eyebrow}</p>
-      <p className="mt-1 text-base font-semibold">{title}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+    <section className="rounded-[28px] border bg-card p-5 shadow-sm">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/70">{eyebrow}</p>
+        <h3 className="mt-1 text-lg font-semibold">{title}</h3>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
+      </div>
+      <div className="mt-5">{children}</div>
+    </section>
+  );
+}
+
+function MiniInfo({
+  icon: Icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="rounded-[22px] border bg-background p-4">
+      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+        <Icon className="size-4 text-primary" />
+        {label}
+      </div>
+      <p className="mt-2 text-lg font-semibold">{value}</p>
+      {hint ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
@@ -145,8 +197,10 @@ export function RentalContractDialog({ property }: { property: Property }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [form, setForm] = useState(() => getInitialForm(property));
   const [contractFile, setContractFile] = useState<File | null>(null);
+
   const reviewReasons = useMemo(
     () => getReviewReasons(property.rentalContract?.notes ?? ""),
     [property.rentalContract?.notes]
@@ -167,6 +221,11 @@ export function RentalContractDialog({ property }: { property: Property }) {
         "text/plain",
       ].join(","),
     []
+  );
+
+  const ownerParticipationTotal = form.owners.reduce(
+    (sum, owner) => sum + (Number(owner.participationPercent) || 0),
+    0
   );
 
   function updateOwner(index: number, patch: Partial<OwnerFormRow>) {
@@ -216,11 +275,8 @@ export function RentalContractDialog({ property }: { property: Property }) {
     }));
   }
 
-  async function handleSave() {
-    setSubmitting(true);
-    setError(null);
-
-    const sanitizedOwners = form.owners
+  function buildSanitizedOwners() {
+    return form.owners
       .map((owner, index) => ({
         id: owner.id,
         fullName: owner.fullName.trim(),
@@ -233,25 +289,26 @@ export function RentalContractDialog({ property }: { property: Property }) {
         displayOrder: index,
       }))
       .filter((owner) => owner.fullName);
+  }
 
-    if (sanitizedOwners.length === 0) {
-      setSubmitting(false);
-      setError("Carga al menos un propietario para poder liquidar el alquiler.");
-      return;
-    }
+  async function handleSave() {
+    setSubmitting(true);
+    setError(null);
 
+    const sanitizedOwners = buildSanitizedOwners();
+    const primaryOwner = sanitizedOwners[0] ?? null;
     const body = new FormData();
-    const primaryOwner = sanitizedOwners[0];
+
     body.set("propertyId", property.id);
     body.set("tenantName", form.tenantName);
     body.set("tenantPhone", form.tenantPhone);
     body.set("tenantEmail", form.tenantEmail);
-    body.set("ownerName", primaryOwner.fullName);
-    body.set("ownerPhone", primaryOwner.phone ?? "");
-    body.set("ownerEmail", primaryOwner.email ?? "");
+    body.set("ownerName", primaryOwner?.fullName ?? "");
+    body.set("ownerPhone", primaryOwner?.phone ?? "");
+    body.set("ownerEmail", primaryOwner?.email ?? "");
     body.set("managementFeePercent", form.managementFeePercent);
     body.set("monthlyOwnerCosts", form.monthlyOwnerCosts);
-    body.set("ownerNotes", primaryOwner.notes ?? "");
+    body.set("ownerNotes", primaryOwner?.notes ?? "");
     body.set("ownersPayload", JSON.stringify(sanitizedOwners));
     body.set("currentRent", form.currentRent);
     body.set("indexType", form.indexType);
@@ -272,7 +329,6 @@ export function RentalContractDialog({ property }: { property: Property }) {
       method: "POST",
       body,
     });
-
     const payload = await response.json().catch(() => null);
 
     if (!response.ok) {
@@ -282,7 +338,6 @@ export function RentalContractDialog({ property }: { property: Property }) {
     }
 
     setWarning(payload?.warning ?? null);
-
     setSubmitting(false);
     setOpen(false);
     setContractFile(null);
@@ -296,20 +351,7 @@ export function RentalContractDialog({ property }: { property: Property }) {
     setError(null);
     setWarning(null);
 
-    const sanitizedOwners = form.owners
-      .map((owner, index) => ({
-        id: owner.id,
-        fullName: owner.fullName.trim(),
-        phone: owner.phone.trim() || null,
-        email: owner.email.trim() || null,
-        participationPercent: Number(owner.participationPercent || 0),
-        bankAlias: owner.bankAlias.trim() || null,
-        bankAccount: owner.bankAccount.trim() || null,
-        notes: owner.notes.trim(),
-        displayOrder: index,
-      }))
-      .filter((owner) => owner.fullName);
-
+    const sanitizedOwners = buildSanitizedOwners();
     const response = await fetch("/api/admin/rental-contracts", {
       method: "PATCH",
       headers: {
@@ -338,7 +380,6 @@ export function RentalContractDialog({ property }: { property: Property }) {
         notes: form.notes,
       }),
     });
-
     const payload = await response.json().catch(() => null);
 
     if (!response.ok) {
@@ -361,6 +402,7 @@ export function RentalContractDialog({ property }: { property: Property }) {
           setError(null);
           setWarning(null);
           setContractFile(null);
+          setShowAdvanced(false);
           setForm(getInitialForm(property));
         }
       }}
@@ -369,198 +411,122 @@ export function RentalContractDialog({ property }: { property: Property }) {
         {requiresReview
           ? "Revisar contrato"
           : property.rentalContract
-          ? "Editar contrato"
-          : "Configurar alquiler"}
+            ? "Editar contrato"
+            : "Configurar alquiler"}
       </DialogTrigger>
-      <DialogContent className="h-[min(92vh,940px)] w-[min(96vw,1280px)] max-w-[min(96vw,1280px)] overflow-x-hidden overflow-y-auto rounded-[32px] p-0 sm:max-w-[min(96vw,1280px)]">
-        <div className="p-6 lg:p-8">
-          <DialogHeader>
-            <DialogTitle>Contrato de alquiler</DialogTitle>
-            <DialogDescription>
-              Completa el contacto del inquilino y adjunta el contrato. Props analiza el documento para detectar
-              alquiler, fechas, índice y próximos ajustes automáticamente.
-            </DialogDescription>
-          </DialogHeader>
+      <DialogContent className="h-[min(94vh,920px)] w-[min(96vw,1180px)] max-w-[min(96vw,1180px)] overflow-hidden rounded-[32px] p-0 sm:max-w-[min(96vw,1180px)]">
+        <div className="flex max-h-[calc(min(94vh,920px)-76px)] flex-col overflow-y-auto">
+          <div className="border-b bg-muted/20 p-5 lg:p-6">
+            <DialogHeader>
+              <DialogTitle className="text-xl">
+                {property.rentalContract ? "Gestionar alquiler" : "Configurar alquiler"}
+              </DialogTitle>
+              <DialogDescription>
+                Un flujo simple: cargamos inquilino, contrato y propietarios. Props usa la IA para leer fechas,
+                monto, indice y proximos ajustes cuando adjuntas el documento.
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="mt-6 grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
-            <div className="space-y-6">
-              <section className="rounded-[28px] border bg-card p-5">
-                <SectionTitle
-                  eyebrow="Base"
-                  title="Datos del inquilino y automatización"
-                  description="Lo mínimo operativo para guardar el alquiler y dejar listos los avisos automáticos."
-                />
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              <MiniInfo
+                icon={CircleDollarSign}
+                label="Precio publicado"
+                value={formatMoney(property.price, property.currency)}
+                hint="Se usa como referencia si el contrato no aclara el monto."
+              />
+              <MiniInfo
+                icon={CalendarDays}
+                label="Ajuste"
+                value={
+                  property.rentalContract
+                    ? `${property.rentalContract.indexType} cada ${property.rentalContract.adjustmentFrequencyMonths} meses`
+                    : "Lo detecta la IA"
+                }
+                hint={
+                  property.rentalContract?.nextAdjustmentDate
+                    ? `Proximo: ${formatShortDate(property.rentalContract.nextAdjustmentDate)}`
+                    : "Tambien podes completarlo manualmente en avanzados."
+                }
+              />
+              <MiniInfo
+                icon={Sparkles}
+                label="Contrato"
+                value={property.rentalContract?.contractFileName ? "Adjunto" : "Pendiente"}
+                hint="PDF, DOCX o TXT. Queda guardado para consultas internas."
+              />
+            </div>
+          </div>
 
-                <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-12">
-                  <div className="space-y-2 xl:col-span-5">
-                    <label className="text-sm font-medium">Nombre del inquilino</label>
+          <div className="grid gap-5 p-5 lg:grid-cols-[1.12fr_0.88fr] lg:p-6">
+            <div className="space-y-5">
+              <SectionCard
+                eyebrow="Paso 1"
+                title="Datos minimos del inquilino"
+                description="Pedimos solo lo necesario para operar y poder contactarlo. El email queda opcional."
+              >
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Nombre del inquilino">
                     <Input
-                      placeholder="María Gómez"
+                      placeholder="Maria Gomez"
                       value={form.tenantName}
                       onChange={(event) => setForm((prev) => ({ ...prev, tenantName: event.target.value }))}
                     />
-                  </div>
-                  <div className="space-y-2 xl:col-span-4">
-                    <label className="text-sm font-medium">WhatsApp del inquilino</label>
+                  </Field>
+                  <Field label="WhatsApp del inquilino">
                     <Input
                       placeholder="+54 11 5555 1234"
                       value={form.tenantPhone}
                       onChange={(event) => setForm((prev) => ({ ...prev, tenantPhone: event.target.value }))}
                     />
-                  </div>
-                  <div className="space-y-2 xl:col-span-3">
-                    <label className="text-sm font-medium">Email del inquilino</label>
+                  </Field>
+                  <Field label="Email del inquilino" hint="Opcional. No bloquea la configuracion.">
                     <Input
-                      placeholder="Opcional"
+                      placeholder="inquilino@email.com"
                       value={form.tenantEmail}
                       onChange={(event) => setForm((prev) => ({ ...prev, tenantEmail: event.target.value }))}
                     />
-                  </div>
-
-                  <div className="space-y-2 xl:col-span-3">
-                    <label className="text-sm font-medium">Alquiler actual (ARS)</label>
+                  </Field>
+                  <Field label="Alquiler actual" hint="Si el contrato adjunto dice otro monto, la IA puede priorizarlo.">
                     <Input
                       placeholder="800000"
                       value={form.currentRent}
                       onChange={(event) => setForm((prev) => ({ ...prev, currentRent: event.target.value }))}
                     />
-                  </div>
+                  </Field>
+                </div>
+              </SectionCard>
 
-                  <div className="space-y-2 xl:col-span-3">
-                    <label className="text-sm font-medium">Índice preferido</label>
-                    <select
-                      className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
-                      value={form.indexType}
-                      onChange={(event) => setForm((prev) => ({ ...prev, indexType: event.target.value as "IPC" | "ICL" }))}
-                    >
-                      <option value="IPC">IPC</option>
-                      <option value="ICL">ICL</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2 xl:col-span-3">
-                    <label className="text-sm font-medium">Frecuencia en meses</label>
-                    <Input
-                      placeholder="6"
-                      value={form.adjustmentFrequencyMonths}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, adjustmentFrequencyMonths: event.target.value }))
-                      }
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Si el contrato dice otra cosa, Props prioriza el documento.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2 xl:col-span-3">
-                    <label className="text-sm font-medium">Inicio del contrato</label>
-                    <Input
-                      type="date"
-                      value={form.contractStartDate}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, contractStartDate: event.target.value }))
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2 xl:col-span-3">
-                    <label className="text-sm font-medium">Próximo aumento</label>
-                    <Input
-                      type="date"
-                      value={form.nextAdjustmentDate}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, nextAdjustmentDate: event.target.value }))
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2 xl:col-span-3">
-                    <label className="text-sm font-medium">Punitorio por dia (ARS)</label>
-                    <Input
-                      placeholder="10000"
-                      value={form.lateFeeDailyAmount}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, lateFeeDailyAmount: event.target.value }))
-                      }
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Si no corresponde, dejalo en 0.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2 xl:col-span-3">
-                    <label className="text-sm font-medium">Dias de gracia</label>
-                    <Input
-                      placeholder="10"
-                      value={form.lateFeeGraceDays}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, lateFeeGraceDays: event.target.value }))
-                      }
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Props calcula punitorios despues de ese margen.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2 xl:col-span-3">
-                    <label className="text-sm font-medium">Estado del contrato</label>
-                    <select
-                      className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
-                      value={form.status}
-                      onChange={(event) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          status: event.target.value as "Activo" | "Pausado" | "Finalizado",
-                        }))
-                      }
-                    >
-                      <option value="Activo">Activo</option>
-                      <option value="Pausado">Pausado</option>
-                      <option value="Finalizado">Finalizado</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2 xl:col-span-3">
-                    <label className="text-sm font-medium">Aviso automático</label>
-                    <label className="flex h-11 items-center gap-2 rounded-xl border px-3 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={form.autoNotify}
-                        onChange={(event) => setForm((prev) => ({ ...prev, autoNotify: event.target.checked }))}
-                      />
-                      Enviar WhatsApp automático
-                    </label>
-                  </div>
-
-                  <div className="space-y-2 xl:col-span-12">
-                    <label className="text-sm font-medium">Notas internas</label>
-                    <Textarea
-                      rows={4}
-                      placeholder="Observaciones, restricciones o contexto del contrato..."
-                      value={form.notes}
-                      onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
-                    />
+              <SectionCard
+                eyebrow="Paso 2"
+                title="Propietarios y liquidacion"
+                description="Sirve para calcular automaticamente cuanto corresponde pagarle a cada propietario."
+              >
+                <div className="mb-4 rounded-[22px] border bg-muted/20 p-4 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span>
+                      Participacion cargada:{" "}
+                      <strong className={ownerParticipationTotal === 100 ? "text-emerald-700" : "text-amber-700"}>
+                        {ownerParticipationTotal}%
+                      </strong>
+                    </span>
+                    {ownerParticipationTotal !== 100 ? (
+                      <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                        Revisa que sume 100%
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                        <CheckCircle2 className="size-3" />
+                        Listo para liquidar
+                      </span>
+                    )}
                   </div>
                 </div>
-              </section>
 
-              <section className="rounded-[28px] border bg-card p-5">
-                <SectionTitle
-                  eyebrow="Propietario"
-                  title="Copropietarios y liquidacion"
-                  description="Props reparte la liquidacion por porcentaje de participacion y permite seguir el neto de cada propietario."
-                />
-
-                <div className="mt-5 space-y-4">
+                <div className="space-y-4">
                   {form.owners.map((owner, index) => (
                     <div key={`${owner.id ?? "owner"}-${index}`} className="rounded-[24px] border bg-background p-4">
                       <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold">Propietario {index + 1}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Define contacto, porcentaje y cuenta de cobro.
-                          </p>
-                        </div>
+                        <p className="font-semibold">Propietario {index + 1}</p>
                         <Button
                           type="button"
                           variant="ghost"
@@ -572,63 +538,47 @@ export function RentalContractDialog({ property }: { property: Property }) {
                         </Button>
                       </div>
 
-                      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-12">
-                        <div className="space-y-2 xl:col-span-4">
-                          <label className="text-sm font-medium">Nombre</label>
+                      <div className="mt-4 grid gap-3 md:grid-cols-12">
+                        <Field label="Nombre" className="md:col-span-5">
                           <Input
                             placeholder="Carlos Perez"
                             value={owner.fullName}
                             onChange={(event) => updateOwner(index, { fullName: event.target.value })}
                           />
-                        </div>
-                        <div className="space-y-2 xl:col-span-3">
-                          <label className="text-sm font-medium">WhatsApp</label>
+                        </Field>
+                        <Field label="% participa" className="md:col-span-3">
+                          <Input
+                            placeholder="100"
+                            value={owner.participationPercent}
+                            onChange={(event) => updateOwner(index, { participationPercent: event.target.value })}
+                          />
+                        </Field>
+                        <Field label="WhatsApp" className="md:col-span-4">
                           <Input
                             placeholder="+54 11 5555 8888"
                             value={owner.phone}
                             onChange={(event) => updateOwner(index, { phone: event.target.value })}
                           />
-                        </div>
-                        <div className="space-y-2 xl:col-span-3">
-                          <label className="text-sm font-medium">Email</label>
+                        </Field>
+                        <Field label="Alias / CBU" className="md:col-span-6">
                           <Input
-                            placeholder="propietario@email.com"
+                            placeholder="alias.propietario o CBU"
+                            value={owner.bankAlias || owner.bankAccount}
+                            onChange={(event) =>
+                              updateOwner(index, {
+                                bankAlias: event.target.value,
+                                bankAccount: event.target.value,
+                              })
+                            }
+                          />
+                        </Field>
+                        <Field label="Email" className="md:col-span-6">
+                          <Input
+                            placeholder="Opcional"
                             value={owner.email}
                             onChange={(event) => updateOwner(index, { email: event.target.value })}
                           />
-                        </div>
-                        <div className="space-y-2 xl:col-span-2">
-                          <label className="text-sm font-medium">% participacion</label>
-                          <Input
-                            placeholder="50"
-                            value={owner.participationPercent}
-                            onChange={(event) => updateOwner(index, { participationPercent: event.target.value })}
-                          />
-                        </div>
-                        <div className="space-y-2 xl:col-span-3">
-                          <label className="text-sm font-medium">Alias bancario</label>
-                          <Input
-                            placeholder="alias.propietario"
-                            value={owner.bankAlias}
-                            onChange={(event) => updateOwner(index, { bankAlias: event.target.value })}
-                          />
-                        </div>
-                        <div className="space-y-2 xl:col-span-3">
-                          <label className="text-sm font-medium">Cuenta / CBU</label>
-                          <Input
-                            placeholder="CBU o referencia"
-                            value={owner.bankAccount}
-                            onChange={(event) => updateOwner(index, { bankAccount: event.target.value })}
-                          />
-                        </div>
-                        <div className="space-y-2 xl:col-span-6">
-                          <label className="text-sm font-medium">Notas del propietario</label>
-                          <Input
-                            placeholder="Ej: retencion especial, condicion comercial o instruccion de pago."
-                            value={owner.notes}
-                            onChange={(event) => updateOwner(index, { notes: event.target.value })}
-                          />
-                        </div>
+                        </Field>
                       </div>
                     </div>
                   ))}
@@ -638,273 +588,286 @@ export function RentalContractDialog({ property }: { property: Property }) {
                     Agregar propietario
                   </Button>
 
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-12">
-                    <div className="space-y-2 xl:col-span-3">
-                    <label className="text-sm font-medium">Comision (%)</label>
-                    <Input
-                      placeholder="8"
-                      value={form.managementFeePercent}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, managementFeePercent: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2 xl:col-span-3">
-                    <label className="text-sm font-medium">Gastos fijos mensuales</label>
-                    <Input
-                      placeholder="0"
-                      value={form.monthlyOwnerCosts}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, monthlyOwnerCosts: event.target.value }))
-                      }
-                    />
-                  </div>
-                    <div className="xl:col-span-6 rounded-[20px] border bg-muted/20 p-4 text-sm text-muted-foreground">
-                      Props toma estos datos para repartir el alquiler cobrado, descontar comision y generar una
-                      liquidacion por cada propietario.
-                    </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Comision de administracion (%)">
+                      <Input
+                        placeholder="8"
+                        value={form.managementFeePercent}
+                        onChange={(event) =>
+                          setForm((prev) => ({ ...prev, managementFeePercent: event.target.value }))
+                        }
+                      />
+                    </Field>
+                    <Field label="Gastos fijos mensuales">
+                      <Input
+                        placeholder="0"
+                        value={form.monthlyOwnerCosts}
+                        onChange={(event) =>
+                          setForm((prev) => ({ ...prev, monthlyOwnerCosts: event.target.value }))
+                        }
+                      />
+                    </Field>
                   </div>
                 </div>
-              </section>
+              </SectionCard>
 
-              <section className="rounded-[28px] border bg-card p-5">
-                <SectionTitle
-                  eyebrow="Contexto"
-                  title="Qué toma automáticamente Props"
-                  description="La propiedad ya aporta precio y el contrato define fechas, monto y cláusulas para la IA."
-                />
-
-                <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {requiresReview ? (
-                    <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 md:col-span-2 xl:col-span-3">
-                      <p className="font-semibold">Revisión requerida antes de automatizar</p>
-                      <ul className="mt-2 space-y-1">
-                        {reviewReasons.map((reason) => (
-                          <li key={reason}>- {reason}</li>
-                        ))}
-                      </ul>
-                      <p className="mt-3 text-amber-700">
-                        Confirma estos datos y activa recién cuando estén correctos.
-                      </p>
-                    </div>
-                  ) : null}
-
-                  <div className="rounded-[24px] border bg-muted/20 p-4">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <CircleDollarSign className="size-4 text-primary" />
-                      Precio publicado
-                    </div>
-                    <p className="mt-2 text-2xl font-semibold">{formatMoney(property.price, property.currency)}</p>
+              <section className="rounded-[28px] border bg-card p-5 shadow-sm">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-3 text-left"
+                  onClick={() => setShowAdvanced((prev) => !prev)}
+                >
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/70">Opcional</p>
+                    <h3 className="mt-1 text-lg font-semibold">Ajustes avanzados</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Se usa como base cuando el contrato no explicita el alquiler actual.
+                      Solo tocalos si queres corregir lo que detecto la IA o si no adjuntas contrato.
                     </p>
                   </div>
+                  <ChevronDown className={cn("size-5 transition", showAdvanced && "rotate-180")} />
+                </button>
 
-                  <div className="rounded-[24px] border bg-muted/20 p-4">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <CalendarDays className="size-4 text-primary" />
-                      Fechas del contrato
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Inicio de contrato y próximo aumento se detectan leyendo el documento adjunto.
-                    </p>
-                    {property.rentalContract?.nextAdjustmentDate ? (
-                      <p className="mt-3 text-sm font-medium">
-                        Último próximo aumento detectado: {formatShortDate(property.rentalContract.nextAdjustmentDate)}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="rounded-[24px] border bg-muted/20 p-4">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <Sparkles className="size-4 text-primary" />
-                      IA del contrato
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Props resume cláusulas, requisitos, índice y próximos pasos a partir del texto extraído.
-                    </p>
-                  </div>
-                </div>
-
-                {property.rentalContract ? (
-                  <div className="mt-5 rounded-[24px] border bg-background p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/70">
-                      Datos detectados / confirmados
-                    </p>
-                    <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Alquiler actual</p>
-                        <p className="mt-1 font-semibold">
-                          {formatArsCurrency(property.rentalContract.currentRent)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Índice</p>
-                        <p className="mt-1 font-semibold">{property.rentalContract.indexType}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Frecuencia</p>
-                        <p className="mt-1 font-semibold">
-                          Cada {property.rentalContract.adjustmentFrequencyMonths} meses
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Próximo aumento</p>
-                        <p className="mt-1 font-semibold">
-                          {formatShortDate(property.rentalContract.nextAdjustmentDate)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Inicio del contrato</p>
-                        <p className="mt-1 font-semibold">
-                          {formatShortDate(property.rentalContract.contractStartDate)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Fecha base del cálculo</p>
-                        <p className="mt-1 font-semibold">
-                          {formatShortDate(property.rentalContract.rentReferenceDate)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Estado</p>
-                        <p className="mt-1 font-semibold">{property.rentalContract.status}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Notificación automática</p>
-                        <p className="mt-1 font-semibold">
-                          {property.rentalContract.autoNotify ? "Activa" : "Pausada"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Punitorio diario</p>
-                        <p className="mt-1 font-semibold">
-                          {formatArsCurrency(property.rentalContract.lateFeeDailyAmount)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Dias de gracia</p>
-                        <p className="mt-1 font-semibold">
-                          {property.rentalContract.lateFeeGraceDays}
-                        </p>
-                      </div>
-                    </div>
-
-                    {property.rentalContract.contractText ? (
-                      <div className="mt-4 rounded-[20px] border bg-muted/20 p-4 text-sm leading-6 text-muted-foreground">
-                        <p className="mb-2 font-medium text-foreground">Texto leído del contrato</p>
-                        <p>{property.rentalContract.contractText.slice(0, 520)}...</p>
-                      </div>
-                    ) : null}
+                {showAdvanced ? (
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <Field label="Indice">
+                      <select
+                        className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
+                        value={form.indexType}
+                        onChange={(event) =>
+                          setForm((prev) => ({ ...prev, indexType: event.target.value as "IPC" | "ICL" }))
+                        }
+                      >
+                        <option value="IPC">IPC</option>
+                        <option value="ICL">ICL</option>
+                      </select>
+                    </Field>
+                    <Field label="Frecuencia en meses">
+                      <Input
+                        placeholder="6"
+                        value={form.adjustmentFrequencyMonths}
+                        onChange={(event) =>
+                          setForm((prev) => ({ ...prev, adjustmentFrequencyMonths: event.target.value }))
+                        }
+                      />
+                    </Field>
+                    <Field label="Inicio del contrato">
+                      <Input
+                        type="date"
+                        value={form.contractStartDate}
+                        onChange={(event) =>
+                          setForm((prev) => ({ ...prev, contractStartDate: event.target.value }))
+                        }
+                      />
+                    </Field>
+                    <Field label="Proximo aumento">
+                      <Input
+                        type="date"
+                        value={form.nextAdjustmentDate}
+                        onChange={(event) =>
+                          setForm((prev) => ({ ...prev, nextAdjustmentDate: event.target.value }))
+                        }
+                      />
+                    </Field>
+                    <Field label="Punitorio por dia">
+                      <Input
+                        placeholder="10000"
+                        value={form.lateFeeDailyAmount}
+                        onChange={(event) =>
+                          setForm((prev) => ({ ...prev, lateFeeDailyAmount: event.target.value }))
+                        }
+                      />
+                    </Field>
+                    <Field label="Dias de gracia">
+                      <Input
+                        placeholder="10"
+                        value={form.lateFeeGraceDays}
+                        onChange={(event) =>
+                          setForm((prev) => ({ ...prev, lateFeeGraceDays: event.target.value }))
+                        }
+                      />
+                    </Field>
+                    <Field label="Estado del contrato">
+                      <select
+                        className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none"
+                        value={form.status}
+                        onChange={(event) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            status: event.target.value as "Activo" | "Pausado" | "Finalizado",
+                          }))
+                        }
+                      >
+                        <option value="Activo">Activo</option>
+                        <option value="Pausado">Pausado</option>
+                        <option value="Finalizado">Finalizado</option>
+                      </select>
+                    </Field>
+                    <Field label="Aviso automatico">
+                      <label className="flex h-11 items-center gap-2 rounded-xl border px-3 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={form.autoNotify}
+                          onChange={(event) => setForm((prev) => ({ ...prev, autoNotify: event.target.checked }))}
+                        />
+                        Enviar WhatsApp automatico
+                      </label>
+                    </Field>
+                    <Field label="Notas internas" className="md:col-span-2">
+                      <Textarea
+                        rows={4}
+                        placeholder="Observaciones, restricciones o contexto del contrato..."
+                        value={form.notes}
+                        onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
+                      />
+                    </Field>
                   </div>
                 ) : null}
               </section>
             </div>
 
-            <aside className="space-y-6">
-              <section className="rounded-[28px] border bg-card p-5">
-                <SectionTitle
-                  eyebrow="Archivo"
-                  title="Contrato adjunto"
-                  description="Adjunta el documento real para que quede guardado y listo para que la IA lo lea."
-                />
+            <aside className="space-y-5">
+              <SectionCard
+                eyebrow="Contrato"
+                title="Archivo e IA"
+                description="Adjunta el contrato real. Props lo guarda y lo usa como fuente para fechas, aumentos y consultas internas."
+              >
+                <label className="flex cursor-pointer flex-col rounded-[24px] border border-dashed bg-muted/30 px-5 py-6 transition hover:bg-muted/50">
+                  <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <UploadCloud className="size-5" />
+                  </div>
+                  <p className="font-medium">{contractFile ? "Contrato seleccionado" : "Subir contrato"}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">PDF, DOC, DOCX o TXT. Hasta 12 MB.</p>
+                  <input
+                    className="hidden"
+                    type="file"
+                    accept={acceptedFormats}
+                    onChange={(event) => setContractFile(event.target.files?.[0] ?? null)}
+                  />
+                  <span className="mt-4 rounded-2xl border bg-background px-3 py-2 text-center font-medium">
+                    {contractFile ? contractFile.name : "Elegir archivo"}
+                  </span>
+                </label>
 
-                <div className="mt-5 space-y-4">
-                  <label className="flex cursor-pointer flex-col rounded-[24px] border border-dashed bg-muted/30 px-5 py-6 transition hover:bg-muted/50">
-                    <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                      <UploadCloud className="size-5" />
+                <div className="mt-4 rounded-[22px] border bg-background p-4 text-sm">
+                  <div className="flex items-center gap-2 font-medium">
+                    <BadgeInfo className="size-4 text-primary" />
+                    Props intenta detectar
+                  </div>
+                  <ul className="mt-3 space-y-2 text-muted-foreground">
+                    <li>- Inicio del contrato y proxima fecha de ajuste.</li>
+                    <li>- Monto de alquiler, indice y frecuencia.</li>
+                    <li>- Clausulas utiles para responder consultas.</li>
+                  </ul>
+                </div>
+
+                {property.rentalContract?.contractFileName ? (
+                  <div className="mt-4 rounded-[22px] border bg-background p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 rounded-2xl bg-primary/10 p-2 text-primary">
+                        <FileText className="size-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{property.rentalContract.contractFileName}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {property.rentalContract.contractFileMimeType ?? "documento"} ·{" "}
+                          {property.rentalContract.contractFileSizeBytes
+                            ? `${Math.round(property.rentalContract.contractFileSizeBytes / 1024)} KB`
+                            : "sin tamano"}
+                        </p>
+                      </div>
                     </div>
-                    <p className="font-medium">{contractFile ? "Reemplazar contrato" : "Subir nuevo contrato"}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Formatos: PDF, DOC, DOCX o TXT. Hasta 12 MB.
-                    </p>
-                    <input
-                      className="hidden"
-                      type="file"
-                      accept={acceptedFormats}
-                      onChange={(event) => setContractFile(event.target.files?.[0] ?? null)}
+                    <Link
+                      href={`/api/admin/rental-contracts/${property.rentalContract.id}/document`}
+                      target="_blank"
+                      className={buttonVariants({
+                        size: "sm",
+                        variant: "outline",
+                        className: "mt-4 rounded-2xl",
+                      })}
+                    >
+                      Ver contrato
+                    </Link>
+                  </div>
+                ) : null}
+              </SectionCard>
+
+              {requiresReview ? (
+                <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
+                  <p className="font-semibold">Revision requerida antes de activar</p>
+                  <ul className="mt-3 space-y-2">
+                    {reviewReasons.map((reason) => (
+                      <li key={reason}>- {reason}</li>
+                    ))}
+                  </ul>
+                  <p className="mt-3 text-amber-700">
+                    Podes corregir los datos en avanzados y activar recien cuando este todo claro.
+                  </p>
+                </div>
+              ) : null}
+
+              {property.rentalContract ? (
+                <SectionCard
+                  eyebrow="Detectado"
+                  title="Datos que ya tiene Props"
+                  description="Esto queda visible aunque el contrato necesite revision."
+                >
+                  <div className="grid gap-3">
+                    <MiniInfo
+                      icon={CircleDollarSign}
+                      label="Alquiler"
+                      value={formatArsCurrency(property.rentalContract.currentRent)}
                     />
-                    <span className="mt-4 rounded-2xl border px-3 py-2 text-center font-medium">
-                      {contractFile ? contractFile.name : "Elegir contrato"}
-                    </span>
-                  </label>
-
-                  <div className="rounded-[22px] border bg-background p-4 text-sm">
-                    <div className="flex items-center gap-2 font-medium">
-                      <BadgeInfo className="size-4 text-primary" />
-                      Qué se detecta automáticamente
-                    </div>
-                    <ul className="mt-3 space-y-2 text-muted-foreground">
-                      <li>Inicio del contrato y próxima fecha de ajuste.</li>
-                      <li>Monto del alquiler si figura en el documento.</li>
-                      <li>Índice, frecuencia y cláusulas útiles para la IA.</li>
-                    </ul>
+                    <MiniInfo
+                      icon={CalendarDays}
+                      label="Proximo aumento"
+                      value={formatShortDate(property.rentalContract.nextAdjustmentDate)}
+                      hint={`${property.rentalContract.indexType} cada ${property.rentalContract.adjustmentFrequencyMonths} meses`}
+                    />
+                    <MiniInfo
+                      icon={CheckCircle2}
+                      label="Estado"
+                      value={property.rentalContract.status}
+                      hint={property.rentalContract.autoNotify ? "Aviso automatico activo" : "Aviso automatico pausado"}
+                    />
                   </div>
 
-                  {property.rentalContract?.contractFileName ? (
-                    <div className="rounded-[22px] border bg-background p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="mt-0.5 rounded-2xl bg-primary/10 p-2 text-primary">
-                          <FileText className="size-4" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium">{property.rentalContract.contractFileName}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {property.rentalContract.contractFileMimeType ?? "documento"} ·{" "}
-                            {property.rentalContract.contractFileSizeBytes
-                              ? `${Math.round(property.rentalContract.contractFileSizeBytes / 1024)} KB`
-                              : "sin tamaño"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <Link
-                          href={`/api/admin/rental-contracts/${property.rentalContract.id}/document`}
-                          target="_blank"
-                          className={buttonVariants({ size: "sm", variant: "outline", className: "rounded-2xl" })}
-                        >
-                          Ver contrato
-                        </Link>
-                      </div>
-                      {property.rentalContract.contractText ? (
-                        <div className="mt-4 rounded-2xl border bg-muted/35 p-3 text-xs leading-6 text-muted-foreground">
-                          <p className="mb-1 font-medium text-foreground">Contexto legible para la IA</p>
-                          <p>{property.rentalContract.contractText.slice(0, 380)}...</p>
-                        </div>
-                      ) : null}
+                  {property.rentalContract.contractText ? (
+                    <div className="mt-4 rounded-[22px] border bg-muted/20 p-4 text-sm leading-6 text-muted-foreground">
+                      <p className="mb-1 font-medium text-foreground">Texto leido por la IA</p>
+                      <p>{property.rentalContract.contractText.slice(0, 420)}...</p>
                     </div>
                   ) : null}
-                </div>
-              </section>
+                </SectionCard>
+              ) : null}
             </aside>
           </div>
 
           {error ? (
-            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="mx-5 mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 lg:mx-6">
               {error}
             </div>
           ) : null}
 
           {warning ? (
-            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <div className="mx-5 mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 lg:mx-6">
               {warning}
             </div>
           ) : null}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="m-0 border-t bg-background/95 px-5 py-4 lg:px-6">
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancelar
           </Button>
           {requiresReview ? (
             <Button onClick={handleConfirmAutomation} disabled={submitting}>
               {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
-              Confirmar y activar automatización
+              Confirmar y activar
             </Button>
           ) : null}
           <Button onClick={handleSave} disabled={submitting}>
             {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
-            Guardar contrato
+            Guardar alquiler
           </Button>
         </DialogFooter>
       </DialogContent>
