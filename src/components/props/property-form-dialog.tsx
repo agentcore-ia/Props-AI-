@@ -69,6 +69,20 @@ const initialState = {
   autoNotify: true,
 };
 
+type ContractAnalysis = {
+  tenantName: string | null;
+  currentRent: number | null;
+  indexType: "IPC" | "ICL" | null;
+  adjustmentFrequencyMonths: number | null;
+  lateFeeDailyAmount: number | null;
+  lateFeeGraceDays: number | null;
+  contractStartDate: string | null;
+  nextAdjustmentDate: string | null;
+  summary: string;
+  requiresReview: boolean;
+  reviewReasons: string[];
+};
+
 type GoogleAutocompleteInstance = {
   label: string;
   exactAddress: string;
@@ -163,7 +177,9 @@ export function PropertyFormDialog({
     tenantEmail: property?.rentalContract?.tenantEmail ?? "",
     currentRent: property?.rentalContract?.currentRent
       ? String(property.rentalContract.currentRent)
-      : "",
+      : property?.operation === "Alquiler" && property?.price
+        ? String(property.price)
+        : "",
     indexType: property?.rentalContract?.indexType ?? ("IPC" as "IPC" | "ICL"),
     adjustmentFrequencyMonths: property?.rentalContract?.adjustmentFrequencyMonths
       ? String(property.rentalContract.adjustmentFrequencyMonths)
@@ -182,6 +198,10 @@ export function PropertyFormDialog({
   const [form, setForm] = useState(buildInitialForm);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [contractFile, setContractFile] = useState<File | null>(null);
+  const [analyzingContract, setAnalyzingContract] = useState(false);
+  const [analysisMessage, setAnalysisMessage] = useState<string | null>(null);
+  const [analysisSummary, setAnalysisSummary] = useState<string | null>(null);
+  const [analysisReviewReasons, setAnalysisReviewReasons] = useState<string[]>([]);
   const [addressSuggestions, setAddressSuggestions] = useState<GoogleAutocompleteInstance[]>([]);
   const [addressLoading, setAddressLoading] = useState(false);
   const addressInputRef = useRef<HTMLInputElement | null>(null);
@@ -254,6 +274,10 @@ export function PropertyFormDialog({
     setError(null);
     setImageFiles([]);
     setContractFile(null);
+    setAnalyzingContract(false);
+    setAnalysisMessage(null);
+    setAnalysisSummary(null);
+    setAnalysisReviewReasons([]);
     setAddressSuggestions([]);
     setAddressLoading(false);
     setForm(buildInitialForm());
@@ -272,8 +296,80 @@ export function PropertyFormDialog({
       return {
         ...prev,
         operation: nextOperation,
+        currentRent: prev.currentRent || prev.price,
       };
     });
+  }
+
+  function applyContractAnalysis(analysis: ContractAnalysis) {
+    setForm((prev) => ({
+      ...prev,
+      rentEnabled: true,
+      tenantName: analysis.tenantName ?? prev.tenantName,
+      currentRent: analysis.currentRent ? String(Math.round(analysis.currentRent)) : prev.currentRent,
+      indexType: analysis.indexType ?? prev.indexType,
+      adjustmentFrequencyMonths: analysis.adjustmentFrequencyMonths
+        ? String(analysis.adjustmentFrequencyMonths)
+        : prev.adjustmentFrequencyMonths,
+      lateFeeDailyAmount:
+        analysis.lateFeeDailyAmount !== null && analysis.lateFeeDailyAmount !== undefined
+          ? String(Math.round(analysis.lateFeeDailyAmount))
+          : prev.lateFeeDailyAmount,
+      lateFeeGraceDays:
+        analysis.lateFeeGraceDays !== null && analysis.lateFeeGraceDays !== undefined
+          ? String(analysis.lateFeeGraceDays)
+          : prev.lateFeeGraceDays,
+      contractStartDate: analysis.contractStartDate ?? prev.contractStartDate,
+      nextAdjustmentDate: analysis.nextAdjustmentDate ?? prev.nextAdjustmentDate,
+    }));
+  }
+
+  async function handleContractFileChange(file: File | null) {
+    setContractFile(file);
+    setAnalysisMessage(null);
+    setAnalysisSummary(null);
+    setAnalysisReviewReasons([]);
+
+    if (!file) return;
+
+    setAnalyzingContract(true);
+    setAnalysisMessage("Leyendo contrato y completando datos...");
+    setError(null);
+
+    const body = new FormData();
+    body.set("contractFile", file);
+    body.set("fallbackRent", form.currentRent || form.price);
+
+    try {
+      const response = await fetch("/api/admin/rental-contracts/analyze", {
+        method: "POST",
+        body,
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok || !payload?.analysis) {
+        setAnalysisMessage(payload?.error ?? "No pudimos analizar el contrato automaticamente.");
+        return;
+      }
+
+      const analysis = payload.analysis as ContractAnalysis;
+      applyContractAnalysis(analysis);
+      setAnalysisSummary(analysis.summary || null);
+      setAnalysisReviewReasons(analysis.reviewReasons ?? []);
+      setAnalysisMessage(
+        analysis.requiresReview
+          ? "Autocompletamos los datos detectados, pero hay puntos para revisar."
+          : "Datos del alquiler autocompletados desde el contrato."
+      );
+    } catch (error) {
+      setAnalysisMessage(
+        error instanceof Error
+          ? error.message
+          : "No pudimos analizar el contrato automaticamente."
+      );
+    } finally {
+      setAnalyzingContract(false);
+    }
   }
 
   async function handleCreateProperty() {
@@ -283,6 +379,8 @@ export function PropertyFormDialog({
     const body = new FormData();
     if (property?.id) {
       body.set("propertyId", property.id);
+      body.set("originalTitle", property.title);
+      body.set("originalExactAddress", property.exactAddress);
     }
     body.set("tenantSlug", form.tenantSlug);
     body.set("title", form.title);
@@ -868,15 +966,46 @@ export function PropertyFormDialog({
                             className="hidden"
                             type="file"
                             accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-                            onChange={(event) => setContractFile(event.target.files?.[0] ?? null)}
+                            onChange={(event) => void handleContractFileChange(event.target.files?.[0] ?? null)}
                           />
                           <span className="rounded-2xl border px-3 py-2 text-center font-medium">
-                            {contractFile ? contractFile.name : "Elegir contrato"}
+                            {analyzingContract ? "Analizando contrato..." : contractFile ? contractFile.name : "Elegir contrato"}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             Hasta 12 MB. La IA podra usar el texto extraido del archivo.
                           </span>
                         </label>
+
+                        {analysisMessage ? (
+                          <div
+                            className={`rounded-[22px] border p-4 text-sm ${
+                              analysisReviewReasons.length > 0
+                                ? "border-amber-200 bg-amber-50 text-amber-800"
+                                : "border-emerald-200 bg-emerald-50 text-emerald-800"
+                            }`}
+                          >
+                            <div className="flex items-start gap-2">
+                              {analyzingContract ? (
+                                <Loader2 className="mt-0.5 size-4 animate-spin" />
+                              ) : (
+                                <Sparkles className="mt-0.5 size-4" />
+                              )}
+                              <div>
+                                <p className="font-semibold">{analysisMessage}</p>
+                                {analysisSummary ? (
+                                  <p className="mt-2 leading-6">{analysisSummary}</p>
+                                ) : null}
+                                {analysisReviewReasons.length > 0 ? (
+                                  <ul className="mt-3 space-y-1">
+                                    {analysisReviewReasons.map((reason) => (
+                                      <li key={reason}>- {reason}</li>
+                                    ))}
+                                  </ul>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
 
                         <div className="rounded-[22px] border bg-background p-4 text-sm">
                           <div className="flex items-center gap-2 font-medium">
@@ -1008,7 +1137,7 @@ export function PropertyFormDialog({
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleCreateProperty} disabled={submitting}>
+          <Button onClick={handleCreateProperty} disabled={submitting || analyzingContract}>
             {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
             {isEditing ? "Guardar cambios" : "Guardar y publicar"}
           </Button>

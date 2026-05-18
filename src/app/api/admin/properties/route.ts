@@ -63,7 +63,9 @@ async function handleUpsertProperty(request: Request, mode: "create" | "update")
   }
 
   const formData = await request.formData();
-  const propertyId = String(formData.get("propertyId") ?? "").trim();
+  let propertyId = String(formData.get("propertyId") ?? "").trim();
+  const originalTitle = String(formData.get("originalTitle") ?? "").trim();
+  const originalExactAddress = String(formData.get("originalExactAddress") ?? "").trim();
   const tenantSlug = String(formData.get("tenantSlug") ?? "").trim().toLowerCase();
   const title = String(formData.get("title") ?? "").trim();
   const price = Number(formData.get("price") ?? 0);
@@ -148,13 +150,36 @@ async function handleUpsertProperty(request: Request, mode: "create" | "update")
     | null = null;
 
   if (isUpdate) {
-    const { data: foundProperty, error: propertyLookupError } = await admin
+    let { data: foundProperty, error: propertyLookupError } = await admin
       .from("properties")
       .select("id, agency_id, image, images")
       .eq("id", propertyId)
       .maybeSingle();
 
+    if (!foundProperty && !propertyLookupError && originalTitle && originalExactAddress) {
+      const { data: fallbackProperties, error: fallbackLookupError } = await admin
+        .from("properties")
+        .select("id, agency_id, image, images")
+        .eq("agency_id", agency.id)
+        .eq("title", originalTitle)
+        .eq("exact_address", originalExactAddress)
+        .limit(2);
+
+      if (fallbackLookupError) {
+        propertyLookupError = fallbackLookupError;
+      } else if ((fallbackProperties ?? []).length === 1) {
+        foundProperty = fallbackProperties?.[0] ?? null;
+        propertyId = foundProperty?.id ?? propertyId;
+      }
+    }
+
     if (propertyLookupError || !foundProperty) {
+      console.warn("[properties] update property not found", {
+        propertyId,
+        tenantSlug,
+        originalTitle: originalTitle || null,
+        originalExactAddress: originalExactAddress || null,
+      });
       return NextResponse.json({ error: "No encontramos la propiedad a editar." }, { status: 404 });
     }
 
@@ -246,7 +271,9 @@ async function handleUpsertProperty(request: Request, mode: "create" | "update")
 
   if (operation === "Alquiler" && rentalContract?.enabled) {
     if (!rentalContract.tenantName?.trim() || !rentalContract.tenantPhone?.trim()) {
-      await admin.from("properties").delete().eq("id", property.id);
+      if (!isUpdate) {
+        await admin.from("properties").delete().eq("id", property.id);
+      }
 
       return NextResponse.json(
         { error: "Completa al menos el nombre y WhatsApp del inquilino." },
@@ -302,31 +329,33 @@ async function handleUpsertProperty(request: Request, mode: "create" | "update")
     const draftLateFeeDailyAmount = Number(rentalContract.lateFeeDailyAmount ?? 0);
     const draftLateFeeGraceDays = Number(rentalContract.lateFeeGraceDays ?? 10);
     const resolvedCurrentRent =
-      analyzedContract?.currentRent ??
       (draftCurrentRent > 0 ? draftCurrentRent : null) ??
+      analyzedContract?.currentRent ??
       price;
     const resolvedIndexType =
-      analyzedContract?.indexType ??
       rentalContract.indexType ??
+      analyzedContract?.indexType ??
       "IPC";
     const resolvedAdjustmentFrequencyMonths =
-      analyzedContract?.adjustmentFrequencyMonths ??
       (draftFrequency > 0 ? draftFrequency : null) ??
+      analyzedContract?.adjustmentFrequencyMonths ??
       6;
     const resolvedLateFeeDailyAmount = Math.max(
       0,
-      analyzedContract?.lateFeeDailyAmount ??
-        (Number.isFinite(draftLateFeeDailyAmount) ? draftLateFeeDailyAmount : 0)
+      (Number.isFinite(draftLateFeeDailyAmount) ? draftLateFeeDailyAmount : null) ??
+        analyzedContract?.lateFeeDailyAmount ??
+        0
     );
     const resolvedLateFeeGraceDays = Math.max(
       0,
-      analyzedContract?.lateFeeGraceDays ??
-        (Number.isFinite(draftLateFeeGraceDays) ? Math.round(draftLateFeeGraceDays) : 10)
+      (Number.isFinite(draftLateFeeGraceDays) ? Math.round(draftLateFeeGraceDays) : null) ??
+        analyzedContract?.lateFeeGraceDays ??
+        10
     );
     const resolvedContractStartDate =
-      analyzedContract?.contractStartDate ?? rentalContract.contractStartDate ?? null;
+      rentalContract.contractStartDate || analyzedContract?.contractStartDate || null;
     const resolvedNextAdjustmentDate =
-      analyzedContract?.nextAdjustmentDate ?? rentalContract.nextAdjustmentDate ?? null;
+      rentalContract.nextAdjustmentDate || analyzedContract?.nextAdjustmentDate || null;
     const schedule = buildFallbackContractSchedule({
       contractStartDate: resolvedContractStartDate,
       nextAdjustmentDate: resolvedNextAdjustmentDate,
