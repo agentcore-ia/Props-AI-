@@ -71,6 +71,7 @@ const initialState = {
 
 type ContractAnalysis = {
   tenantName: string | null;
+  ownerName: string | null;
   currentRent: number | null;
   indexType: "IPC" | "ICL" | null;
   adjustmentFrequencyMonths: number | null;

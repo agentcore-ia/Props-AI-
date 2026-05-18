@@ -4,6 +4,7 @@ import { getOpenAIEnv } from "@/lib/openai-env";
 
 type RentalContractAnalysis = {
   tenantName: string | null;
+  ownerName: string | null;
   currentRent: number | null;
   indexType: "IPC" | "ICL" | null;
   adjustmentFrequencyMonths: number | null;
@@ -17,6 +18,7 @@ type RentalContractAnalysis = {
 };
 
 type AIRentalContractAnalysis = Partial<RentalContractAnalysis> & {
+  lateFeeDailyPercent?: number | string | null;
   confidence?: "high" | "medium" | "low" | null;
   notes?: string[] | null;
 };
@@ -281,10 +283,9 @@ function inferTenantName(text: string) {
 
 function inferTenantNameAroundRole(text: string) {
   const normalized = normalizeTextForMatching(text);
-  const patterns = [
-    /(?:Sr\.?|Sra\.?|Srta\.?|Senor|Senora)?\s*([A-Z][A-Za-z?'`.-]+(?:\s+[A-Z][A-Za-z?'`.-]+){1,5})\s*\(\s*(?:LOCATARIO|LOCATARIA|INQUILINO|INQUILINA|ARRENDATARIO|ARRENDATARIA|Locatario|Locataria|Inquilino|Inquilina|Arrendatario|Arrendataria|locatario|locataria|inquilino|inquilina|arrendatario|arrendataria)\s*\)/,
-    /(?:LOCATARIO|LOCATARIA|INQUILINO|INQUILINA|ARRENDATARIO|ARRENDATARIA|Locatario|Locataria|Inquilino|Inquilina|Arrendatario|Arrendataria|locatario|locataria|inquilino|inquilina|arrendatario|arrendataria)\s*(?::|-)\s*(?:Sr\.?|Sra\.?|Srta\.?|Senor|Senora)?\s*([A-Z][A-Za-z?'`.-]+(?:\s+[A-Z][A-Za-z?'`.-]+){1,5})/,
-  ];
+  const roles =
+    "LOCATARIO|LOCATARIA|INQUILINO|INQUILINA|ARRENDATARIO|ARRENDATARIA|Locatario|Locataria|Inquilino|Inquilina|Arrendatario|Arrendataria|locatario|locataria|inquilino|inquilina|arrendatario|arrendataria";
+  const patterns = buildPartyNamePatterns(roles);
 
   for (const pattern of patterns) {
     const match = normalized.match(pattern);
@@ -295,6 +296,33 @@ function inferTenantNameAroundRole(text: string) {
   }
 
   return null;
+}
+
+function inferOwnerNameAroundRole(text: string) {
+  const normalized = normalizeTextForMatching(text);
+  const roles =
+    "LOCADOR|LOCADORA|PROPIETARIO|PROPIETARIA|ARRENDADOR|ARRENDADORA|Locador|Locadora|Propietario|Propietaria|Arrendador|Arrendadora|locador|locadora|propietario|propietaria|arrendador|arrendadora";
+  const patterns = buildPartyNamePatterns(roles);
+
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    const name = match?.[1]?.trim();
+    if (name) {
+      return name.replace(/^(sr\.?|sra\.?|srta\.?|senor|senora)\s+/i, "").replace(/\s+/g, " ");
+    }
+  }
+
+  return null;
+}
+
+function buildPartyNamePatterns(roles: string) {
+  const personName = String.raw`([A-Z][A-Za-z?'` + "`" + String.raw`.-]+(?:\s+[A-Z][A-Za-z?'` + "`" + String.raw`.-]+){1,5})`;
+  const prefix = String.raw`(?:Sr\.?|Sra\.?|Srta\.?|Senor|Senora)?\s*`;
+
+  return [
+    new RegExp(`${prefix}${personName}\\s*\\(\\s*(?:${roles})\\s*\\)`),
+    new RegExp(`(?:${roles})\\s*(?::|-)\\s*${prefix}${personName}`),
+  ];
 }
 
 function inferCurrentRent(text: string) {
@@ -328,6 +356,25 @@ function inferLateFeeDailyAmount(text: string) {
     const amount = parseAmount(match[1]);
     if (amount && !Number.isNaN(amount)) {
       return amount;
+    }
+  }
+
+  return null;
+}
+
+function inferLateFeeDailyPercent(text: string) {
+  const patterns = [
+    /(?:punitorio|mora|multa|interes(?:es)?)[\s\S]{0,120}?([\d.,]+)\s*%\s*(?:diario|por\s+d[ií]a|cada\s+d[ií]a)?/i,
+    /([\d.,]+)\s*%\s*(?:diario|por\s+d[ií]a|cada\s+d[ií]a)[\s\S]{0,120}?(?:punitorio|mora|multa|interes(?:es)?)/i,
+    /([\d.,]+)\s*%\s*(?:diario|por\s+d[ií]a|cada\s+d[ií]a)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    const percent = parseAmount(match[1]);
+    if (percent !== null && Number.isFinite(percent) && percent > 0 && percent <= 100) {
+      return percent;
     }
   }
 
@@ -387,7 +434,7 @@ async function inferWithOpenAI(text: string): Promise<AIRentalContractAnalysis |
             {
               type: "input_text",
               text:
-                "Lee un contrato de alquiler argentino y extrae datos estructurados. Devuelve solo JSON valido con las claves tenantName, currentRent, indexType, adjustmentFrequencyMonths, lateFeeDailyAmount, lateFeeGraceDays, contractStartDate, nextAdjustmentDate, summary, confidence y notes. Usa null si un dato no está expresado con claridad suficiente. lateFeeDailyAmount es el monto fijo por cada dia de atraso o mora; lateFeeGraceDays son dias de gracia antes de aplicar punitorios. Las fechas deben salir como YYYY-MM-DD incluso si el contrato usa formatos legales como '01 de Abril del año 2024' o 'mes de OCTUBRE del año 2024'. indexType solo puede ser IPC o ICL. confidence solo puede ser high, medium o low. No inventes datos faltantes.",
+                "Lee un contrato de alquiler argentino y extrae datos estructurados. Devuelve solo JSON valido con las claves tenantName, ownerName, currentRent, indexType, adjustmentFrequencyMonths, lateFeeDailyAmount, lateFeeDailyPercent, lateFeeGraceDays, contractStartDate, nextAdjustmentDate, summary, confidence y notes. ownerName es el locador/propietario. tenantName es el locatario/inquilino. Usa null si un dato no esta expresado con claridad suficiente. lateFeeDailyAmount es solo monto fijo por cada dia de atraso o mora. Si el contrato expresa punitorio como porcentaje diario, usa lateFeeDailyPercent y deja lateFeeDailyAmount en null. lateFeeGraceDays son dias de gracia antes de aplicar punitorios. Las fechas deben salir como YYYY-MM-DD incluso si el contrato usa formatos legales como '01 de Abril del año 2024' o 'mes de OCTUBRE del año 2024'. indexType solo puede ser IPC o ICL. confidence solo puede ser high, medium o low. No inventes datos faltantes.",
             },
           ],
         },
@@ -441,20 +488,28 @@ export async function analyzeRentalContractText({
 
   const aiTenantName =
     typeof ai?.tenantName === "string" && ai.tenantName.trim() ? ai.tenantName.trim() : null;
+  const aiOwnerName =
+    typeof ai?.ownerName === "string" && ai.ownerName.trim() ? ai.ownerName.trim() : null;
   const aiCurrentRent = normalizePositiveAmount(ai?.currentRent);
   const aiIndexType = normalizeIndexType(ai?.indexType);
   const aiAdjustmentFrequencyMonths = normalizePositiveInteger(ai?.adjustmentFrequencyMonths);
   const aiLateFeeDailyAmount = normalizePositiveAmount(ai?.lateFeeDailyAmount);
+  const aiLateFeeDailyPercent = normalizePositiveAmount(ai?.lateFeeDailyPercent);
   const aiLateFeeGraceDays = normalizeNonNegativeInteger(ai?.lateFeeGraceDays);
   const aiContractStartDate = normalizeIsoDate(ai?.contractStartDate);
   const aiNextAdjustmentDate = normalizeIsoDate(ai?.nextAdjustmentDate);
 
   const tenantName = aiTenantName ?? ruleTenantName ?? null;
+  const ownerName = aiOwnerName ?? inferOwnerNameAroundRole(normalizedText) ?? null;
   const detectedCurrentRent = aiCurrentRent ?? ruleCurrentRent;
   const detectedIndexType = aiIndexType ?? ruleIndexType;
   const detectedAdjustmentFrequencyMonths =
     aiAdjustmentFrequencyMonths ?? ruleAdjustmentFrequencyMonths;
-  const detectedLateFeeDailyAmount = aiLateFeeDailyAmount ?? ruleLateFeeDailyAmount;
+  const detectedLateFeeDailyPercent =
+    inferLateFeeDailyPercent(normalizedText) ?? aiLateFeeDailyPercent;
+  const detectedLateFeeDailyAmount = detectedLateFeeDailyPercent && detectedCurrentRent
+    ? Math.round((detectedCurrentRent * detectedLateFeeDailyPercent) / 100)
+    : aiLateFeeDailyAmount ?? ruleLateFeeDailyAmount;
   const detectedLateFeeGraceDays = aiLateFeeGraceDays ?? ruleLateFeeGraceDays;
   const detectedContractStartDate = aiContractStartDate ?? ruleContractStartDate;
   const detectedNextAdjustmentDate =
@@ -529,6 +584,7 @@ export async function analyzeRentalContractText({
 
   return {
     tenantName,
+    ownerName,
     currentRent,
     indexType,
     adjustmentFrequencyMonths,
@@ -540,6 +596,7 @@ export async function analyzeRentalContractText({
       ai?.summary ??
       [
         tenantName ? `Inquilino detectado: ${tenantName}.` : null,
+        ownerName ? `Propietario detectado: ${ownerName}.` : null,
         contractStartDate ? `Inicio del contrato: ${contractStartDate}.` : null,
         nextAdjustmentDate ? `Próximo ajuste estimado: ${nextAdjustmentDate}.` : null,
         indexType ? `Índice detectado: ${indexType}.` : "Índice no detectado con certeza.",

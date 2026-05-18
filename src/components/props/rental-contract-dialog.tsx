@@ -46,6 +46,7 @@ type OwnerFormRow = {
 
 type ContractAnalysis = {
   tenantName: string | null;
+  ownerName: string | null;
   currentRent: number | null;
   indexType: "IPC" | "ICL" | null;
   adjustmentFrequencyMonths: number | null;
@@ -313,6 +314,18 @@ export function RentalContractDialog({ property }: { property: Property }) {
     setForm((prev) => ({
       ...prev,
       tenantName: analysis.tenantName ?? prev.tenantName,
+      ownerName: analysis.ownerName ?? prev.ownerName,
+      owners:
+        analysis.ownerName && !prev.owners.some((owner) => owner.fullName.trim())
+          ? [
+              {
+                ...prev.owners[0],
+                fullName: analysis.ownerName,
+                participationPercent: prev.owners[0]?.participationPercent || "100",
+              },
+              ...prev.owners.slice(1),
+            ]
+          : prev.owners,
       currentRent: analysis.currentRent ? String(Math.round(analysis.currentRent)) : prev.currentRent,
       indexType: analysis.indexType ?? prev.indexType,
       adjustmentFrequencyMonths: analysis.adjustmentFrequencyMonths
