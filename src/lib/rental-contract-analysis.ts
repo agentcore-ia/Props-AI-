@@ -132,6 +132,35 @@ function normalizeIsoDate(value: unknown) {
   return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : null;
 }
 
+function extractOpenAIOutputText(payload: unknown) {
+  if (!payload || typeof payload !== "object") return "";
+  const directOutput = (payload as { output_text?: unknown }).output_text;
+  if (typeof directOutput === "string" && directOutput.trim()) {
+    return directOutput.trim();
+  }
+
+  const output = (payload as { output?: unknown }).output;
+  if (!Array.isArray(output)) return "";
+
+  const chunks: string[] = [];
+
+  for (const item of output) {
+    if (!item || typeof item !== "object") continue;
+    const content = (item as { content?: unknown }).content;
+    if (!Array.isArray(content)) continue;
+
+    for (const part of content) {
+      if (!part || typeof part !== "object") continue;
+      const text = (part as { text?: unknown }).text;
+      if (typeof text === "string" && text.trim()) {
+        chunks.push(text.trim());
+      }
+    }
+  }
+
+  return chunks.join("\n").trim();
+}
+
 function addMonthsIsoDate(isoDate: string, months: number) {
   const [year, month, day] = isoDate.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1 + months, 1));
@@ -250,6 +279,24 @@ function inferTenantName(text: string) {
   return match?.[1]?.trim() ?? null;
 }
 
+function inferTenantNameAroundRole(text: string) {
+  const normalized = normalizeTextForMatching(text);
+  const patterns = [
+    /(?:Sr\.?|Sra\.?|Srta\.?|Senor|Senora)?\s*([A-Z][A-Za-z?'`.-]+(?:\s+[A-Z][A-Za-z?'`.-]+){1,5})\s*\(\s*(?:LOCATARIO|LOCATARIA|INQUILINO|INQUILINA|ARRENDATARIO|ARRENDATARIA|Locatario|Locataria|Inquilino|Inquilina|Arrendatario|Arrendataria|locatario|locataria|inquilino|inquilina|arrendatario|arrendataria)\s*\)/,
+    /(?:LOCATARIO|LOCATARIA|INQUILINO|INQUILINA|ARRENDATARIO|ARRENDATARIA|Locatario|Locataria|Inquilino|Inquilina|Arrendatario|Arrendataria|locatario|locataria|inquilino|inquilina|arrendatario|arrendataria)\s*(?::|-)\s*(?:Sr\.?|Sra\.?|Srta\.?|Senor|Senora)?\s*([A-Z][A-Za-z?'`.-]+(?:\s+[A-Z][A-Za-z?'`.-]+){1,5})/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    const name = match?.[1]?.trim();
+    if (name) {
+      return name.replace(/^(sr\.?|sra\.?|srta\.?|senor|senora)\s+/i, "").replace(/\s+/g, " ");
+    }
+  }
+
+  return null;
+}
+
 function inferCurrentRent(text: string) {
   const patterns = [
     /(?:canon locativo(?: inicial)?|alquiler(?: inicial| mensual| actual)?|precio mensual)[\s\S]{0,120}?\(\s*(?:ars\s*)?\$\s*([\d.]+(?:,\d{2})?)\s*\)/i,
@@ -305,6 +352,22 @@ function inferLateFeeGraceDays(text: string) {
   return null;
 }
 
+function inferLateFeeGraceDaysFlexible(text: string) {
+  const normalized = normalizeTextForMatching(text).toLowerCase();
+  const match =
+    normalized.match(/(\d{1,2})\s+dias?\s+de\s+gracia/) ||
+    normalized.match(/gracia\s+de\s+(\d{1,2})\s+dias?/) ||
+    normalized.match(/dias?\s+de\s+gracia[\s\S]{0,60}?(\d{1,2})\s+dias?/) ||
+    normalized.match(/gracia[\s\S]{0,60}?(\d{1,2})\s+dias?/) ||
+    normalized.match(/d.as?\s+de\s+gracia[\s\S]{0,60}?(\d{1,2})\s+d.as?/) ||
+    normalized.match(/gracia[\s\S]{0,60}?(\d{1,2})\s+d.as?/) ||
+    normalized.match(/vencid[oa]s?\s+(\d{1,2})\s+dias?/);
+
+  if (match) return Number(match[1]);
+  if (/sin\s+dias?\s+de\s+gracia|sin\s+gracia/.test(normalized)) return 0;
+  return null;
+}
+
 async function inferWithOpenAI(text: string): Promise<AIRentalContractAnalysis | null> {
   const openAI = getOpenAIEnv();
   if (!openAI.configured) return null;
@@ -343,8 +406,8 @@ async function inferWithOpenAI(text: string): Promise<AIRentalContractAnalysis |
 
   if (!response.ok) return null;
 
-  const payload = (await response.json()) as { output_text?: string };
-  const output = payload.output_text?.trim();
+  const payload = await response.json();
+  const output = extractOpenAIOutputText(payload);
   if (!output) return null;
 
   const normalized = output.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
@@ -366,12 +429,13 @@ export async function analyzeRentalContractText({
   const normalizedText = normalizeWhitespace(text);
   const ai = await inferWithOpenAI(normalizedText);
 
-  const ruleTenantName = inferTenantName(normalizedText);
+  const ruleTenantName = inferTenantNameAroundRole(normalizedText) ?? inferTenantName(normalizedText);
   const ruleCurrentRent = inferCurrentRent(normalizedText);
   const ruleIndexType = inferIndexType(normalizedText);
   const ruleAdjustmentFrequencyMonths = inferFrequencyMonths(normalizedText);
   const ruleLateFeeDailyAmount = inferLateFeeDailyAmount(normalizedText);
-  const ruleLateFeeGraceDays = inferLateFeeGraceDays(normalizedText);
+  const ruleLateFeeGraceDays =
+    inferLateFeeGraceDaysFlexible(normalizedText) ?? inferLateFeeGraceDays(normalizedText);
   const ruleContractStartDate = inferContractStartDate(normalizedText);
   const ruleNextAdjustmentDate = inferNextAdjustmentDate(normalizedText, ruleContractStartDate);
 
