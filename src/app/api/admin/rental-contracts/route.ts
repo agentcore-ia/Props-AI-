@@ -268,9 +268,9 @@ export async function POST(request: Request) {
   const resolvedOwnerNotes = ownerNotes || existingContract?.owner_notes || "";
   const primaryOwner = sanitizedOwners[0] ?? null;
   const resolvedCurrentRent =
+    (currentRentRaw ? Number(currentRentRaw) : null) ??
     analyzedContract?.currentRent ??
     existingContract?.current_rent ??
-    (currentRentRaw ? Number(currentRentRaw) : null) ??
     fallbackRent;
   const resolvedIndexType =
     (indexType === "IPC" || indexType === "ICL" ? indexType : null) ??
@@ -299,13 +299,13 @@ export async function POST(request: Request) {
           Number(existingContract?.late_fee_grace_days ?? 10)
   );
   const resolvedContractStartDate =
-    analyzedContract?.contractStartDate ??
     normalizeOptionalString(contractStartDateRaw) ??
+    analyzedContract?.contractStartDate ??
     existingContract?.contract_start_date ??
     null;
   const resolvedNextAdjustmentDate =
-    analyzedContract?.nextAdjustmentDate ??
     normalizeOptionalString(nextAdjustmentDateRaw) ??
+    analyzedContract?.nextAdjustmentDate ??
     existingContract?.next_adjustment_date ??
     null;
   const schedule = buildFallbackContractSchedule({

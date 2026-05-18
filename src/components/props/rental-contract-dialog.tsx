@@ -44,6 +44,20 @@ type OwnerFormRow = {
   notes: string;
 };
 
+type ContractAnalysis = {
+  tenantName: string | null;
+  currentRent: number | null;
+  indexType: "IPC" | "ICL" | null;
+  adjustmentFrequencyMonths: number | null;
+  lateFeeDailyAmount: number | null;
+  lateFeeGraceDays: number | null;
+  contractStartDate: string | null;
+  nextAdjustmentDate: string | null;
+  summary: string;
+  requiresReview: boolean;
+  reviewReasons: string[];
+};
+
 function getInitialOwners(property: Property): OwnerFormRow[] {
   if (property.rentalContract?.owners?.length) {
     return property.rentalContract.owners.map((owner) => ({
@@ -200,6 +214,10 @@ export function RentalContractDialog({ property }: { property: Property }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [form, setForm] = useState(() => getInitialForm(property));
   const [contractFile, setContractFile] = useState<File | null>(null);
+  const [analyzingContract, setAnalyzingContract] = useState(false);
+  const [analysisMessage, setAnalysisMessage] = useState<string | null>(null);
+  const [analysisSummary, setAnalysisSummary] = useState<string | null>(null);
+  const [analysisReviewReasons, setAnalysisReviewReasons] = useState<string[]>([]);
 
   const reviewReasons = useMemo(
     () => getReviewReasons(property.rentalContract?.notes ?? ""),
@@ -289,6 +307,77 @@ export function RentalContractDialog({ property }: { property: Property }) {
         displayOrder: index,
       }))
       .filter((owner) => owner.fullName);
+  }
+
+  function applyContractAnalysis(analysis: ContractAnalysis) {
+    setForm((prev) => ({
+      ...prev,
+      tenantName: analysis.tenantName ?? prev.tenantName,
+      currentRent: analysis.currentRent ? String(Math.round(analysis.currentRent)) : prev.currentRent,
+      indexType: analysis.indexType ?? prev.indexType,
+      adjustmentFrequencyMonths: analysis.adjustmentFrequencyMonths
+        ? String(analysis.adjustmentFrequencyMonths)
+        : prev.adjustmentFrequencyMonths,
+      lateFeeDailyAmount:
+        analysis.lateFeeDailyAmount !== null && analysis.lateFeeDailyAmount !== undefined
+          ? String(Math.round(analysis.lateFeeDailyAmount))
+          : prev.lateFeeDailyAmount,
+      lateFeeGraceDays:
+        analysis.lateFeeGraceDays !== null && analysis.lateFeeGraceDays !== undefined
+          ? String(analysis.lateFeeGraceDays)
+          : prev.lateFeeGraceDays,
+      contractStartDate: analysis.contractStartDate ?? prev.contractStartDate,
+      nextAdjustmentDate: analysis.nextAdjustmentDate ?? prev.nextAdjustmentDate,
+    }));
+  }
+
+  async function handleContractFileChange(file: File | null) {
+    setContractFile(file);
+    setAnalysisMessage(null);
+    setAnalysisSummary(null);
+    setAnalysisReviewReasons([]);
+
+    if (!file) return;
+
+    setAnalyzingContract(true);
+    setAnalysisMessage("Leyendo contrato y completando datos...");
+    setError(null);
+
+    const body = new FormData();
+    body.set("contractFile", file);
+    body.set("fallbackRent", form.currentRent || String(property.price));
+
+    try {
+      const response = await fetch("/api/admin/rental-contracts/analyze", {
+        method: "POST",
+        body,
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok || !payload?.analysis) {
+        setAnalysisMessage(payload?.error ?? "No pudimos analizar el contrato automaticamente.");
+        return;
+      }
+
+      const analysis = payload.analysis as ContractAnalysis;
+      applyContractAnalysis(analysis);
+      setAnalysisSummary(analysis.summary || null);
+      setAnalysisReviewReasons(analysis.reviewReasons ?? []);
+      setAnalysisMessage(
+        analysis.requiresReview
+          ? "Autocompletamos los datos detectados, pero hay puntos para revisar."
+          : "Datos del alquiler autocompletados desde el contrato."
+      );
+      setShowAdvanced(true);
+    } catch (error) {
+      setAnalysisMessage(
+        error instanceof Error
+          ? error.message
+          : "No pudimos analizar el contrato automaticamente."
+      );
+    } finally {
+      setAnalyzingContract(false);
+    }
   }
 
   async function handleSave() {
@@ -402,6 +491,10 @@ export function RentalContractDialog({ property }: { property: Property }) {
           setError(null);
           setWarning(null);
           setContractFile(null);
+          setAnalyzingContract(false);
+          setAnalysisMessage(null);
+          setAnalysisSummary(null);
+          setAnalysisReviewReasons([]);
           setShowAdvanced(false);
           setForm(getInitialForm(property));
         }
@@ -741,12 +834,44 @@ export function RentalContractDialog({ property }: { property: Property }) {
                     className="hidden"
                     type="file"
                     accept={acceptedFormats}
-                    onChange={(event) => setContractFile(event.target.files?.[0] ?? null)}
+                    onChange={(event) => void handleContractFileChange(event.target.files?.[0] ?? null)}
                   />
                   <span className="mt-4 rounded-2xl border bg-background px-3 py-2 text-center font-medium">
-                    {contractFile ? contractFile.name : "Elegir archivo"}
+                    {analyzingContract ? "Analizando contrato..." : contractFile ? contractFile.name : "Elegir archivo"}
                   </span>
                 </label>
+
+                {analysisMessage ? (
+                  <div
+                    className={cn(
+                      "mt-4 rounded-[22px] border p-4 text-sm",
+                      analysisReviewReasons.length > 0
+                        ? "border-amber-200 bg-amber-50 text-amber-800"
+                        : "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    )}
+                  >
+                    <div className="flex items-start gap-2">
+                      {analyzingContract ? (
+                        <Loader2 className="mt-0.5 size-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="mt-0.5 size-4" />
+                      )}
+                      <div>
+                        <p className="font-semibold">{analysisMessage}</p>
+                        {analysisSummary ? (
+                          <p className="mt-2 leading-6">{analysisSummary}</p>
+                        ) : null}
+                        {analysisReviewReasons.length > 0 ? (
+                          <ul className="mt-3 space-y-1">
+                            {analysisReviewReasons.map((reason) => (
+                              <li key={reason}>- {reason}</li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="mt-4 rounded-[22px] border bg-background p-4 text-sm">
                   <div className="flex items-center gap-2 font-medium">
