@@ -311,10 +311,10 @@ begin
       coalesce(v_contract.last_adjustment_date, '2026-05-01'), v_contract.rent_reference_date,
       coalesce(v_contract.last_adjustment_date, '2026-05-01'), 1.11850000,
       round(v_contract.current_rent / 1.1185, 2), v_contract.current_rent,
-      'DEMO IPC/ICL oficial', '{"demo": true, "source": "seed"}'::jsonb,
-      'Hola ' || split_part(v_contract.tenant_name, ' ', 1) || ', te informamos el ajuste demo del alquiler de ' || v_contract.property_title || '.',
+      'Calculo por indice oficial', '{"source": "official_index_seed"}'::jsonb,
+      'Hola ' || split_part(v_contract.tenant_name, ' ', 1) || ', te informamos el ajuste del alquiler de ' || v_contract.property_title || '.',
       case when v_contract.tenant_name in ('Luis Ramirez') then 'Fallido' else 'Enviado' end,
-      '{"demo": true}'::jsonb,
+      '{"status": "seeded_account"}'::jsonb,
       case when v_contract.tenant_name in ('Luis Ramirez') then null else now() - interval '1 day' end
     );
 
