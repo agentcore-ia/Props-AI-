@@ -6,13 +6,11 @@ import {
   ArrowRight,
   CalendarClock,
   CheckCheck,
-  Clock3,
+  ListChecks,
   Loader2,
   MessageCircleMore,
-  RefreshCcw,
 } from "lucide-react";
-import { useState } from "react";
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import type { CrmLeadSummary, TodayWorkspaceSnapshot } from "@/lib/crm-types";
 import { buildAutomaticFollowUpMessage } from "@/lib/crm-insights";
@@ -26,11 +24,44 @@ type FollowUpResult = {
   error?: string;
 };
 
+type TodayItem = {
+  id: string;
+  title: string;
+  description: string;
+  meta: string;
+  actionLabel?: string;
+  actionHref?: string;
+  preview?: string;
+};
+
 export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
   const router = useRouter();
   const [busyAction, setBusyAction] = useState<null | "followups" | "visits">(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [followUpResults, setFollowUpResults] = useState<FollowUpResult[]>([]);
+
+  const actionItems = useMemo<TodayItem[]>(
+    () =>
+      [
+        ...snapshot.myDay.leadsToAnswer.map((lead) => ({
+          id: `lead-${lead.id}`,
+          title: lead.fullName,
+          description: `${lead.propertyTitle ?? "Consulta general"} · ${lead.lastCustomerMessage}`,
+          meta: lead.priority,
+          actionLabel: "Abrir mensajes",
+          actionHref: `/mensajes?lead=${lead.id}`,
+        })),
+        ...snapshot.myDay.dueNow.map((task) => ({
+          id: `task-${task.id}`,
+          title: task.title,
+          description: task.details,
+          meta: task.priority,
+          actionLabel: task.leadId ? "Ver lead" : "Abrir agenda",
+          actionHref: task.leadId ? `/mensajes?lead=${task.leadId}` : "/agenda",
+        })),
+      ].slice(0, 8),
+    [snapshot.myDay.dueNow, snapshot.myDay.leadsToAnswer]
+  );
 
   async function runAction(kind: "followups" | "visits") {
     setBusyAction(kind);
@@ -41,16 +72,14 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
 
     const response = await fetch(
       kind === "followups" ? "/api/admin/follow-ups/run" : "/api/admin/visits/reminders/run",
-      {
-        method: "POST",
-      }
+      { method: "POST" }
     );
 
     const payload = await response.json().catch(() => null);
     setBusyAction(null);
 
     if (!response.ok) {
-      setFeedback(payload?.error ?? "No se pudo ejecutar la automatizacion.");
+      setFeedback(payload?.error ?? "No se pudo ejecutar la accion.");
       return;
     }
 
@@ -61,8 +90,8 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
       setFollowUpResults(results);
       setFeedback(
         errorCount > 0
-          ? `Se enviaron ${sentCount} mensajes por WhatsApp y ${errorCount} quedaron con error.`
-          : `Se enviaron ${sentCount} mensajes por WhatsApp.`
+          ? `Se enviaron ${sentCount} WhatsApp y ${errorCount} quedaron con error.`
+          : `Se enviaron ${sentCount} WhatsApp.`
       );
     } else {
       setFeedback(`Se enviaron ${payload?.processed ?? 0} recordatorios de visita.`);
@@ -73,16 +102,16 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
 
   const followUpLabel =
     snapshot.counters.automaticFollowUps > 0
-      ? `Recontactar ${snapshot.counters.automaticFollowUps} lead${snapshot.counters.automaticFollowUps === 1 ? "" : "s"} por WhatsApp`
-      : "No hay leads listos para recontactar";
+      ? `Recontactar ${snapshot.counters.automaticFollowUps}`
+      : "Sin recontactos";
 
   return (
     <Card className="rounded-[28px] border-0 bg-card shadow-sm">
-      <CardHeader className="gap-3 pb-4 md:flex-row md:items-start md:justify-between">
+      <CardHeader className="gap-3 pb-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <CardTitle className="text-xl">Que tengo que hacer hoy</CardTitle>
+          <CardTitle className="text-xl">Hoy</CardTitle>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Lo urgente primero: contactos humanos, tareas operativas y visitas del dia.
+            Lo primero para no perder consultas, visitas ni pagos.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -110,35 +139,25 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
             ) : (
               <CalendarClock className="size-4" />
             )}
-            Enviar recordatorios de visitas
+            Recordar visitas
           </Button>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        <div className="rounded-2xl border bg-background px-4 py-2.5 text-sm text-muted-foreground">
-          Esta accion envia mensajes reales por WhatsApp a los leads listos para retomar.
-          No crea solo tareas internas.
-        </div>
+      <CardContent className="space-y-3">
+        <section className="grid gap-3 md:grid-cols-5">
+          <MiniStat label="Por hacer" value={String(snapshot.counters.pendingTasks)} />
+          <MiniStat label="Visitas hoy" value={String(snapshot.counters.visitsToday)} />
+          <MiniStat label="Leads urgentes" value={String(snapshot.counters.urgentLeads)} />
+          <MiniStat label="Recontactos" value={String(snapshot.counters.automaticFollowUps)} />
+          <MiniStat label="IA atendio" value={String(snapshot.counters.aiResolved)} />
+        </section>
 
-        <TodayList
-          title="Leads que se van a recontactar ahora"
-          icon={<MessageCircleMore className="size-4 text-primary" />}
-          items={
-            snapshot.myDay.automaticFollowUps.length > 0
-              ? snapshot.myDay.automaticFollowUps.map((lead) => ({
-                  id: lead.id,
-                  title: lead.fullName,
-                  description: `${deriveFollowUpReason(lead)}${lead.propertyTitle ? ` · ${lead.propertyTitle}` : ""}`,
-                  meta: "WhatsApp",
-                  actionLabel: "Abrir lead",
-                  actionHref: `/mensajes?lead=${lead.id}`,
-                  preview: buildAutomaticFollowUpMessage({ lead, property: null }),
-                }))
-              : []
-          }
-          empty="No hay leads con seguimiento automatico listo para salir ahora."
-        />
+        {feedback ? (
+          <div className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground">
+            {feedback}
+          </div>
+        ) : null}
 
         {followUpResults.length > 0 ? (
           <TodayList
@@ -158,99 +177,82 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
                 actionHref: lead ? `/mensajes?lead=${lead.id}` : undefined,
               };
             })}
-            empty="Todavia no se ejecuto ningun seguimiento automatico."
+            empty="Todavia no se ejecuto ningun seguimiento."
           />
         ) : null}
 
-        <section className="grid gap-3 md:grid-cols-5">
-          <MiniStat label="Tareas pendientes" value={String(snapshot.counters.pendingTasks)} />
-          <MiniStat label="Visitas de hoy" value={String(snapshot.counters.visitsToday)} />
-          <MiniStat label="Leads urgentes" value={String(snapshot.counters.urgentLeads)} />
-          <MiniStat label="Recontactos automaticos" value={String(snapshot.counters.automaticFollowUps)} />
-          <MiniStat label="IA ya atendio" value={String(snapshot.counters.aiResolved)} />
-        </section>
-
-        {feedback ? (
-          <div className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground">
-            {feedback}
-          </div>
-        ) : null}
-
-        <div className="grid gap-3 xl:grid-cols-3">
+        <div className="grid gap-3 xl:grid-cols-[1.3fr_0.9fr]">
           <TodayList
-            title="Requieren contacto humano"
-            icon={<Clock3 className="size-4 text-primary" />}
-            items={
-              snapshot.myDay.leadsToAnswer.length > 0
-                ? snapshot.myDay.leadsToAnswer.map((lead) => ({
-                    id: lead.id,
-                    title: lead.fullName,
-                    description: `${lead.propertyTitle ?? "Consulta general"} · ${lead.lastCustomerMessage}`,
-                    meta: lead.priority,
-                    actionLabel: "Abrir mensajes",
-                    actionHref: `/mensajes?lead=${lead.id}`,
-                  }))
-                : []
-            }
-            empty="No hay conversaciones que necesiten respuesta manual ahora."
+            title="Hacer ahora"
+            icon={<ListChecks className="size-4 text-primary" />}
+            items={actionItems}
+            empty="No hay tareas urgentes ni conversaciones para responder ahora."
           />
 
           <TodayList
-            title="Tareas operativas"
-            icon={<RefreshCcw className="size-4 text-primary" />}
+            title="Visitas de hoy"
+            icon={<CalendarClock className="size-4 text-primary" />}
             items={
-              snapshot.myDay.dueNow.length > 0
-                ? snapshot.myDay.dueNow.map((task) => ({
-                    id: task.id,
-                    title: task.title,
-                    description: task.details,
-                    meta: task.priority,
-                    actionLabel: task.leadId ? "Ver lead" : "Abrir agenda",
-                    actionHref: task.leadId ? `/mensajes?lead=${task.leadId}` : "/agenda",
+              snapshot.myDay.visitsToday.length > 0
+                ? snapshot.myDay.visitsToday.map((visit) => ({
+                    id: visit.id,
+                    title: visit.leadName,
+                    description: `${visit.propertyTitle ?? "Propiedad"} · ${formatShortDate(
+                      visit.scheduledFor.slice(0, 10)
+                    )}`,
+                    meta: visit.status,
+                    actionLabel: "Abrir agenda",
+                    actionHref: "/agenda",
                   }))
                 : []
             }
-            empty="No hay tareas operativas activas para hoy."
-          />
-
-          <TodayList
-            title="IA ya resolvio"
-            icon={<CheckCheck className="size-4 text-primary" />}
-            items={
-              snapshot.myDay.aiResolved.length > 0
-                ? snapshot.myDay.aiResolved.map((lead) => ({
-                    id: lead.id,
-                    title: lead.fullName,
-                    description: `${lead.propertyTitle ?? "Consulta general"} · ${lead.lastCustomerMessage}`,
-                    meta: deriveChannelLabel(lead.source),
-                    actionLabel: "Ver conversacion",
-                    actionHref: `/mensajes?lead=${lead.id}`,
-                  }))
-                : []
-            }
-            empty="No hay conversaciones web resueltas por IA para revisar."
+            empty="No hay visitas programadas para hoy."
           />
         </div>
 
-        <TodayList
-          title="Visitas de hoy"
-          icon={<CalendarClock className="size-4 text-primary" />}
-          items={
-            snapshot.myDay.visitsToday.length > 0
-              ? snapshot.myDay.visitsToday.map((visit) => ({
-                  id: visit.id,
-                  title: visit.leadName,
-                  description: `${visit.propertyTitle ?? "Propiedad"} · ${formatShortDate(
-                    visit.scheduledFor.slice(0, 10)
-                  )}`,
-                  meta: visit.status,
-                  actionLabel: "Abrir agenda",
-                  actionHref: "/agenda",
-                }))
-              : []
-          }
-          empty="No hay visitas programadas para hoy."
-        />
+        <details className="rounded-[24px] border bg-background">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-muted-foreground">
+            Automatizaciones y revisiones
+          </summary>
+          <div className="grid gap-3 border-t p-3 xl:grid-cols-2">
+            <TodayList
+              title="Recontactos listos"
+              icon={<MessageCircleMore className="size-4 text-primary" />}
+              items={
+                snapshot.myDay.automaticFollowUps.length > 0
+                  ? snapshot.myDay.automaticFollowUps.map((lead) => ({
+                      id: lead.id,
+                      title: lead.fullName,
+                      description: `${deriveFollowUpReason(lead)}${lead.propertyTitle ? ` · ${lead.propertyTitle}` : ""}`,
+                      meta: "WhatsApp real",
+                      actionLabel: "Abrir lead",
+                      actionHref: `/mensajes?lead=${lead.id}`,
+                      preview: buildAutomaticFollowUpMessage({ lead, property: null }),
+                    }))
+                  : []
+              }
+              empty="No hay leads con seguimiento automatico listo para salir."
+            />
+
+            <TodayList
+              title="IA ya resolvio"
+              icon={<CheckCheck className="size-4 text-primary" />}
+              items={
+                snapshot.myDay.aiResolved.length > 0
+                  ? snapshot.myDay.aiResolved.map((lead) => ({
+                      id: lead.id,
+                      title: lead.fullName,
+                      description: `${lead.propertyTitle ?? "Consulta general"} · ${lead.lastCustomerMessage}`,
+                      meta: deriveChannelLabel(lead.source),
+                      actionLabel: "Ver conversacion",
+                      actionHref: `/mensajes?lead=${lead.id}`,
+                    }))
+                  : []
+              }
+              empty="No hay conversaciones web resueltas por IA para revisar."
+            />
+          </div>
+        </details>
       </CardContent>
     </Card>
   );
@@ -284,9 +286,9 @@ function deriveFollowUpReason(lead: CrmLeadSummary) {
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[22px] border bg-background p-3.5">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-semibold md:text-3xl">{value}</p>
+    <div className="rounded-[20px] border bg-background p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-2xl font-semibold">{value}</p>
     </div>
   );
 }
@@ -299,15 +301,7 @@ function TodayList({
 }: {
   title: string;
   icon: ReactNode;
-  items: Array<{
-    id: string;
-    title: string;
-    description: string;
-    meta: string;
-    actionLabel?: string;
-    actionHref?: string;
-    preview?: string;
-  }>;
+  items: TodayItem[];
   empty: string;
 }) {
   return (
@@ -323,7 +317,7 @@ function TodayList({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-medium">{item.title}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{item.description}</p>
                   {item.preview ? (
                     <div className="mt-3 rounded-xl bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                       <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -335,7 +329,7 @@ function TodayList({
                   {item.actionHref && item.actionLabel ? (
                     <Link
                       href={item.actionHref}
-                      className="mt-3 inline-flex h-8 items-center gap-1 rounded-xl px-2 text-sm font-medium text-primary transition hover:bg-primary/5"
+                      className="mt-2 inline-flex h-8 items-center gap-1 rounded-xl px-2 text-sm font-medium text-primary transition hover:bg-primary/5"
                     >
                       {item.actionLabel}
                       <ArrowRight className="size-4" />

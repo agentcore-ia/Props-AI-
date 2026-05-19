@@ -55,35 +55,35 @@ type NavigationGroup = {
 
 const defaultNavigation: NavigationGroup[] = [
   {
-    label: "Trabajo diario",
+    label: "Dia a dia",
     items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/propiedades", label: "Propiedades", icon: Building2 },
+      { href: "/dashboard", label: "Hoy", icon: LayoutDashboard },
       { href: "/mensajes", label: "Mensajes", icon: MessageSquareText },
-      { href: "/leads", label: "Leads", icon: Users },
       { href: "/agenda", label: "Agenda", icon: CalendarDays },
+      { href: "/leads", label: "Leads", icon: Users },
+      { href: "/propiedades", label: "Propiedades", icon: Building2 },
     ],
   },
   {
-    label: "Administracion",
+    label: "Alquileres",
     items: [
       { href: "/alquileres", label: "Alquileres", icon: KeyRound },
-      { href: "/propietarios", label: "Propietarios", icon: UserRound },
-      { href: "/inquilinos", label: "Inquilinos", icon: Users },
       { href: "/cobranzas", label: "Cobros", icon: Wallet },
       { href: "/morosos", label: "Morosos", icon: CircleAlert },
+      { href: "/inquilinos", label: "Inquilinos", icon: Users },
+      { href: "/propietarios", label: "Propietarios", icon: UserRound },
       { href: "/caja", label: "Caja", icon: Landmark },
       { href: "/transferencias", label: "Pagos propietarios", icon: Wallet },
     ],
   },
   {
-    label: "Gestion",
+    label: "Mas",
     items: [
+      { href: "/configuracion", label: "Ajustes", icon: Settings },
       { href: "/proveedores", label: "Proveedores", icon: Shield },
       { href: "/facturacion", label: "Facturas", icon: Receipt },
-      { href: "/ia", label: "Asistente", icon: Bot },
       { href: "/llamadas", label: "Llamadas", icon: Phone },
-      { href: "/configuracion", label: "Ajustes", icon: Settings },
+      { href: "/ia", label: "Asistente", icon: Bot },
     ],
   },
 ];

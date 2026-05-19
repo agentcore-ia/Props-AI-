@@ -176,8 +176,10 @@ export default async function DashboardPage() {
       <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description="Una vista rapida para seguir publicaciones, consultas y contratos desde la operacion diaria."
+        description="Arranca por lo urgente y despues revisa el estado general de la inmobiliaria."
       />
+
+      <TodayPanel snapshot={todaySnapshot} />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {snapshot.metrics.map((metric) => (
@@ -193,8 +195,6 @@ export default async function DashboardPage() {
         settlements={settlements}
         delinquentCount={delinquencies.length}
       />
-
-      <TodayPanel snapshot={todaySnapshot} />
 
       <section className="grid gap-4 xl:grid-cols-[1.45fr_0.85fr]">
         <Card className="rounded-[28px] border-0 bg-card shadow-sm">
