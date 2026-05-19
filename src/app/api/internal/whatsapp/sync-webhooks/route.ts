@@ -4,9 +4,6 @@ import { isAutomationRequest } from "@/lib/automation-auth";
 import { fetchEvolutionInstances, setEvolutionWebhook } from "@/lib/evolution";
 import { listAgencySummaries } from "@/lib/props-data";
 
-const PROPS_N8N_WEBHOOK_FALLBACK =
-  "https://agentcore-n8n.8zp1cp.easypanel.host/webhook/props-evolution-webhook";
-
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
@@ -14,8 +11,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
 
-  const webhookUrl =
-    process.env.N8N_EVOLUTION_WEBHOOK_URL?.trim() || PROPS_N8N_WEBHOOK_FALLBACK;
+  const webhookUrl = process.env.N8N_EVOLUTION_WEBHOOK_URL?.trim();
+  if (!webhookUrl) {
+    return NextResponse.json(
+      { error: "Falta N8N_EVOLUTION_WEBHOOK_URL en el entorno." },
+      { status: 500 }
+    );
+  }
   const agencies = await listAgencySummaries();
   const instances = await fetchEvolutionInstances();
   const results: Array<Record<string, unknown>> = [];

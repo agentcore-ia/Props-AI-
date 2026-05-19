@@ -1,16 +1,23 @@
 const https = require("https");
 const { randomUUID } = require("crypto");
 
-const N8N_BASE_URL = "https://agentcore-n8n.8zp1cp.easypanel.host";
-const N8N_API_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2NzA0NzEwYy05NTNlLTQ2MzctODM5My1iN2U5OTZiZTJiN2EiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiYjU5NGEzZDEtOTc5ZC00YzYxLTkwZDEtODdhM2YxOWViODMwIiwiaWF0IjoxNzczNzc5MDc5LCJleHAiOjE3ODE0OTYwMDB9.vBqNhO8OUtF_D5NxIOMsKbPTbKmtutcA-7z64mFzuHA";
-const TEMPLATE_WORKFLOW_ID = "Sbf4ewHwOCdsruMv";
+function requireEnv(name) {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`Falta ${name} en el entorno.`);
+  }
+  return value;
+}
+
+const N8N_BASE_URL = requireEnv("N8N_BASE_URL");
+const N8N_API_KEY = requireEnv("N8N_API_KEY");
+const TEMPLATE_WORKFLOW_ID = process.env.N8N_WHATSAPP_TEMPLATE_WORKFLOW_ID?.trim() || "Sbf4ewHwOCdsruMv";
 const WORKFLOW_NAME = "Props - Agente IA Inmobiliaria - Evolution API";
 const WEBHOOK_PATH = "props-evolution-webhook";
-const PROPS_AUTOMATION_SECRET = "props-automation-2026-05";
-const PROPS_APP_BASE_URL = "https://app.props.com.ar";
-const EVOLUTION_API_URL = "https://agentcore-evolution-api.8zp1cp.easypanel.host";
-const EVOLUTION_API_KEY = "429683C4C977415CAAFCCE10F7D57E11";
+const PROPS_AUTOMATION_SECRET = requireEnv("PROPS_RENT_AUTOMATION_SECRET");
+const PROPS_APP_BASE_URL = process.env.PROPS_APP_BASE_URL?.trim() || "https://app.props.com.ar";
+const EVOLUTION_API_URL = requireEnv("EVOLUTION_API_URL");
+const EVOLUTION_API_KEY = requireEnv("EVOLUTION_API_KEY");
 const TIMEZONE = "America/Argentina/Buenos_Aires";
 
 function apiCall(method, path, body) {

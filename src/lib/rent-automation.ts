@@ -9,9 +9,6 @@ import { formatArsCurrency } from "@/lib/utils";
 
 const IPC_SERIES_URL = "https://www.indec.gob.ar/ftp/cuadros/economia/serie_ipc_divisiones.csv";
 const ICL_SERIES_URL = "https://www.bcra.gob.ar/archivos/pdfs/PublicacionesEstadisticas/diar_icl.xls";
-const RENT_AUTOMATION_SECRET_FALLBACK = "props-rent-automation-2026-7f0b0b7d";
-const N8N_NOTIFICATION_WEBHOOK_FALLBACK =
-  "https://agentcore-n8n.8zp1cp.easypanel.host/webhook/props-rent-adjustment-notification";
 
 type DueContractRow = {
   id: string;
@@ -70,14 +67,19 @@ type IndexComputation = {
 };
 
 function getAutomationSecret() {
-  return process.env.PROPS_RENT_AUTOMATION_SECRET ?? RENT_AUTOMATION_SECRET_FALLBACK;
+  const secret = process.env.PROPS_RENT_AUTOMATION_SECRET?.trim();
+  if (!secret) {
+    throw new Error("Falta PROPS_RENT_AUTOMATION_SECRET en el entorno.");
+  }
+  return secret;
 }
 
 function getNotificationWebhookUrl() {
-  return (
-    process.env.N8N_RENT_NOTIFICATION_WEBHOOK_URL ??
-    N8N_NOTIFICATION_WEBHOOK_FALLBACK
-  );
+  const webhookUrl = process.env.N8N_RENT_NOTIFICATION_WEBHOOK_URL?.trim();
+  if (!webhookUrl) {
+    throw new Error("Falta N8N_RENT_NOTIFICATION_WEBHOOK_URL en el entorno.");
+  }
+  return webhookUrl;
 }
 
 function parseDateParts(isoDate: string) {
@@ -311,7 +313,7 @@ async function sendNotificationViaN8n(payload: {
         ok: true,
         status: response.status,
         body,
-        transport: "n8n",
+        transport: "automation-workflow",
       };
     }
 
@@ -338,7 +340,7 @@ async function sendNotificationViaN8n(payload: {
     return {
       ok: true,
       status: 200,
-      body: error instanceof Error ? error.message : "Webhook n8n no disponible.",
+      body: error instanceof Error ? error.message : "Workflow de WhatsApp no disponible.",
       transport: "evolution-fallback",
       fallbackResponse: direct,
     };
@@ -434,7 +436,7 @@ export async function sendTestRentIncreaseMessage(contractId: string) {
   });
 
   if (!notification.ok) {
-    throw new Error("n8n rechazo la prueba de WhatsApp.");
+    throw new Error("El servicio de WhatsApp rechazo la prueba.");
   }
 
   return {

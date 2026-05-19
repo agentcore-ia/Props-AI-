@@ -11,7 +11,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export async function POST(request: Request) {
   if (isAutomationRequest(request)) {
     const result = await runVisitReminders();
-    return NextResponse.json({ ...result, trigger: "n8n" });
+    return NextResponse.json({ ...result, trigger: "automation" });
   }
 
   const current = await getCurrentUserContext();
