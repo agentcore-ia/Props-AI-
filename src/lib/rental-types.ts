@@ -65,6 +65,8 @@ export type RentalAdjustmentSummary = {
   contractId: string;
   propertyId: string;
   agencyId: string;
+  propertyTitle: string;
+  propertyLocation: string;
   indexType: RentIndexType;
   appliedOn: string;
   referenceStartDate: string;

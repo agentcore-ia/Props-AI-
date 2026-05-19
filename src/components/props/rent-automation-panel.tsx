@@ -92,6 +92,14 @@ export function RentAutomationPanel({
                   <p className="font-medium">
                     {adjustment.indexType} aplicado el {formatShortDate(adjustment.appliedOn)}
                   </p>
+                  {adjustment.propertyTitle ? (
+                    <p className="mt-1 text-sm font-medium text-foreground/80">
+                      {adjustment.propertyTitle}
+                      {adjustment.propertyLocation ? (
+                        <span className="font-normal text-muted-foreground"> - {adjustment.propertyLocation}</span>
+                      ) : null}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-sm text-muted-foreground">
                     {formatArsCurrency(adjustment.previousRent)} → {formatArsCurrency(adjustment.newRent)}
                   </p>

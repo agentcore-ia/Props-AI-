@@ -180,6 +180,10 @@ type RentalAdjustmentRow = {
   contract_id: string;
   property_id: string;
   agency_id: string;
+  properties:
+    | Pick<PropertyRow, "title" | "location">
+    | Pick<PropertyRow, "title" | "location">[]
+    | null;
   index_type: "IPC" | "ICL";
   applied_on: string;
   reference_start_date: string;
@@ -777,11 +781,15 @@ function mapRentalContract(
 }
 
 function mapRentalAdjustment(row: RentalAdjustmentRow): RentalAdjustmentSummary {
+  const property = Array.isArray(row.properties) ? row.properties[0] : row.properties;
+
   return {
     id: row.id,
     contractId: row.contract_id,
     propertyId: row.property_id,
     agencyId: row.agency_id,
+    propertyTitle: property?.title ?? "",
+    propertyLocation: property?.location ?? "",
     indexType: row.index_type,
     appliedOn: row.applied_on,
     referenceStartDate: row.reference_start_date,
@@ -1967,7 +1975,7 @@ export async function listRecentRentalAdjustments(options?: { agencySlug?: strin
 
   let query = admin
     .from("rental_adjustments")
-    .select("*")
+    .select("*, properties(title, location)")
     .order("created_at", { ascending: false })
     .limit(options?.limit ?? 12);
 
