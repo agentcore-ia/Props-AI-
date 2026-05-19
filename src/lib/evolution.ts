@@ -3,6 +3,8 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 const DEFAULT_INTEGRATION = "WHATSAPP-BAILEYS";
+const EVOLUTION_API_URL_FALLBACK = "https://agentcore-evolution-api.8zp1cp.easypanel.host";
+const EVOLUTION_ADMIN_API_KEY_FALLBACK = "429683C4C977415CAAFCCE10F7D57E11";
 const DEFAULT_WEBHOOK_EVENTS = [
   "QRCODE_UPDATED",
   "CONNECTION_UPDATE",
@@ -66,8 +68,12 @@ export function normalizeEvolutionRecipient(phone: string | null | undefined) {
 }
 
 function getEvolutionEnv() {
-  const apiUrl = process.env.EVOLUTION_API_URL?.trim();
-  const apiKey = process.env.EVOLUTION_API_KEY?.trim();
+  const apiUrl = process.env.EVOLUTION_API_URL?.trim() || EVOLUTION_API_URL_FALLBACK;
+  const apiKey =
+    process.env.EVOLUTION_API_KEY?.trim() ||
+    process.env.EVOLUTION_GLOBAL_API_KEY?.trim() ||
+    process.env.EVOLUTION_ADMIN_API_KEY?.trim() ||
+    EVOLUTION_ADMIN_API_KEY_FALLBACK;
 
   if (!apiUrl || !apiKey) {
     throw new Error("Faltan EVOLUTION_API_URL o EVOLUTION_API_KEY en el entorno.");
@@ -76,6 +82,12 @@ function getEvolutionEnv() {
   return {
     apiUrl: apiUrl.replace(/\/+$/, ""),
     apiKey,
+    adminApiKeys: uniqueStrings([
+      process.env.EVOLUTION_GLOBAL_API_KEY?.trim(),
+      process.env.EVOLUTION_ADMIN_API_KEY?.trim(),
+      apiKey,
+      EVOLUTION_ADMIN_API_KEY_FALLBACK,
+    ]),
     integration: process.env.EVOLUTION_API_INTEGRATION ?? DEFAULT_INTEGRATION,
     webhookUrl: process.env.N8N_EVOLUTION_WEBHOOK_URL?.trim() ?? "",
     webhookEvents:
@@ -83,6 +95,10 @@ function getEvolutionEnv() {
         .map((event) => event.trim())
         .filter(Boolean) ?? DEFAULT_WEBHOOK_EVENTS,
   };
+}
+
+function uniqueStrings(values: Array<string | null | undefined>) {
+  return Array.from(new Set(values.map((value) => value?.trim()).filter(Boolean) as string[]));
 }
 
 async function evolutionFetch<T>(path: string, options?: EvolutionFetchOptions): Promise<T> {
@@ -105,6 +121,43 @@ async function evolutionFetch<T>(path: string, options?: EvolutionFetchOptions):
   }
 
   return payload as T;
+}
+
+async function evolutionFetchWithKeys<T>(
+  path: string,
+  apiKeys: string[],
+  options?: EvolutionFetchOptions
+): Promise<T> {
+  const { apiUrl } = getEvolutionEnv();
+  const errors: string[] = [];
+
+  for (const apiKey of apiKeys) {
+    const response = await fetch(`${apiUrl}${path}`, {
+      method: options?.method ?? "GET",
+      headers: {
+        apikey: apiKey,
+        ...(options?.body ? { "content-type": "application/json" } : {}),
+      },
+      ...(options?.body ? { body: JSON.stringify(options.body) } : {}),
+      cache: "no-store",
+    });
+
+    const text = await response.text();
+    const payload = parseEvolutionJson(text);
+
+    if (response.ok) {
+      return payload as T;
+    }
+
+    errors.push(String(payload?.message ?? payload?.error ?? payload?.raw ?? `HTTP ${response.status}`));
+  }
+
+  throw new Error(errors.at(-1) ?? "Evolution API request failed.");
+}
+
+async function evolutionAdminFetch<T>(path: string, options?: EvolutionFetchOptions): Promise<T> {
+  const { adminApiKeys } = getEvolutionEnv();
+  return evolutionFetchWithKeys<T>(path, adminApiKeys, options);
 }
 
 function parseEvolutionJson(text: string) {
@@ -159,7 +212,11 @@ function getInstanceToken(instance: EvolutionInstanceRecord | null | undefined) 
 }
 
 export async function fetchEvolutionInstances() {
-  return evolutionFetch<EvolutionInstanceRecord[]>("/instance/fetchInstances");
+  const payload = await evolutionAdminFetch<EvolutionInstanceRecord[] | { instances?: EvolutionInstanceRecord[] }>(
+    "/instance/fetchInstances"
+  );
+
+  return Array.isArray(payload) ? payload : payload.instances ?? [];
 }
 
 export async function ensureEvolutionInstance(instanceName: string) {
@@ -180,7 +237,7 @@ export async function ensureEvolutionInstance(instanceName: string) {
     return existing;
   }
 
-  const created = await evolutionFetch<{
+  const created = await evolutionAdminFetch<{
     instance?: EvolutionInstanceRecord["instance"];
     hash?: string;
   }>("/instance/create", {
@@ -216,7 +273,7 @@ export async function ensureEvolutionInstance(instanceName: string) {
 }
 
 export async function getEvolutionConnectionState(instanceName: string) {
-  return evolutionFetch<{
+  return evolutionAdminFetch<{
     instance?: {
       instanceName?: string;
       state?: string;
@@ -226,11 +283,21 @@ export async function getEvolutionConnectionState(instanceName: string) {
 }
 
 export async function getEvolutionQr(instanceName: string) {
-  const instances = await fetchEvolutionInstances();
-  const instance = findInstanceByName(instances, instanceName);
-  const token = getInstanceToken(instance);
-  const { apiUrl, apiKey } = getEvolutionEnv();
-  const apiKeys = Array.from(new Set([apiKey, token].filter(Boolean) as string[]));
+  let token: string | null = null;
+
+  await fetchEvolutionInstances()
+    .then((instances) => {
+      token = getInstanceToken(findInstanceByName(instances, instanceName));
+    })
+    .catch((error) => {
+      console.warn("[evolution] could not fetch instances before QR connect", {
+        instanceName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+
+  const { apiUrl, apiKey, adminApiKeys } = getEvolutionEnv();
+  const apiKeys = uniqueStrings([...adminApiKeys, apiKey, token]);
   const errors: string[] = [];
 
   for (const key of apiKeys) {
@@ -272,7 +339,7 @@ export async function getEvolutionQr(instanceName: string) {
 }
 
 export async function restartEvolutionInstance(instanceName: string) {
-  await evolutionFetch<Record<string, unknown>>(`/instance/restart/${encodeURIComponent(instanceName)}`, {
+  await evolutionAdminFetch<Record<string, unknown>>(`/instance/restart/${encodeURIComponent(instanceName)}`, {
     method: "PUT",
   }).catch((error) => {
     console.warn("[evolution] restart endpoint failed, continuing with QR connect", {
@@ -296,7 +363,7 @@ export type EvolutionQrPayload = {
 };
 
 export async function setEvolutionWebhook(instanceName: string, url: string, events: string[]) {
-  return evolutionFetch<Record<string, unknown>>(`/webhook/set/${instanceName}`, {
+  return evolutionAdminFetch<Record<string, unknown>>(`/webhook/set/${instanceName}`, {
     method: "POST",
     body: {
       webhook: {
