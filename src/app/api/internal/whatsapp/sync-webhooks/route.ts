@@ -11,13 +11,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
 
-  const webhookUrl = process.env.N8N_EVOLUTION_WEBHOOK_URL?.trim();
-  if (!webhookUrl) {
-    return NextResponse.json(
-      { error: "Falta N8N_EVOLUTION_WEBHOOK_URL en el entorno." },
-      { status: 500 }
-    );
-  }
+  const webhookUrl =
+    process.env.PROPS_EVOLUTION_WEBHOOK_URL?.trim() ||
+    process.env.N8N_EVOLUTION_WEBHOOK_URL?.trim() ||
+    `${(process.env.PROPS_APP_BASE_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://props.com.ar").replace(
+      /\/+$/,
+      ""
+    )}/api/internal/whatsapp/inbound`;
   const agencies = await listAgencySummaries();
   const instances = await fetchEvolutionInstances();
   const results: Array<Record<string, unknown>> = [];

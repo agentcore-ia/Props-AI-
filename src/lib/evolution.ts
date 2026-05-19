@@ -89,12 +89,27 @@ function getEvolutionEnv() {
       EVOLUTION_ADMIN_API_KEY_FALLBACK,
     ]),
     integration: process.env.EVOLUTION_API_INTEGRATION ?? DEFAULT_INTEGRATION,
-    webhookUrl: process.env.N8N_EVOLUTION_WEBHOOK_URL?.trim() ?? "",
+    webhookUrl: resolveEvolutionWebhookUrl(),
     webhookEvents:
       process.env.EVOLUTION_WEBHOOK_EVENTS?.split(",")
         .map((event) => event.trim())
         .filter(Boolean) ?? DEFAULT_WEBHOOK_EVENTS,
   };
+}
+
+function resolveEvolutionWebhookUrl() {
+  const explicit =
+    process.env.PROPS_EVOLUTION_WEBHOOK_URL?.trim() ||
+    process.env.N8N_EVOLUTION_WEBHOOK_URL?.trim();
+
+  if (explicit) return explicit;
+
+  const appBaseUrl =
+    process.env.PROPS_APP_BASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    "https://props.com.ar";
+
+  return `${appBaseUrl.replace(/\/+$/, "")}/api/internal/whatsapp/inbound`;
 }
 
 function uniqueStrings(values: Array<string | null | undefined>) {
