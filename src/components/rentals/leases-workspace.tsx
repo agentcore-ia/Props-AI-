@@ -12,6 +12,7 @@ import {
   Download,
   FileText,
   Loader2,
+  Mail,
   Phone,
   Printer,
   ReceiptText,
@@ -73,7 +74,11 @@ export function LeasesWorkspace({
   const [registeringRent, setRegisteringRent] = useState(false);
   const [rentReceipt, setRentReceipt] = useState<null | {
     receiptNumber: string;
+    contractId: string;
+    agencyName: string;
     tenantName: string;
+    tenantPhone: string;
+    tenantEmail: string | null;
     propertyTitle: string;
     propertyLocation: string;
     collectionMonth: string;
@@ -81,8 +86,8 @@ export function LeasesWorkspace({
     expectedRent: number;
     paymentMethod: string;
     paymentDate: string;
-    settlementProcessed: number;
   }>(null);
+  const [sendingReceiptChannel, setSendingReceiptChannel] = useState<"whatsapp" | null>(null);
   const [rentForm, setRentForm] = useState({
     contractId: initialLease?.contractId ?? "",
     collectionMonth: currentMonth,
@@ -399,7 +404,11 @@ export function LeasesWorkspace({
 
     const receipt = {
       receiptNumber: collectionPayload?.receiptNumber ?? buildDocumentNumber("RC", new Date().toISOString(), selectedRentLease.contractId),
+      contractId: selectedRentLease.contractId,
+      agencyName: selectedRentLease.agencyName,
       tenantName: selectedRentLease.tenantName,
+      tenantPhone: selectedRentLease.tenantPhone,
+      tenantEmail: selectedRentLease.tenantEmail,
       propertyTitle: selectedRentLease.propertyTitle,
       propertyLocation: selectedRentLease.propertyLocation,
       collectionMonth: rentForm.collectionMonth,
@@ -407,7 +416,6 @@ export function LeasesWorkspace({
       expectedRent: selectedRentLease.currentRent,
       paymentMethod: rentForm.paymentMethod,
       paymentDate: rentForm.paymentDate,
-      settlementProcessed,
     };
 
     setRentReceipt(receipt);
@@ -441,7 +449,7 @@ export function LeasesWorkspace({
         </head>
         <body>
           <div class="box">
-            <p class="label">Props - comprobante de alquiler ${receipt.receiptNumber}</p>
+            <p class="label">${receipt.agencyName} - comprobante de alquiler ${receipt.receiptNumber}</p>
             <h1>${receipt.tenantName}</h1>
             <p class="muted">${receipt.propertyTitle} - ${receipt.propertyLocation}</p>
             <p>Periodo: <strong>${receipt.collectionMonth}</strong></p>
@@ -451,9 +459,9 @@ export function LeasesWorkspace({
               <div class="metric"><div class="label">Alquiler esperado</div><div class="value">${formatMoney(receipt.expectedRent, "ARS")}</div></div>
               <div class="metric"><div class="label">Cobrado</div><div class="value">${formatMoney(receipt.collectedAmount, "ARS")}</div></div>
               <div class="metric"><div class="label">Saldo</div><div class="value">${formatMoney(balance, "ARS")}</div></div>
-              <div class="metric"><div class="label">Liquidaciones</div><div class="value">${receipt.settlementProcessed}</div></div>
+              <div class="metric"><div class="label">Inmobiliaria</div><div class="value">${receipt.agencyName}</div></div>
             </div>
-            <p class="muted" style="margin-top:24px;">Emitido desde Props Control Inmobiliario.</p>
+            <p class="muted" style="margin-top:24px;">Este comprobante confirma el pago informado para el periodo indicado.</p>
           </div>
           <script>window.print(); window.close();</script>
         </body>
@@ -462,6 +470,61 @@ export function LeasesWorkspace({
     const printWindow = window.open("", "_blank", "width=900,height=700");
     printWindow?.document.write(html);
     printWindow?.document.close();
+  }
+
+  async function sendRentReceiptByWhatsApp() {
+    if (!rentReceipt) return;
+    setSendingReceiptChannel("whatsapp");
+    setFeedback(null);
+
+    const response = await fetch("/api/admin/rental-receipts/whatsapp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contractId: rentReceipt.contractId,
+        collectionMonth: rentReceipt.collectionMonth,
+        receiptNumber: rentReceipt.receiptNumber,
+      }),
+    });
+    const payload = await response.json().catch(() => null);
+    setSendingReceiptChannel(null);
+
+    if (!response.ok) {
+      setFeedback({
+        type: "error",
+        message: payload?.error ?? "No se pudo enviar el comprobante por WhatsApp.",
+      });
+      return;
+    }
+
+    setFeedback({
+      type: "success",
+      message: `Comprobante ${rentReceipt.receiptNumber} enviado por WhatsApp a ${rentReceipt.tenantName}.`,
+    });
+  }
+
+  function buildRentReceiptEmailHref() {
+    if (!rentReceipt?.tenantEmail) return "#";
+    const balance = Math.max(0, rentReceipt.expectedRent - rentReceipt.collectedAmount);
+    const subject = `Comprobante de alquiler ${rentReceipt.receiptNumber}`;
+    const body = [
+      `Hola ${rentReceipt.tenantName},`,
+      "",
+      `Te enviamos el comprobante de alquiler de ${rentReceipt.agencyName}.`,
+      "",
+      `Comprobante: ${rentReceipt.receiptNumber}`,
+      `Propiedad: ${rentReceipt.propertyTitle} - ${rentReceipt.propertyLocation}`,
+      `Periodo: ${rentReceipt.collectionMonth}`,
+      `Importe abonado: ${formatMoney(rentReceipt.collectedAmount, "ARS")}`,
+      `Metodo de pago: ${rentReceipt.paymentMethod}`,
+      `Fecha: ${rentReceipt.paymentDate || "pendiente"}`,
+      `Saldo pendiente: ${formatMoney(balance, "ARS")}`,
+      "",
+      `Gracias.`,
+      rentReceipt.agencyName,
+    ].join("\n");
+
+    return `mailto:${encodeURIComponent(rentReceipt.tenantEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }
 
   async function handleRescission(contractId: string, tenantName: string) {
@@ -1539,9 +1602,7 @@ export function LeasesWorkspace({
                   {rentReceipt ? (
                     <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
                       <p className="font-semibold">Comprobante {rentReceipt.receiptNumber}</p>
-                      <p className="mt-1">
-                        Liquidaciones generadas: {rentReceipt.settlementProcessed}. Puedes imprimirlo ahora.
-                      </p>
+                      <p className="mt-1">Listo para imprimir o enviar al inquilino por WhatsApp/email.</p>
                     </div>
                   ) : null}
                 </div>
@@ -1555,6 +1616,29 @@ export function LeasesWorkspace({
                     <Printer className="size-4" />
                     Imprimir comprobante
                   </Button>
+                  <Button
+                    variant="outline"
+                    className="rounded-2xl"
+                    disabled={!rentReceipt || sendingReceiptChannel === "whatsapp"}
+                    onClick={sendRentReceiptByWhatsApp}
+                  >
+                    {sendingReceiptChannel === "whatsapp" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                    Enviar WhatsApp
+                  </Button>
+                  {rentReceipt?.tenantEmail ? (
+                    <a
+                      href={buildRentReceiptEmailHref()}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border bg-background px-4 text-sm font-medium transition hover:bg-muted"
+                    >
+                      <Mail className="size-4" />
+                      Enviar email
+                    </a>
+                  ) : (
+                    <Button variant="outline" className="rounded-2xl" disabled>
+                      <Mail className="size-4" />
+                      Enviar email
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
