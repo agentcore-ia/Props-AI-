@@ -459,7 +459,6 @@ export function LeasesWorkspace({
               <div class="metric"><div class="label">Alquiler esperado</div><div class="value">${formatMoney(receipt.expectedRent, "ARS")}</div></div>
               <div class="metric"><div class="label">Cobrado</div><div class="value">${formatMoney(receipt.collectedAmount, "ARS")}</div></div>
               <div class="metric"><div class="label">Saldo</div><div class="value">${formatMoney(balance, "ARS")}</div></div>
-              <div class="metric"><div class="label">Inmobiliaria</div><div class="value">${receipt.agencyName}</div></div>
             </div>
             <p class="muted" style="margin-top:24px;">Este comprobante confirma el pago informado para el periodo indicado.</p>
           </div>
