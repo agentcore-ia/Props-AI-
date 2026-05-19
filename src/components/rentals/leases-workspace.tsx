@@ -14,11 +14,13 @@ import {
   Loader2,
   Phone,
   Printer,
+  ReceiptText,
   Search,
   Send,
   Sparkles,
   UserRound,
   Wrench,
+  X,
 } from "lucide-react";
 
 import { EmptyState } from "@/components/layout/empty-state";
@@ -61,8 +63,34 @@ export function LeasesWorkspace({
   collections: RentalCollectionSummary[];
   delinquencies: DelinquentTenantSummary[];
 }) {
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const todayDate = new Date().toISOString().slice(0, 10);
+  const initialLease = leases[0] ?? null;
   const [employeeMode, setEmployeeMode] = useState<"actions" | "dossier">("actions");
   const [query, setQuery] = useState("");
+  const [rentFormOpen, setRentFormOpen] = useState(false);
+  const [rentSearch, setRentSearch] = useState("");
+  const [registeringRent, setRegisteringRent] = useState(false);
+  const [rentReceipt, setRentReceipt] = useState<null | {
+    receiptNumber: string;
+    tenantName: string;
+    propertyTitle: string;
+    propertyLocation: string;
+    collectionMonth: string;
+    collectedAmount: number;
+    expectedRent: number;
+    paymentMethod: string;
+    paymentDate: string;
+    settlementProcessed: number;
+  }>(null);
+  const [rentForm, setRentForm] = useState({
+    contractId: initialLease?.contractId ?? "",
+    collectionMonth: currentMonth,
+    collectedAmount: initialLease ? String(initialLease.currentRent) : "",
+    paymentMethod: "Transferencia",
+    paymentDate: todayDate,
+    generateSettlement: true,
+  });
   const [sendingTestId, setSendingTestId] = useState<string | null>(null);
   const [generatingSettlementId, setGeneratingSettlementId] = useState<string | null>(null);
   const [rescindingContractId, setRescindingContractId] = useState<string | null>(null);
@@ -75,7 +103,7 @@ export function LeasesWorkspace({
     notes: "",
   });
   const [feedback, setFeedback] = useState<null | { type: "success" | "error"; message: string }>(null);
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const selectedRentLease = leases.find((lease) => lease.contractId === rentForm.contractId) ?? null;
 
   const filteredLeases = useMemo(() => {
     const normalized = query
@@ -103,6 +131,26 @@ export function LeasesWorkspace({
       return haystack.includes(normalized);
     });
   }, [leases, query]);
+
+  const rentFormLeases = useMemo(() => {
+    const normalized = rentSearch
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+
+    if (!normalized) return leases;
+
+    return leases.filter((lease) => {
+      const haystack = [lease.tenantName, lease.propertyTitle, lease.propertyLocation, lease.exactAddress, lease.ownerName ?? ""]
+        .join(" ")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+
+      return haystack.includes(normalized);
+    });
+  }, [leases, rentSearch]);
 
   const collectionsByContract = useMemo(() => {
     const map = new Map<string, RentalCollectionSummary>();
@@ -277,6 +325,143 @@ export function LeasesWorkspace({
         : `Se emitieron ${payload?.processed ?? 0} liquidaciones de propietarios para ${payload?.settlementMonth ?? "este mes"}.`,
     });
     window.location.reload();
+  }
+
+  function openRentRegistration(contractId?: string) {
+    const lease = leases.find((item) => item.contractId === contractId) ?? selectedRentLease ?? leases[0] ?? null;
+    setRentReceipt(null);
+    setRentFormOpen(true);
+    if (lease) {
+      setRentForm((current) => ({
+        ...current,
+        contractId: lease.contractId,
+        collectedAmount: String(lease.currentRent),
+      }));
+    }
+  }
+
+  async function handleRegisterRent() {
+    if (!selectedRentLease) {
+      setFeedback({ type: "error", message: "Selecciona una propiedad alquilada para registrar el cobro." });
+      return;
+    }
+
+    setRegisteringRent(true);
+    setFeedback(null);
+    setRentReceipt(null);
+
+    const collectedAmount = Number(rentForm.collectedAmount || 0);
+    const collectionResponse = await fetch("/api/admin/rental-collections", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contractId: selectedRentLease.contractId,
+        collectionMonth: rentForm.collectionMonth,
+        collectedAmount,
+        paymentMethod: rentForm.paymentMethod,
+        paymentDate: rentForm.paymentDate,
+      }),
+    });
+    const collectionPayload = await collectionResponse.json().catch(() => null);
+
+    if (!collectionResponse.ok) {
+      setRegisteringRent(false);
+      setFeedback({
+        type: "error",
+        message: collectionPayload?.error ?? "No se pudo registrar el alquiler.",
+      });
+      return;
+    }
+
+    let settlementProcessed = 0;
+    if (rentForm.generateSettlement) {
+      const settlementResponse = await fetch("/api/admin/owner-settlements", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          contractId: selectedRentLease.contractId,
+          settlementMonth: rentForm.collectionMonth,
+        }),
+      });
+      const settlementPayload = await settlementResponse.json().catch(() => null);
+      if (!settlementResponse.ok) {
+        setRegisteringRent(false);
+        setFeedback({
+          type: "error",
+          message: `Alquiler registrado, pero no se pudo liquidar al propietario: ${
+            settlementPayload?.error ?? "revisa la liquidacion manualmente."
+          }`,
+        });
+        return;
+      }
+      settlementProcessed = Number(settlementPayload?.processed ?? 0);
+    }
+
+    const receipt = {
+      receiptNumber: collectionPayload?.receiptNumber ?? buildDocumentNumber("RC", new Date().toISOString(), selectedRentLease.contractId),
+      tenantName: selectedRentLease.tenantName,
+      propertyTitle: selectedRentLease.propertyTitle,
+      propertyLocation: selectedRentLease.propertyLocation,
+      collectionMonth: rentForm.collectionMonth,
+      collectedAmount,
+      expectedRent: selectedRentLease.currentRent,
+      paymentMethod: rentForm.paymentMethod,
+      paymentDate: rentForm.paymentDate,
+      settlementProcessed,
+    };
+
+    setRentReceipt(receipt);
+    setRegisteringRent(false);
+    setFeedback({
+      type: "success",
+      message: `Alquiler registrado con comprobante ${receipt.receiptNumber}. ${
+        rentForm.generateSettlement ? `Liquidaciones generadas: ${settlementProcessed}.` : "Liquidacion pendiente."
+      }`,
+    });
+  }
+
+  function printRentReceipt(receipt = rentReceipt) {
+    if (!receipt) return;
+    const balance = Math.max(0, receipt.expectedRent - receipt.collectedAmount);
+    const html = `
+      <html>
+        <head>
+          <title>Comprobante de alquiler - ${receipt.receiptNumber}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 32px; color: #0f172a; }
+            .box { border: 1px solid #cbd5e1; border-radius: 18px; padding: 24px; }
+            h1 { margin: 0 0 8px; font-size: 24px; }
+            p { margin: 6px 0; }
+            .muted { color: #64748b; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px; }
+            .metric { border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; }
+            .label { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: #64748b; }
+            .value { margin-top: 8px; font-size: 20px; font-weight: 700; }
+          </style>
+        </head>
+        <body>
+          <div class="box">
+            <p class="label">Props - comprobante de alquiler ${receipt.receiptNumber}</p>
+            <h1>${receipt.tenantName}</h1>
+            <p class="muted">${receipt.propertyTitle} - ${receipt.propertyLocation}</p>
+            <p>Periodo: <strong>${receipt.collectionMonth}</strong></p>
+            <p>Metodo: <strong>${receipt.paymentMethod}</strong></p>
+            <p>Fecha de pago: <strong>${receipt.paymentDate || "Pendiente"}</strong></p>
+            <div class="grid">
+              <div class="metric"><div class="label">Alquiler esperado</div><div class="value">${formatMoney(receipt.expectedRent, "ARS")}</div></div>
+              <div class="metric"><div class="label">Cobrado</div><div class="value">${formatMoney(receipt.collectedAmount, "ARS")}</div></div>
+              <div class="metric"><div class="label">Saldo</div><div class="value">${formatMoney(balance, "ARS")}</div></div>
+              <div class="metric"><div class="label">Liquidaciones</div><div class="value">${receipt.settlementProcessed}</div></div>
+            </div>
+            <p class="muted" style="margin-top:24px;">Emitido desde Props Control Inmobiliario.</p>
+          </div>
+          <script>window.print(); window.close();</script>
+        </body>
+      </html>
+    `;
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    printWindow?.document.write(html);
+    printWindow?.document.close();
   }
 
   async function handleRescission(contractId: string, tenantName: string) {
@@ -497,6 +682,24 @@ export function LeasesWorkspace({
         title="Alquileres"
         description="Sigue contratos activos, datos de inquilinos, propiedades alquiladas y proximos ajustes desde una sola vista."
       />
+
+      <section className="rounded-[28px] border bg-card p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/75">
+              Cobro rapido
+            </p>
+            <h2 className="mt-2 text-xl font-semibold">Registrar alquiler desde Alquileres</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Busca la propiedad, registra el pago, genera el comprobante y deja lista la liquidacion al propietario.
+            </p>
+          </div>
+          <Button className="rounded-2xl" disabled={leases.length === 0} onClick={() => openRentRegistration()}>
+            <ReceiptText className="size-4" />
+            Registrar alquiler
+          </Button>
+        </div>
+      </section>
 
       <RentAutomationPanel summary={rentalSummary} recentAdjustments={recentAdjustments} />
 
@@ -1183,6 +1386,181 @@ export function LeasesWorkspace({
           description="Cuando una propiedad tenga contrato activo, el inquilino y su cronograma de aumentos apareceran automaticamente en esta seccion."
         />
       )}
+
+      {rentFormOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:items-center">
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[30px] border bg-background p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/75">
+                  Registrar alquiler
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold">Cobro, comprobante y liquidacion</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Selecciona la propiedad alquilada, confirma el monto y Props genera el comprobante. Si esta activado,
+                  tambien liquida al propietario.
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" className="rounded-full" onClick={() => setRentFormOpen(false)}>
+                <X className="size-4" />
+              </Button>
+            </div>
+
+            <div className="mt-5 grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
+              <div className="space-y-3">
+                <label className="space-y-2 text-sm font-medium">
+                  Buscar propiedad, inquilino o propietario
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      value={rentSearch}
+                      onChange={(event) => setRentSearch(event.target.value)}
+                      placeholder="Ej. Balvanera, Juan, monoambiente"
+                      className="h-11 w-full rounded-2xl border bg-background pl-10 pr-3 text-sm outline-none transition focus:border-primary"
+                    />
+                  </div>
+                </label>
+
+                <div className="max-h-80 space-y-2 overflow-y-auto rounded-[24px] border bg-muted/20 p-2">
+                  {rentFormLeases.length > 0 ? (
+                    rentFormLeases.map((lease) => (
+                      <button
+                        key={lease.contractId}
+                        type="button"
+                        className={`w-full rounded-2xl border p-3 text-left transition ${
+                          rentForm.contractId === lease.contractId
+                            ? "border-primary bg-primary/10"
+                            : "bg-background hover:bg-muted"
+                        }`}
+                        onClick={() =>
+                          setRentForm((current) => ({
+                            ...current,
+                            contractId: lease.contractId,
+                            collectedAmount: String(lease.currentRent),
+                          }))
+                        }
+                      >
+                        <p className="font-semibold">{lease.propertyTitle}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {lease.tenantName} - {lease.propertyLocation}
+                        </p>
+                        <p className="mt-2 text-sm font-medium">{formatMoney(lease.currentRent, "ARS")}</p>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="p-4 text-sm text-muted-foreground">No encontramos contratos con esa busqueda.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-4 rounded-[26px] border bg-card p-4">
+                {selectedRentLease ? (
+                  <div className="rounded-2xl border bg-background p-4">
+                    <p className="font-semibold">{selectedRentLease.tenantName}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {selectedRentLease.propertyTitle} - {selectedRentLease.propertyLocation}
+                    </p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                      <InfoMetric label="Alquiler" value={formatMoney(selectedRentLease.currentRent, "ARS")} />
+                      <InfoMetric label="Propietario" value={selectedRentLease.ownerName ?? "Sin configurar"} />
+                      <InfoMetric label="Comision" value={`${selectedRentLease.managementFeePercent}%`} />
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-2 text-sm font-medium">
+                    Periodo
+                    <input
+                      type="month"
+                      value={rentForm.collectionMonth}
+                      onChange={(event) => setRentForm((current) => ({ ...current, collectionMonth: event.target.value }))}
+                      className="h-11 w-full rounded-2xl border bg-background px-4 outline-none transition focus:border-primary"
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm font-medium">
+                    Fecha de pago
+                    <input
+                      type="date"
+                      value={rentForm.paymentDate}
+                      onChange={(event) => setRentForm((current) => ({ ...current, paymentDate: event.target.value }))}
+                      className="h-11 w-full rounded-2xl border bg-background px-4 outline-none transition focus:border-primary"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-2 text-sm font-medium">
+                    Monto cobrado
+                    <input
+                      type="number"
+                      value={rentForm.collectedAmount}
+                      onChange={(event) => setRentForm((current) => ({ ...current, collectedAmount: event.target.value }))}
+                      className="h-11 w-full rounded-2xl border bg-background px-4 outline-none transition focus:border-primary"
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm font-medium">
+                    Metodo de pago
+                    <input
+                      value={rentForm.paymentMethod}
+                      onChange={(event) => setRentForm((current) => ({ ...current, paymentMethod: event.target.value }))}
+                      className="h-11 w-full rounded-2xl border bg-background px-4 outline-none transition focus:border-primary"
+                    />
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  className="flex w-full items-start gap-3 rounded-2xl border bg-primary/5 p-4 text-left transition hover:bg-primary/10"
+                  onClick={() => setRentForm((current) => ({ ...current, generateSettlement: !current.generateSettlement }))}
+                >
+                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border bg-background">
+                    {rentForm.generateSettlement ? <CheckCircle2 className="size-4 text-primary" /> : null}
+                  </span>
+                  <span>
+                    <span className="block font-semibold">Liquidar al propietario automaticamente</span>
+                    <span className="mt-1 block text-sm text-muted-foreground">
+                      Props usa el monto cobrado, comision, gastos y participacion de propietarios.
+                    </span>
+                  </span>
+                </button>
+
+                <div className="rounded-2xl border bg-background p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Resultado
+                  </p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Se registrara un cobro por{" "}
+                    <span className="font-semibold text-foreground">
+                      {formatMoney(Number(rentForm.collectedAmount || 0), "ARS")}
+                    </span>{" "}
+                    y se emitira un comprobante numerado.
+                  </p>
+                  {rentReceipt ? (
+                    <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                      <p className="font-semibold">Comprobante {rentReceipt.receiptNumber}</p>
+                      <p className="mt-1">
+                        Liquidaciones generadas: {rentReceipt.settlementProcessed}. Puedes imprimirlo ahora.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button className="rounded-2xl" disabled={registeringRent || !selectedRentLease} onClick={handleRegisterRent}>
+                    {registeringRent ? <Loader2 className="size-4 animate-spin" /> : <ReceiptText className="size-4" />}
+                    Registrar y generar comprobante
+                  </Button>
+                  <Button variant="outline" className="rounded-2xl" disabled={!rentReceipt} onClick={() => printRentReceipt()}>
+                    <Printer className="size-4" />
+                    Imprimir comprobante
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1505,4 +1883,9 @@ function downloadCsv(fileName: string, rows: string[][]) {
   link.download = fileName;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function buildDocumentNumber(prefix: string, dateLike: string, id: string) {
+  const datePart = new Date(dateLike).toISOString().slice(0, 10).replace(/-/g, "");
+  return `${prefix}-${datePart}-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 }
