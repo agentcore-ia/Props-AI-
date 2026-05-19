@@ -470,6 +470,7 @@ export async function sendEvolutionMediaMessage(payload: {
   caption?: string;
   mediaType?: "image" | "video" | "document";
   fileName?: string;
+  mimetype?: string;
 }) {
   const number = normalizeEvolutionRecipient(payload.number);
   const media = String(payload.mediaUrl ?? "").trim();
@@ -486,9 +487,19 @@ export async function sendEvolutionMediaMessage(payload: {
       body: {
         number,
         mediatype: payload.mediaType ?? "image",
+        mimetype:
+          payload.mimetype ??
+          (payload.mediaType === "document"
+            ? "application/pdf"
+            : payload.mediaType === "video"
+              ? "video/mp4"
+              : "image/jpeg"),
         media,
         caption,
         fileName: payload.fileName,
+        options: {
+          delay: 800,
+        },
       },
     }
   );

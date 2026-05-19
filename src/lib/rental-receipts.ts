@@ -118,6 +118,22 @@ export async function uploadTenantRentReceiptPdf(input: TenantReceiptPdfInput) {
   await ensureReceiptBucket();
 
   const admin = createAdminClient();
+  const buffer = buildTenantRentReceiptPdf(input);
+  const safeReceipt = normalizePdfText(input.receiptNumber).replace(/[^a-zA-Z0-9._-]+/g, "-") || randomUUID();
+  const path = `${normalizePdfText(input.agencyName).toLowerCase().replace(/[^a-z0-9]+/g, "-")}/${Date.now()}-${safeReceipt}.pdf`;
+
+  const { error } = await admin.storage.from(BUCKET).upload(path, buffer, {
+    contentType: "application/pdf",
+    upsert: true,
+  });
+
+  if (error) throw error;
+
+  const { data } = admin.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+export function buildTenantRentReceiptPdf(input: TenantReceiptPdfInput) {
   const lines = [
     `Inmobiliaria: ${input.agencyName}`,
     `Comprobante: ${input.receiptNumber}`,
@@ -135,17 +151,10 @@ export async function uploadTenantRentReceiptPdf(input: TenantReceiptPdfInput) {
     "Este comprobante confirma el pago informado para el periodo indicado.",
     `Emitido por ${input.agencyName}.`,
   ];
-  const buffer = buildPdf(lines);
-  const safeReceipt = normalizePdfText(input.receiptNumber).replace(/[^a-zA-Z0-9._-]+/g, "-") || randomUUID();
-  const path = `${normalizePdfText(input.agencyName).toLowerCase().replace(/[^a-z0-9]+/g, "-")}/${Date.now()}-${safeReceipt}.pdf`;
 
-  const { error } = await admin.storage.from(BUCKET).upload(path, buffer, {
-    contentType: "application/pdf",
-    upsert: true,
-  });
+  return buildPdf(lines);
+}
 
-  if (error) throw error;
-
-  const { data } = admin.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+export function buildTenantRentReceiptPdfDataUri(input: TenantReceiptPdfInput) {
+  return `data:application/pdf;base64,${buildTenantRentReceiptPdf(input).toString("base64")}`;
 }

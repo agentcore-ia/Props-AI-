@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
-import { normalizeEvolutionRecipient, sendEvolutionMediaMessage } from "@/lib/evolution";
-import { uploadTenantRentReceiptPdf } from "@/lib/rental-receipts";
+import {
+  normalizeEvolutionRecipient,
+  sendEvolutionMediaMessage,
+  sendEvolutionTextMessage,
+} from "@/lib/evolution";
+import {
+  buildTenantRentReceiptPdfDataUri,
+  uploadTenantRentReceiptPdf,
+} from "@/lib/rental-receipts";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatMoney } from "@/lib/utils";
 
@@ -65,7 +72,7 @@ export async function POST(request: Request) {
 
   const balance = Math.max(0, Number(collection.expected_rent ?? 0) - Number(collection.collected_amount ?? 0));
   const finalReceiptNumber = receiptNumber || collection.receipt_number || collection.id;
-  const receiptUrl = await uploadTenantRentReceiptPdf({
+  const receiptInput = {
     agencyName: agency?.name ?? "Inmobiliaria",
     receiptNumber: finalReceiptNumber,
     tenantName: contract?.tenant_name ?? "Inquilino",
@@ -77,7 +84,8 @@ export async function POST(request: Request) {
     expectedRent: Number(collection.expected_rent ?? 0),
     collectedAmount: Number(collection.collected_amount ?? 0),
     balance,
-  });
+  };
+  const receiptDataUri = buildTenantRentReceiptPdfDataUri(receiptInput);
   const caption = [
     `Hola ${contract?.tenant_name ?? ""}, te enviamos adjunto el comprobante de alquiler ${finalReceiptNumber}.`,
     `Importe abonado: ${formatMoney(Number(collection.collected_amount ?? 0), "ARS")}.`,
@@ -86,14 +94,53 @@ export async function POST(request: Request) {
     .filter(Boolean)
     .join("\n");
 
-  await sendEvolutionMediaMessage({
-    instanceName,
-    number,
-    mediaUrl: receiptUrl,
-    caption,
-    mediaType: "document",
-    fileName: `comprobante-alquiler-${finalReceiptNumber}.pdf`,
-  });
+  let receiptUrl: string | null = null;
 
-  return NextResponse.json({ ok: true, receiptUrl });
+  try {
+    await sendEvolutionMediaMessage({
+      instanceName,
+      number,
+      mediaUrl: receiptDataUri,
+      caption,
+      mediaType: "document",
+      mimetype: "application/pdf",
+      fileName: `comprobante-alquiler-${finalReceiptNumber}.pdf`,
+    });
+
+    return NextResponse.json({ ok: true, delivery: "document" });
+  } catch (mediaError) {
+    console.error("[rental-receipts] document WhatsApp delivery failed", {
+      contractId,
+      collectionMonth,
+      error: mediaError instanceof Error ? mediaError.message : String(mediaError),
+    });
+  }
+
+  try {
+    receiptUrl = await uploadTenantRentReceiptPdf(receiptInput);
+    await sendEvolutionTextMessage({
+      instanceName,
+      number,
+      text: [
+        `Hola ${contract?.tenant_name ?? ""}, no pudimos adjuntar el PDF automaticamente.`,
+        `Te dejamos el comprobante de alquiler ${finalReceiptNumber} para descargar: ${receiptUrl}`,
+        `Gracias. ${agency?.name ?? ""}`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    });
+  } catch (fallbackError) {
+    console.error("[rental-receipts] fallback WhatsApp delivery failed", {
+      contractId,
+      collectionMonth,
+      error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+    });
+
+    return NextResponse.json(
+      { error: "No se pudo enviar el comprobante por WhatsApp." },
+      { status: 502 }
+    );
+  }
+
+  return NextResponse.json({ ok: true, delivery: "link_fallback", receiptUrl });
 }
