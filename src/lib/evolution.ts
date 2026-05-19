@@ -201,6 +201,13 @@ function normalizeQrPayload(payload: Record<string, unknown> | null) {
   };
 }
 
+function extractQrPayload(payload: Record<string, unknown> | null) {
+  return normalizeQrPayload((payload?.qrcode ?? payload?.qr ? payload : { qrcode: payload }) as Record<
+    string,
+    unknown
+  > | null) as EvolutionQrPayload;
+}
+
 function findInstanceByName(instances: EvolutionInstanceRecord[], instanceName: string) {
   return instances.find(
     (item) => item.name === instanceName || item.instance?.instanceName === instanceName
@@ -349,6 +356,57 @@ export async function restartEvolutionInstance(instanceName: string) {
   });
 
   return getEvolutionQr(instanceName);
+}
+
+export async function recreateEvolutionInstance(instanceName: string) {
+  const { integration, webhookUrl, webhookEvents } = getEvolutionEnv();
+
+  await evolutionAdminFetch<Record<string, unknown>>(`/instance/logout/${encodeURIComponent(instanceName)}`, {
+    method: "DELETE",
+  }).catch(() => null);
+
+  await evolutionAdminFetch<Record<string, unknown>>(`/instance/delete/${encodeURIComponent(instanceName)}`, {
+    method: "DELETE",
+  }).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.toLowerCase().includes("does not exist")) {
+      console.warn("[evolution] delete before reconnect failed, continuing with create", {
+        instanceName,
+        error: message,
+      });
+    }
+  });
+
+  const created = await evolutionAdminFetch<Record<string, unknown>>("/instance/create", {
+    method: "POST",
+    body: {
+      instanceName,
+      qrcode: true,
+      integration,
+      token: randomUUID(),
+      ...(webhookUrl
+        ? {
+            webhook: {
+              enabled: true,
+              url: webhookUrl,
+              events: webhookEvents,
+            },
+          }
+        : {}),
+    },
+  });
+
+  if (webhookUrl) {
+    await setEvolutionWebhook(instanceName, webhookUrl, webhookEvents).catch((error) => {
+      console.warn("[evolution] webhook sync failed after recreate", {
+        instanceName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
+
+  const qr = extractQrPayload(created);
+  return qr.base64 || qr.code || qr.pairingCode ? qr : getEvolutionQr(instanceName);
 }
 
 export type EvolutionQrPayload = {

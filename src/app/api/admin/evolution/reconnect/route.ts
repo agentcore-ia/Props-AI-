@@ -4,8 +4,7 @@ import { ensureAgencyMessagingInstance, getManagedAgency } from "@/lib/agency-ac
 import { getCurrentUserContext } from "@/lib/auth/current-user";
 import {
   ensureEvolutionInstance,
-  getEvolutionQr,
-  restartEvolutionInstance,
+  recreateEvolutionInstance,
 } from "@/lib/evolution";
 
 function sleep(ms: number) {
@@ -34,9 +33,8 @@ export async function POST(request: Request) {
   try {
     const managedAgency = await ensureAgencyMessagingInstance(current, agency);
     await ensureEvolutionInstance(managedAgency.messaging_instance);
-    await restartEvolutionInstance(managedAgency.messaging_instance);
-    await sleep(2500);
-    const qr = await getEvolutionQr(managedAgency.messaging_instance);
+    const qr = await recreateEvolutionInstance(managedAgency.messaging_instance);
+    await sleep(1000);
 
     return NextResponse.json({
       ok: true,

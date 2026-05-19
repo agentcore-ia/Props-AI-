@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Loader2,
@@ -130,6 +130,7 @@ export function AgencySettingsWorkspace({
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [qrCount, setQrCount] = useState<number>(0);
+  const qrSessionStartedRef = useRef(false);
 
   useEffect(() => {
     setForm(buildInitialForm(selectedAgency));
@@ -258,13 +259,17 @@ export function AgencySettingsWorkspace({
       return;
     }
 
-    void loadQr(false);
+    if (!qrSessionStartedRef.current) {
+      qrSessionStartedRef.current = true;
+      void loadQr(connectionState !== "open");
+    }
+
     const interval = setInterval(() => {
       void loadQr(false);
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [loadQr, qrOpen]);
+  }, [connectionState, loadQr, qrOpen]);
 
   async function handleSave() {
     if (!selectedAgency) {
@@ -595,6 +600,7 @@ export function AgencySettingsWorkspace({
         onOpenChange={(nextOpen) => {
           setQrOpen(nextOpen);
           if (!nextOpen) {
+            qrSessionStartedRef.current = false;
             setQrError(null);
             setQrImage(null);
             setPairingCode(null);
