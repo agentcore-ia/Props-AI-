@@ -49,6 +49,12 @@ export async function POST(request: Request) {
       qr,
     });
   } catch (error) {
+    console.error("[evolution-reconnect] failed to reconnect instance", {
+      agencySlug: agency.slug,
+      messagingInstance: agency.messaging_instance,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "No se pudo reconectar la instancia de WhatsApp.",

@@ -39,6 +39,12 @@ export async function GET(request: Request) {
       qr,
     });
   } catch (error) {
+    console.error("[evolution-qr] failed to generate QR", {
+      agencySlug: agency.slug,
+      messagingInstance: agency.messaging_instance,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "No se pudo obtener el QR de WhatsApp.",

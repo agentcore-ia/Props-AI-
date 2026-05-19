@@ -12,7 +12,7 @@ const DEFAULT_WEBHOOK_EVENTS = [
 ];
 
 type EvolutionFetchOptions = {
-  method?: "GET" | "POST" | "PUT";
+  method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: Record<string, unknown>;
 };
 
@@ -98,13 +98,54 @@ async function evolutionFetch<T>(path: string, options?: EvolutionFetchOptions):
   });
 
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
+  const payload = parseEvolutionJson(text);
 
   if (!response.ok) {
     throw new Error(payload?.message ?? payload?.error ?? "Evolution API request failed.");
   }
 
   return payload as T;
+}
+
+function parseEvolutionJson(text: string) {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { raw: text };
+  }
+}
+
+function normalizeQrBase64(value: unknown) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return undefined;
+  if (raw.startsWith("data:image")) return raw;
+  if (/^[A-Za-z0-9+/=]+$/.test(raw) && raw.length > 80) {
+    return `data:image/png;base64,${raw}`;
+  }
+  return raw;
+}
+
+function normalizeQrPayload(payload: Record<string, unknown> | null) {
+  const qrcode = (payload?.qrcode ?? payload?.qr) as Record<string, unknown> | undefined;
+  const instance = (payload?.instance ?? qrcode?.instance) as Record<string, unknown> | undefined;
+  const rawBase64 = normalizeQrBase64(payload?.base64 ?? qrcode?.base64);
+  const rawCode = normalizeQrBase64(payload?.code ?? qrcode?.code);
+  const base64 = rawBase64 ?? (rawCode?.startsWith("data:image") ? rawCode : undefined);
+  const code = rawCode?.startsWith("data:image") ? undefined : rawCode;
+
+  return {
+    pairingCode: (payload?.pairingCode ?? payload?.pairing_code ?? qrcode?.pairingCode ?? qrcode?.pairing_code) as
+      | string
+      | undefined,
+    code,
+    base64,
+    count: Number(payload?.count ?? qrcode?.count ?? 0),
+    instance: {
+      state: (instance?.state ?? instance?.connectionStatus ?? payload?.status) as string | undefined,
+    },
+    status: (payload?.status ?? instance?.state ?? instance?.connectionStatus) as string | undefined,
+  };
 }
 
 function findInstanceByName(instances: EvolutionInstanceRecord[], instanceName: string) {
@@ -128,7 +169,12 @@ export async function ensureEvolutionInstance(instanceName: string) {
 
   if (existing) {
     if (webhookUrl) {
-      await setEvolutionWebhook(instanceName, webhookUrl, webhookEvents);
+      await setEvolutionWebhook(instanceName, webhookUrl, webhookEvents).catch((error) => {
+        console.warn("[evolution] webhook sync failed for existing instance", {
+          instanceName,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
     }
 
     return existing;
@@ -157,7 +203,12 @@ export async function ensureEvolutionInstance(instanceName: string) {
   });
 
   if (webhookUrl) {
-    await setEvolutionWebhook(instanceName, webhookUrl, webhookEvents);
+    await setEvolutionWebhook(instanceName, webhookUrl, webhookEvents).catch((error) => {
+      console.warn("[evolution] webhook sync failed for created instance", {
+        instanceName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
   }
 
   const refreshedInstances = await fetchEvolutionInstances();
@@ -178,42 +229,71 @@ export async function getEvolutionQr(instanceName: string) {
   const instances = await fetchEvolutionInstances();
   const instance = findInstanceByName(instances, instanceName);
   const token = getInstanceToken(instance);
+  const { apiUrl, apiKey } = getEvolutionEnv();
+  const apiKeys = Array.from(new Set([apiKey, token].filter(Boolean) as string[]));
+  const errors: string[] = [];
 
-  if (!token) {
-    throw new Error("La instancia existe pero no devolvio token para generar el QR.");
+  for (const key of apiKeys) {
+    const response = await fetch(`${apiUrl}/instance/connect/${encodeURIComponent(instanceName)}`, {
+      method: "GET",
+      headers: {
+        apikey: key,
+      },
+      cache: "no-store",
+    });
+
+    const text = await response.text();
+    const payload = parseEvolutionJson(text) as Record<string, unknown> | null;
+
+    if (response.ok) {
+      return normalizeQrPayload(payload) as {
+        pairingCode?: string;
+        code?: string;
+        base64?: string;
+        count?: number;
+        instance?: {
+          state?: string;
+        };
+        status?: string;
+      };
+    }
+
+    errors.push(
+      String(
+        payload?.message ??
+          payload?.error ??
+          payload?.raw ??
+          `HTTP ${response.status} al pedir QR con ${key === apiKey ? "API key global" : "token de instancia"}`
+      )
+    );
   }
 
-  const { apiUrl } = getEvolutionEnv();
-  const response = await fetch(`${apiUrl}/instance/connect/${instanceName}`, {
-    method: "GET",
-    headers: {
-      apikey: token,
-    },
-    cache: "no-store",
-  });
-
-  const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
-
-  if (!response.ok) {
-    throw new Error(payload?.message ?? payload?.error ?? "No se pudo obtener el QR de Evolution.");
-  }
-
-  return payload as {
-    pairingCode?: string;
-    code?: string;
-    base64?: string;
-    count?: number;
-    instance?: {
-      state?: string;
-    };
-    status?: string;
-  };
+  throw new Error(errors.at(-1) ?? "No se pudo obtener el QR de Evolution.");
 }
 
 export async function restartEvolutionInstance(instanceName: string) {
+  await evolutionFetch<Record<string, unknown>>(`/instance/restart/${encodeURIComponent(instanceName)}`, {
+    method: "PUT",
+  }).catch((error) => {
+    console.warn("[evolution] restart endpoint failed, continuing with QR connect", {
+      instanceName,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
+
   return getEvolutionQr(instanceName);
 }
+
+export type EvolutionQrPayload = {
+  pairingCode?: string;
+  code?: string;
+  base64?: string;
+  count?: number;
+  instance?: {
+    state?: string;
+  };
+  status?: string;
+};
 
 export async function setEvolutionWebhook(instanceName: string, url: string, events: string[]) {
   return evolutionFetch<Record<string, unknown>>(`/webhook/set/${instanceName}`, {
