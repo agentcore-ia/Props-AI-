@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
-import { normalizeEvolutionRecipient, sendEvolutionTextMessage } from "@/lib/evolution";
+import { normalizeEvolutionRecipient, sendEvolutionMediaMessage } from "@/lib/evolution";
+import { uploadTenantRentReceiptPdf } from "@/lib/rental-receipts";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatMoney } from "@/lib/utils";
 
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
   const { data: collection, error: collectionError } = await admin
     .from("rental_collections")
     .select(
-      "id, contract_id, agency_id, collection_month, expected_rent, collected_amount, payment_method, payment_date, status, rental_contracts!inner(tenant_name, tenant_phone, tenant_email, agencies!inner(name, slug, messaging_instance), properties!inner(title, location))"
+      "id, contract_id, agency_id, collection_month, expected_rent, collected_amount, payment_method, payment_date, status, receipt_number, rental_contracts!inner(tenant_name, tenant_phone, tenant_email, agencies!inner(name, slug, messaging_instance), properties!inner(title, location))"
     )
     .eq("contract_id", contractId)
     .eq("collection_month", collectionMonth)
@@ -63,27 +64,36 @@ export async function POST(request: Request) {
   }
 
   const balance = Math.max(0, Number(collection.expected_rent ?? 0) - Number(collection.collected_amount ?? 0));
-  const message = [
-    `Hola ${contract?.tenant_name ?? ""}, te enviamos el comprobante de alquiler de ${agency?.name ?? "la inmobiliaria"}.`,
-    "",
-    `Comprobante: ${receiptNumber || collection.id}`,
-    `Propiedad: ${property?.title ?? "Propiedad"} - ${property?.location ?? ""}`,
-    `Periodo: ${collection.collection_month}`,
-    `Importe abonado: ${formatMoney(Number(collection.collected_amount ?? 0), "ARS")}`,
-    `Metodo de pago: ${collection.payment_method}`,
-    `Fecha: ${collection.payment_date ?? "pendiente"}`,
-    balance > 0 ? `Saldo pendiente: ${formatMoney(balance, "ARS")}` : "Saldo pendiente: $ 0",
-    "",
+  const finalReceiptNumber = receiptNumber || collection.receipt_number || collection.id;
+  const receiptUrl = await uploadTenantRentReceiptPdf({
+    agencyName: agency?.name ?? "Inmobiliaria",
+    receiptNumber: finalReceiptNumber,
+    tenantName: contract?.tenant_name ?? "Inquilino",
+    propertyTitle: property?.title ?? "Propiedad",
+    propertyLocation: property?.location ?? "",
+    collectionMonth: collection.collection_month,
+    paymentMethod: collection.payment_method ?? "No informado",
+    paymentDate: collection.payment_date ?? "Pendiente",
+    expectedRent: Number(collection.expected_rent ?? 0),
+    collectedAmount: Number(collection.collected_amount ?? 0),
+    balance,
+  });
+  const caption = [
+    `Hola ${contract?.tenant_name ?? ""}, te enviamos adjunto el comprobante de alquiler ${finalReceiptNumber}.`,
+    `Importe abonado: ${formatMoney(Number(collection.collected_amount ?? 0), "ARS")}.`,
     `Gracias. ${agency?.name ?? ""}`,
   ]
     .filter(Boolean)
     .join("\n");
 
-  await sendEvolutionTextMessage({
+  await sendEvolutionMediaMessage({
     instanceName,
     number,
-    text: message,
+    mediaUrl: receiptUrl,
+    caption,
+    mediaType: "document",
+    fileName: `comprobante-alquiler-${finalReceiptNumber}.pdf`,
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, receiptUrl });
 }
