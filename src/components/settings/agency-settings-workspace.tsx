@@ -130,7 +130,6 @@ export function AgencySettingsWorkspace({
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [qrCount, setQrCount] = useState<number>(0);
-  const [reconnecting, setReconnecting] = useState(false);
 
   useEffect(() => {
     setForm(buildInitialForm(selectedAgency));
@@ -266,14 +265,6 @@ export function AgencySettingsWorkspace({
 
     return () => clearInterval(interval);
   }, [loadQr, qrOpen]);
-
-  async function handleReconnect() {
-    setReconnecting(true);
-    setQrOpen(true);
-    await loadQr(true);
-    setReconnecting(false);
-    await loadStatus();
-  }
 
   async function handleSave() {
     if (!selectedAgency) {
@@ -454,7 +445,7 @@ export function AgencySettingsWorkspace({
               />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium">Messaging instance</label>
+              <label className="text-sm font-medium">Codigo interno de WhatsApp</label>
               <Input
                 value={form.messagingInstance}
                 onChange={(event) =>
@@ -466,7 +457,7 @@ export function AgencySettingsWorkspace({
                 placeholder="props-mi-inmobiliaria"
               />
               <p className="text-xs text-muted-foreground">
-                Esta instancia se usa para vincular WhatsApp por QR y mantener activo el envio de mensajes desde Props.
+                Props usa este codigo interno para mantener conectados los mensajes de WhatsApp.
               </p>
             </div>
 
@@ -505,7 +496,7 @@ export function AgencySettingsWorkspace({
                 {statusCopy.label}
               </Badge>
               <Badge className="rounded-full border-0 bg-primary/10 px-3 py-1 text-primary">
-                {(connectionMeta?.messagingInstance ?? form.messagingInstance) || "sin instancia"}
+                {(connectionMeta?.messagingInstance ?? form.messagingInstance) ? "Conexion configurada" : "Sin conexion"}
               </Badge>
             </div>
 
@@ -536,7 +527,7 @@ export function AgencySettingsWorkspace({
                   Mensajeria lista
                 </div>
                 <p className="mt-3 text-sm text-muted-foreground">
-                  Al crear o verificar la instancia, Props deja listo este numero para recibir y enviar mensajes automaticos.
+                  Al vincular WhatsApp, Props deja listo este numero para recibir consultas y enviar avisos automaticos.
                 </p>
               </div>
             </div>
@@ -544,16 +535,7 @@ export function AgencySettingsWorkspace({
             <div className="flex flex-wrap gap-3">
               <Button className="rounded-2xl" onClick={() => setQrOpen(true)}>
                 <QrCode className="size-4" />
-                Vincular con QR
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-2xl"
-                onClick={handleReconnect}
-                disabled={reconnecting}
-              >
-                {reconnecting ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
-                Reconectar instancia
+                {connectionState === "open" ? "Ver WhatsApp conectado" : "Vincular WhatsApp"}
               </Button>
             </div>
           </CardContent>
@@ -625,7 +607,7 @@ export function AgencySettingsWorkspace({
             <DialogHeader>
               <DialogTitle>Vincular WhatsApp</DialogTitle>
               <DialogDescription>
-                Escanea el QR desde WhatsApp en el telefono de la inmobiliaria. Cuando conecte, Props usara esta misma instancia para mensajes y avisos automaticos.
+                Escanea el QR desde WhatsApp en el telefono de la inmobiliaria. Cuando conecte, Props usara este numero para mensajes y avisos automaticos.
               </DialogDescription>
             </DialogHeader>
 
@@ -643,11 +625,11 @@ export function AgencySettingsWorkspace({
                   <div className="flex flex-col items-center gap-3 text-center">
                     <CheckCircle2 className="size-12 text-emerald-500" />
                     <p className="text-lg font-semibold">WhatsApp conectado</p>
-                    <p className="text-sm text-muted-foreground">La instancia ya quedo lista para enviar y recibir mensajes.</p>
+                    <p className="text-sm text-muted-foreground">El numero ya quedo listo para enviar y recibir mensajes.</p>
                   </div>
                 ) : (
                   <div className="text-center text-sm text-muted-foreground">
-                    No pudimos obtener el QR todavía. Intenta reconectar la instancia.
+                    No pudimos obtener el QR todavia. Genera uno nuevo y volve a intentarlo.
                   </div>
                 )}
               </div>
@@ -673,6 +655,18 @@ export function AgencySettingsWorkspace({
                 <div className="w-full rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {qrError}
                 </div>
+              ) : null}
+
+              {connectionState !== "open" ? (
+                <Button
+                  variant="outline"
+                  className="w-full rounded-2xl"
+                  onClick={() => void loadQr(true)}
+                  disabled={qrLoading}
+                >
+                  {qrLoading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
+                  Generar nuevo QR
+                </Button>
               ) : null}
             </div>
           </div>
