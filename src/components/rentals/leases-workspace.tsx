@@ -1,14 +1,30 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { Building2, CalendarDays, CircleDollarSign, Loader2, Phone, Send, UserRound } from "lucide-react";
+import Link from "next/link";
+import { useMemo, useState, type ReactNode } from "react";
+import {
+  AlertTriangle,
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  CircleDollarSign,
+  ClipboardList,
+  FileText,
+  Loader2,
+  Phone,
+  Search,
+  Send,
+  Sparkles,
+  UserRound,
+  Wrench,
+} from "lucide-react";
 
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { RentAutomationPanel } from "@/components/props/rent-automation-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { ContractRescissionSummary } from "@/lib/operations-types";
+import type { ContractRescissionSummary, DelinquentTenantSummary, RentalCollectionSummary } from "@/lib/operations-types";
 import type { LeaseRosterItem } from "@/lib/props-data";
 import type {
   OwnerSettlementItemSummary,
@@ -31,6 +47,8 @@ export function LeasesWorkspace({
   ownerSettlements,
   ownerSettlementItems,
   rescissions,
+  collections,
+  delinquencies,
 }: {
   leases: LeaseRosterItem[];
   rentalSummary: RentalDashboardSummary;
@@ -38,7 +56,11 @@ export function LeasesWorkspace({
   ownerSettlements: OwnerSettlementSummary[];
   ownerSettlementItems: OwnerSettlementItemSummary[];
   rescissions: ContractRescissionSummary[];
+  collections: RentalCollectionSummary[];
+  delinquencies: DelinquentTenantSummary[];
 }) {
+  const [employeeMode, setEmployeeMode] = useState<"actions" | "dossier">("actions");
+  const [query, setQuery] = useState("");
   const [sendingTestId, setSendingTestId] = useState<string | null>(null);
   const [generatingSettlementId, setGeneratingSettlementId] = useState<string | null>(null);
   const [rescindingContractId, setRescindingContractId] = useState<string | null>(null);
@@ -51,6 +73,144 @@ export function LeasesWorkspace({
     notes: "",
   });
   const [feedback, setFeedback] = useState<null | { type: "success" | "error"; message: string }>(null);
+  const currentMonth = new Date().toISOString().slice(0, 7);
+
+  const filteredLeases = useMemo(() => {
+    const normalized = query
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+
+    if (!normalized) return leases;
+
+    return leases.filter((lease) => {
+      const haystack = [
+        lease.tenantName,
+        lease.tenantPhone,
+        lease.propertyTitle,
+        lease.propertyLocation,
+        lease.exactAddress,
+        lease.ownerName ?? "",
+      ]
+        .join(" ")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+
+      return haystack.includes(normalized);
+    });
+  }, [leases, query]);
+
+  const collectionsByContract = useMemo(() => {
+    const map = new Map<string, RentalCollectionSummary>();
+    for (const collection of collections) {
+      if (!map.has(collection.contractId)) {
+        map.set(collection.contractId, collection);
+      }
+    }
+    return map;
+  }, [collections]);
+
+  const delinquenciesByContract = useMemo(() => {
+    return new Map(delinquencies.map((item) => [item.contractId, item]));
+  }, [delinquencies]);
+
+  const settlementsByContract = useMemo(() => {
+    const map = new Map<string, OwnerSettlementSummary>();
+    for (const settlement of ownerSettlements) {
+      if (!map.has(settlement.contractId)) {
+        map.set(settlement.contractId, settlement);
+      }
+    }
+    return map;
+  }, [ownerSettlements]);
+
+  const adjustmentsByContract = useMemo(() => {
+    const map = new Map<string, RentalAdjustmentSummary>();
+    for (const adjustment of recentAdjustments) {
+      if (!map.has(adjustment.contractId)) {
+        map.set(adjustment.contractId, adjustment);
+      }
+    }
+    return map;
+  }, [recentAdjustments]);
+
+  const employeeActions = useMemo(() => {
+    return leases
+      .flatMap((lease) => {
+        const latestCollection = collectionsByContract.get(lease.contractId);
+        const delinquency = delinquenciesByContract.get(lease.contractId);
+        const latestSettlement = settlementsByContract.get(lease.contractId);
+        const actions: Array<{
+          id: string;
+          label: string;
+          detail: string;
+          priority: "Alta" | "Media" | "Baja";
+          href?: string;
+          contractId?: string;
+          kind: "collection" | "settlement" | "delinquency" | "contract" | "maintenance";
+        }> = [];
+
+        if (delinquency) {
+          actions.push({
+            id: `${lease.contractId}-mora`,
+            label: `Avisar mora a ${lease.tenantName}`,
+            detail: `${formatMoney(delinquency.totalDebtAmount, "ARS")} pendientes - ${delinquency.daysLate} dias de atraso.`,
+            priority: delinquency.risk,
+            href: "/morosos",
+            kind: "delinquency",
+          });
+        } else if (!latestCollection || latestCollection.collectionMonth !== currentMonth || latestCollection.status !== "Cobrada") {
+          actions.push({
+            id: `${lease.contractId}-cobrar`,
+            label: `Cobrar alquiler de ${lease.tenantName}`,
+            detail: `${lease.propertyTitle} - ${formatMoney(lease.currentRent, "ARS")}`,
+            priority: "Alta",
+            href: `/cobranzas?contract=${lease.contractId}`,
+            kind: "collection",
+          });
+        }
+
+        if (lease.ownerName && (!latestSettlement || latestSettlement.settlementMonth !== currentMonth)) {
+          actions.push({
+            id: `${lease.contractId}-liquidar`,
+            label: `Liquidar a ${lease.ownerName}`,
+            detail: `Contrato de ${lease.tenantName} - ${lease.propertyTitle}`,
+            priority: "Media",
+            contractId: lease.contractId,
+            kind: "settlement",
+          });
+        }
+
+        if (!lease.ownerName || !lease.tenantPhone || !lease.adjustmentFrequencyMonths) {
+          actions.push({
+            id: `${lease.contractId}-revisar`,
+            label: `Completar datos del contrato`,
+            detail: `${lease.propertyTitle} necesita datos para operar sin friccion.`,
+            priority: "Media",
+            href: `/propiedades?edit=${lease.propertyId}`,
+            kind: "contract",
+          });
+        }
+
+        actions.push({
+          id: `${lease.contractId}-mantenimiento`,
+          label: `Revisar tickets y carteles`,
+          detail: `Control operativo de ${lease.propertyTitle}.`,
+          priority: "Baja",
+          href: "/proveedores",
+          kind: "maintenance",
+        });
+
+        return actions;
+      })
+      .sort((a, b) => {
+        const weight = { Alta: 0, Media: 1, Baja: 2 };
+        return weight[a.priority] - weight[b.priority];
+      })
+      .slice(0, 8);
+  }, [collectionsByContract, currentMonth, delinquenciesByContract, leases, settlementsByContract]);
 
   async function handleSendTest(contractId: string, tenantName: string) {
     setSendingTestId(contractId);
@@ -276,6 +436,99 @@ export function LeasesWorkspace({
               value={String(rentalSummary.pendingOwnerPayouts)}
               hint="Pendientes de marcar como pagados."
             />
+          </section>
+
+          <section className="rounded-[30px] border bg-card p-5 shadow-sm">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div>
+                <p className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+                  <Sparkles className="size-4" />
+                  Modo empleado
+                </p>
+                <h2 className="mt-3 text-xl font-semibold">Operacion diaria de alquileres</h2>
+                <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+                  Cada contrato funciona como expediente unico: cobranza, cuenta corriente, ajustes, propietario,
+                  morosidad, documentos, rescisiones y tareas operativas en una sola vista.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Buscar inquilino, propiedad o propietario"
+                    className="h-11 w-full rounded-2xl border bg-background pl-10 pr-3 text-sm outline-none transition focus:border-primary sm:w-80"
+                  />
+                </div>
+                <div className="flex rounded-2xl border bg-muted/30 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setEmployeeMode("actions")}
+                    className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      employeeMode === "actions" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    Acciones
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEmployeeMode("dossier")}
+                    className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      employeeMode === "dossier" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    Expedientes
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {employeeMode === "actions" ? (
+              <div className="mt-5 grid gap-3 lg:grid-cols-2">
+                {employeeActions.length > 0 ? (
+                  employeeActions.map((action) => (
+                    <DailyActionCard
+                      key={action.id}
+                      action={action}
+                      disabled={action.contractId ? generatingSettlementId === action.contractId : false}
+                      onGenerateSettlement={
+                        action.contractId
+                          ? () => {
+                              const lease = leases.find((item) => item.contractId === action.contractId);
+                              handleGenerateSettlement(action.contractId, lease?.ownerName ?? undefined);
+                            }
+                          : undefined
+                      }
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-[24px] border border-dashed bg-background p-5 text-sm text-muted-foreground lg:col-span-2">
+                    No hay acciones urgentes. El equipo puede revisar mensajes, publicaciones o agenda.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-5 grid gap-4 xl:grid-cols-2">
+                {filteredLeases.map((lease) => (
+                  <ContractDossierCard
+                    key={lease.contractId}
+                    lease={lease}
+                    collection={collectionsByContract.get(lease.contractId)}
+                    delinquency={delinquenciesByContract.get(lease.contractId)}
+                    settlement={settlementsByContract.get(lease.contractId)}
+                    adjustment={adjustmentsByContract.get(lease.contractId)}
+                    sendingTest={sendingTestId === lease.contractId}
+                    generatingSettlement={generatingSettlementId === lease.contractId}
+                    rescinding={rescindingContractId === lease.contractId}
+                    onSendTest={() => handleSendTest(lease.contractId, lease.tenantName)}
+                    onGenerateSettlement={() => handleGenerateSettlement(lease.contractId, lease.ownerName ?? undefined)}
+                    onRescission={() => handleRescission(lease.contractId, lease.tenantName)}
+                  />
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="rounded-[30px] border bg-card p-5 shadow-sm">
@@ -788,6 +1041,271 @@ function InfoRow({
       <span className="mt-0.5 text-primary">{icon}</span>
       <span>{label}</span>
     </div>
+  );
+}
+
+function DailyActionCard({
+  action,
+  disabled,
+  onGenerateSettlement,
+}: {
+  action: {
+    label: string;
+    detail: string;
+    priority: "Alta" | "Media" | "Baja";
+    href?: string;
+    contractId?: string;
+  };
+  disabled?: boolean;
+  onGenerateSettlement?: () => void;
+}) {
+  const icon = action.priority === "Alta" ? <AlertTriangle className="size-4" /> : <ClipboardList className="size-4" />;
+  const priorityClass =
+    action.priority === "Alta"
+      ? "bg-red-500/10 text-red-700"
+      : action.priority === "Media"
+        ? "bg-amber-500/10 text-amber-700"
+        : "bg-emerald-500/10 text-emerald-700";
+
+  return (
+    <article className="rounded-[24px] border bg-background p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex gap-3">
+          <span className="mt-0.5 flex size-9 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            {icon}
+          </span>
+          <div>
+            <p className="font-semibold">{action.label}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{action.detail}</p>
+          </div>
+        </div>
+        <Badge className={priorityClass}>{action.priority}</Badge>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {onGenerateSettlement ? (
+          <Button className="rounded-2xl" size="sm" disabled={disabled} onClick={onGenerateSettlement}>
+            {disabled ? <Loader2 className="size-4 animate-spin" /> : <CircleDollarSign className="size-4" />}
+            Liquidar ahora
+          </Button>
+        ) : null}
+        {action.href ? (
+          <Link
+            href={action.href}
+            className="inline-flex h-9 items-center justify-center rounded-2xl border px-3 text-sm font-medium transition hover:bg-muted"
+          >
+            Abrir modulo
+          </Link>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+function ContractDossierCard({
+  lease,
+  collection,
+  delinquency,
+  settlement,
+  adjustment,
+  sendingTest,
+  generatingSettlement,
+  rescinding,
+  onSendTest,
+  onGenerateSettlement,
+  onRescission,
+}: {
+  lease: LeaseRosterItem;
+  collection?: RentalCollectionSummary;
+  delinquency?: DelinquentTenantSummary;
+  settlement?: OwnerSettlementSummary;
+  adjustment?: RentalAdjustmentSummary;
+  sendingTest: boolean;
+  generatingSettlement: boolean;
+  rescinding: boolean;
+  onSendTest: () => void;
+  onGenerateSettlement: () => void;
+  onRescission: () => void;
+}) {
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentCollection = collection?.collectionMonth === currentMonth ? collection : null;
+  const expectedRent = currentCollection?.expectedRent ?? lease.currentRent;
+  const collected = currentCollection?.collectedAmount ?? 0;
+  const rentBalance = Math.max(0, expectedRent - collected);
+  const lateFees = delinquency?.lateFeeAmount ?? 0;
+  const totalBalance = delinquency?.totalDebtAmount ?? rentBalance;
+
+  const checklist = [
+    {
+      label: currentCollection?.status === "Cobrada" ? "Cobranza al dia" : "Cobranza pendiente",
+      ok: currentCollection?.status === "Cobrada",
+    },
+    {
+      label: settlement?.settlementMonth === currentMonth ? "Liquidacion emitida" : "Liquidacion pendiente",
+      ok: settlement?.settlementMonth === currentMonth,
+    },
+    {
+      label: lease.ownerName ? "Propietario configurado" : "Falta propietario",
+      ok: Boolean(lease.ownerName),
+    },
+    {
+      label: lease.autoNotify ? "Avisos automaticos activos" : "Aviso manual",
+      ok: lease.autoNotify,
+    },
+  ];
+
+  return (
+    <article className="rounded-[28px] border bg-background p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className={statusStyles[lease.status]}>{lease.status}</Badge>
+            <Badge variant="outline" className="rounded-full">
+              Expediente unico
+            </Badge>
+          </div>
+          <h3 className="mt-3 text-xl font-semibold">{lease.tenantName}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {lease.propertyTitle} - {lease.propertyLocation}
+          </p>
+        </div>
+        <div className="rounded-2xl border bg-card px-4 py-3 text-right">
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Saldo actual</p>
+          <p className="mt-1 text-lg font-semibold">{formatMoney(totalBalance, "ARS")}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <InfoMetric label="Alquiler" value={formatMoney(lease.currentRent, "ARS")} />
+        <InfoMetric label="Cobrado" value={formatMoney(collected, "ARS")} />
+        <InfoMetric label="Punitorios" value={formatMoney(lateFees, "ARS")} />
+        <InfoMetric label="Proximo ajuste" value={formatShortDate(lease.nextAdjustmentDate)} />
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <div className="rounded-[22px] border bg-card p-4">
+          <p className="flex items-center gap-2 text-sm font-semibold">
+            <CircleDollarSign className="size-4 text-primary" />
+            Cuenta corriente
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Periodo {currentMonth}: esperado {formatMoney(expectedRent, "ARS")}, cobrado{" "}
+            {formatMoney(collected, "ARS")}, saldo {formatMoney(rentBalance, "ARS")}.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href={`/cobranzas?contract=${lease.contractId}`}
+              className="inline-flex h-9 items-center rounded-2xl bg-primary px-3 text-sm font-medium text-primary-foreground"
+            >
+              Cobrar alquiler
+            </Link>
+            {delinquency ? (
+              <Link
+                href="/morosos"
+                className="inline-flex h-9 items-center rounded-2xl border px-3 text-sm font-medium transition hover:bg-muted"
+              >
+                Ver mora
+              </Link>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="rounded-[22px] border bg-card p-4">
+          <p className="flex items-center gap-2 text-sm font-semibold">
+            <UserRound className="size-4 text-primary" />
+            Propietario y liquidacion
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {lease.ownerName
+              ? `${lease.ownerName}. Comision ${lease.managementFeePercent}% y gastos fijos ${formatMoney(
+                  lease.monthlyOwnerCosts,
+                  "ARS"
+                )}.`
+              : "Falta configurar propietario para poder liquidar y transferir."}
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {settlement
+              ? `Ultima liquidacion: ${settlement.settlementMonth}, neto ${formatMoney(
+                  settlement.ownerPayoutAmount,
+                  "ARS"
+                )}, estado ${settlement.status}.`
+              : "Sin liquidacion emitida en los ultimos registros."}
+          </p>
+        </div>
+
+        <div className="rounded-[22px] border bg-card p-4">
+          <p className="flex items-center gap-2 text-sm font-semibold">
+            <FileText className="size-4 text-primary" />
+            Contrato e indexacion
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {lease.indexType} cada {lease.adjustmentFrequencyMonths} meses. Inicio{" "}
+            {formatShortDate(lease.contractStartDate)}.
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {adjustment
+              ? `Ultimo ajuste: ${formatShortDate(adjustment.appliedOn)}, ${formatMoney(
+                  adjustment.previousRent,
+                  "ARS"
+                )} a ${formatMoney(adjustment.newRent, "ARS")}.`
+              : "Aun no hay ajustes aplicados en el historial reciente."}
+          </p>
+        </div>
+
+        <div className="rounded-[22px] border bg-card p-4">
+          <p className="flex items-center gap-2 text-sm font-semibold">
+            <Wrench className="size-4 text-primary" />
+            Tickets, carteles y tareas
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Usa este expediente para revisar mantenimiento, fotos, carteles, rescisiones o pendientes comerciales de la
+            propiedad.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href="/proveedores"
+              className="inline-flex h-9 items-center rounded-2xl border px-3 text-sm font-medium transition hover:bg-muted"
+            >
+              Tickets
+            </Link>
+            <Link
+              href="/propiedades"
+              className="inline-flex h-9 items-center rounded-2xl border px-3 text-sm font-medium transition hover:bg-muted"
+            >
+              Carteles/fotos
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {checklist.map((item) => (
+          <div key={item.label} className="flex items-center gap-2 rounded-2xl border bg-card px-3 py-2 text-sm">
+            {item.ok ? (
+              <CheckCircle2 className="size-4 text-emerald-600" />
+            ) : (
+              <AlertTriangle className="size-4 text-amber-600" />
+            )}
+            <span>{item.label}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button variant="outline" className="rounded-2xl" disabled={sendingTest} onClick={onSendTest}>
+          {sendingTest ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+          Probar aviso
+        </Button>
+        <Button variant="outline" className="rounded-2xl" disabled={!lease.ownerName || generatingSettlement} onClick={onGenerateSettlement}>
+          {generatingSettlement ? <Loader2 className="size-4 animate-spin" /> : <CircleDollarSign className="size-4" />}
+          Liquidar propietario
+        </Button>
+        <Button variant="outline" className="rounded-2xl" disabled={rescinding} onClick={onRescission}>
+          {rescinding ? <Loader2 className="size-4 animate-spin" /> : <CalendarDays className="size-4" />}
+          Iniciar rescision
+        </Button>
+      </div>
+    </article>
   );
 }
 

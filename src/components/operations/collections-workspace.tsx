@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   CheckCircle2,
@@ -26,11 +26,16 @@ export function CollectionsWorkspace({
   collections: RentalCollectionSummary[];
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const currentMonth = new Date().toISOString().slice(0, 7);
+  const requestedContractId = searchParams.get("contract");
+  const initialContractId =
+    leases.find((lease) => lease.contractId === requestedContractId)?.contractId ?? leases[0]?.contractId ?? "";
+  const initialLease = leases.find((lease) => lease.contractId === initialContractId);
   const [form, setForm] = useState({
-    contractId: leases[0]?.contractId ?? "",
+    contractId: initialContractId,
     collectionMonth: currentMonth,
-    collectedAmount: leases[0] ? String(leases[0].currentRent) : "",
+    collectedAmount: initialLease ? String(initialLease.currentRent) : "",
     paymentMethod: "Transferencia",
     paymentDate: new Date().toISOString().slice(0, 10),
     generateSettlement: true,

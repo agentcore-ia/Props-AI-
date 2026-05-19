@@ -37,7 +37,8 @@ type AssistantAction =
   | "generate_settlement"
   | "record_transfer"
   | "record_cash_movement"
-  | "start_rescission";
+  | "start_rescission"
+  | "notify_delinquencies";
 
 type AssistantActionResult = {
   type: AssistantAction;
@@ -134,6 +135,7 @@ function sanitizeAssistantAction(value: unknown): AssistantAction {
     "record_transfer",
     "record_cash_movement",
     "start_rescission",
+    "notify_delinquencies",
   ];
   return allowed.includes(value as AssistantAction) ? (value as AssistantAction) : "answer";
 }
@@ -199,6 +201,10 @@ function inferAssistantAction(prompt: string): AssistantAction {
     return "start_rescission";
   }
 
+  if (/(avisa|avisar|notifica|notificar|manda).*(moros|deud|atrasad)/.test(normalized)) {
+    return "notify_delinquencies";
+  }
+
   return "answer";
 }
 
@@ -236,6 +242,70 @@ function buildContractsForAssistant(input: {
       ownerName: contract.owners[0]?.fullName ?? contract.ownerName ?? null,
     };
   });
+}
+
+function buildDeterministicAnswer(input: {
+  prompt: string;
+  leases: Awaited<ReturnType<typeof listLeaseRoster>>;
+  delinquencies: Awaited<ReturnType<typeof listDelinquentTenants>>;
+  today: Awaited<ReturnType<typeof getTodayWorkspaceSnapshot>>;
+}) {
+  const normalized = normalizeText(input.prompt);
+  const activeLeases = input.leases.filter((lease) => lease.status === "Activo");
+
+  if (/cuantos?.*(alquiler|contrato).*activ/.test(normalized) || /alquileres activos/.test(normalized)) {
+    const sample = activeLeases
+      .slice(0, 5)
+      .map((lease) => `${lease.tenantName} en ${lease.propertyTitle}`)
+      .join("; ");
+    return activeLeases.length > 0
+      ? `Tenes ${activeLeases.length} alquiler${activeLeases.length === 1 ? "" : "es"} activo${
+          activeLeases.length === 1 ? "" : "s"
+        }. ${sample ? `Los primeros son: ${sample}.` : ""}`
+      : "No tenes alquileres activos cargados en este momento.";
+  }
+
+  if (/como.*(genero|hago|armo).*(liquidacion|liquidar).*propiet/.test(normalized)) {
+    return [
+      "Para liquidar a un propietario en Props:",
+      "1. Entra a Alquileres y busca el contrato o inquilino.",
+      "2. Revisa que el cobro del mes este registrado en Cobranzas.",
+      "3. Toca Liquidar propietario. Props calcula alquiler cobrado, comision, gastos y neto a transferir.",
+      "4. Si corresponde, agrega conceptos particulares antes de confirmar el pago.",
+      "Tambien podes pedirme algo como: liquidá a Suarez o liquidá el contrato de Balvanera.",
+    ].join("\n");
+  }
+
+  if (/que.*hago.*hoy|pendiente.*hoy|tareas.*hoy/.test(normalized)) {
+    return `Hoy tenes ${input.today.counters.pendingTasks} tareas pendientes, ${input.today.counters.visitsToday} visitas, ${input.today.counters.urgentLeads} leads urgentes y ${input.today.counters.automaticFollowUps} seguimientos listos. Prioridad: primero contactos humanos, despues visitas y por ultimo tareas operativas.`;
+  }
+
+  if (/moros|deuda|atrasad/.test(normalized)) {
+    if (input.delinquencies.length === 0) {
+      return "No hay morosos detectados para el periodo actual.";
+    }
+
+    const top = input.delinquencies
+      .slice(0, 5)
+      .map(
+        (item) =>
+          `${item.tenantName}: ${formatMoney(item.totalDebtAmount, item.currency)} pendientes, ${item.daysLate} dias de atraso, riesgo ${item.risk}`
+      )
+      .join("; ");
+    return `Detecte ${input.delinquencies.length} caso${
+      input.delinquencies.length === 1 ? "" : "s"
+    } de mora. Prioridad: ${top}. Podes abrir Morosos para avisar por WhatsApp o pedirme: avisá a morosos con más de 10 días.`;
+  }
+
+  if (/cuenta corriente|debe haber|saldo/.test(normalized)) {
+    return "La cuenta corriente se ve desde Alquileres en cada expediente y desde Cobranzas/Morosos: muestra esperado, cobrado, saldo, punitorios, liquidacion al propietario y movimientos asociados al contrato.";
+  }
+
+  if (/ticket|mantenimiento|proveedor|reparacion|arreglo/.test(normalized)) {
+    return "Para mantenimiento, usa Proveedores para registrar proveedor/factura y Alquileres para ver el contrato relacionado. La idea operativa es: reclamo, proveedor asignado, costo, comprobante y estado hasta resolverlo.";
+  }
+
+  return null;
 }
 
 function resolveContractFromPrompt(prompt: string, contracts: AssistantContractContext[]) {
@@ -364,6 +434,7 @@ async function planWithOpenAI(input: {
                 "- record_transfer: registrar transferencia al propietario.",
                 "- record_cash_movement: registrar ingreso/egreso de caja.",
                 "- start_rescission: iniciar rescision de contrato.",
+                "- notify_delinquencies: enviar avisos reales por WhatsApp a inquilinos morosos.",
                 "",
                 "Formato JSON exacto:",
                 '{"action":"answer","confidence":0.0,"needsClarification":false,"clarificationQuestion":null,"contractId":null,"contractQuery":null,"amount":null,"paymentMethod":null,"settlementMonth":null,"cashKind":null,"cashCategory":null,"notes":null}',
@@ -371,6 +442,7 @@ async function planWithOpenAI(input: {
                 "Reglas:",
                 "- Para pagos de alquiler, si el contrato esta claro pero no hay monto, amount=null para usar el alquiler actual.",
                 "- Para caja, no pidas contrato. Extrae cashKind Ingreso/Egreso, amount y cashCategory.",
+                "- Para avisar morosos, no pidas contrato salvo que el usuario quiera un inquilino puntual.",
                 "- Para liquidaciones, transferencias y rescisiones, intenta elegir contractId si el contrato aparece en la lista.",
                 "- settlementMonth debe ser YYYY-MM o null.",
                 "- contractQuery puede ser nombre de inquilino, propiedad, direccion o barrio mencionado.",
@@ -536,6 +608,24 @@ export async function POST(request: Request) {
     )
     .join("\n");
 
+  const fallbackAction = inferAssistantAction(prompt);
+  const deterministicReply =
+    fallbackAction === "answer"
+      ? buildDeterministicAnswer({
+          prompt,
+          leases,
+          delinquencies,
+          today,
+        })
+      : null;
+
+  if (deterministicReply) {
+    return NextResponse.json({
+      reply: deterministicReply,
+      configured: getOpenAIEnv().configured,
+    });
+  }
+
   const openAI = getOpenAIEnv();
 
   if (!openAI.configured) {
@@ -550,7 +640,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const fallbackAction = inferAssistantAction(prompt);
   const plan = await planWithOpenAI({
     openAI,
     prompt,
@@ -657,6 +746,71 @@ export async function POST(request: Request) {
         status: "success",
         title: "Movimiento de caja registrado",
         details: `${kind} · ${category} · ${formatMoney(amount, "ARS")}`,
+      } satisfies AssistantActionResult,
+    });
+  }
+
+  if (current.profile.role !== "superadmin" && inferredAction === "notify_delinquencies") {
+    const normalized = normalizeText(prompt);
+    const minimumDaysMatch = normalized.match(/mas de (\d+) dias|mayor a (\d+) dias|(\d+) dias/);
+    const minimumDays = minimumDaysMatch
+      ? Number(minimumDaysMatch[1] ?? minimumDaysMatch[2] ?? minimumDaysMatch[3] ?? 0)
+      : 0;
+    const selected = delinquencies.filter((item) => item.daysLate >= minimumDays);
+
+    if (selected.length === 0) {
+      return NextResponse.json({
+        reply: minimumDays > 0
+          ? `No encontre morosos con mas de ${minimumDays} dias de atraso para avisar.`
+          : "No hay morosos vigentes para avisar ahora.",
+        configured: openAI.configured,
+        actionResult: {
+          type: inferredAction,
+          status: "clarify",
+          title: "Sin morosos para avisar",
+          details: "No hay contratos que cumplan el criterio indicado.",
+        } satisfies AssistantActionResult,
+      });
+    }
+
+    const result = await callInternalAction(
+      request,
+      "/api/admin/delinquencies/notify",
+      {
+        contractIds: selected.map((item) => item.contractId),
+      },
+      "POST"
+    );
+
+    if (!result.ok) {
+      return NextResponse.json({
+        reply: result.payload?.error ?? "No pude enviar los avisos de mora.",
+        configured: openAI.configured,
+        actionResult: {
+          type: inferredAction,
+          status: "error",
+          title: "No se enviaron los avisos",
+          details: result.payload?.error ?? "Revisa WhatsApp, telefonos o filtros de morosos.",
+        } satisfies AssistantActionResult,
+      });
+    }
+
+    const failed = Array.isArray(result.payload?.failed) ? result.payload.failed : [];
+    const sent = Number(result.payload?.sent ?? 0);
+
+    return NextResponse.json({
+      reply:
+        failed.length > 0
+          ? `Envie ${sent} aviso${sent === 1 ? "" : "s"} de mora. Fallaron ${failed.length}: ${failed
+              .map((item: { tenantName?: string; error?: string }) => `${item.tenantName ?? "sin nombre"} (${item.error ?? "error"})`)
+              .join(", ")}.`
+          : `Listo. Envie ${sent} aviso${sent === 1 ? "" : "s"} de mora por WhatsApp.`,
+      configured: openAI.configured,
+      actionResult: {
+        type: inferredAction,
+        status: failed.length > 0 ? "error" : "success",
+        title: failed.length > 0 ? "Avisos enviados con errores" : "Avisos de mora enviados",
+        details: `${sent} enviados - ${failed.length} fallidos`,
       } satisfies AssistantActionResult,
     });
   }

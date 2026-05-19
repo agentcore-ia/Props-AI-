@@ -4,10 +4,12 @@ import { getAgencyScopeFromUser } from "@/lib/crm-automation";
 import {
   getRentalDashboardSummary,
   listContractRescissions,
+  listDelinquentTenants,
   listLeaseRoster,
   listOwnerSettlementItems,
   listOwnerSettlements,
   listRecentRentalAdjustments,
+  listRentalCollections,
 } from "@/lib/props-data";
 
 export const dynamic = "force-dynamic";
@@ -21,13 +23,24 @@ export default async function LeasesPage() {
 
   const agencyScope = getAgencyScopeFromUser(currentUser);
 
-  const [leases, rentalSummary, recentAdjustments, ownerSettlements, ownerSettlementItems, rescissions] = await Promise.all([
+  const [
+    leases,
+    rentalSummary,
+    recentAdjustments,
+    ownerSettlements,
+    ownerSettlementItems,
+    rescissions,
+    collections,
+    delinquencies,
+  ] = await Promise.all([
     listLeaseRoster(agencyScope),
     getRentalDashboardSummary(agencyScope),
     listRecentRentalAdjustments({ ...agencyScope, limit: 8 }),
     listOwnerSettlements({ ...agencyScope, limit: 12 }),
     listOwnerSettlementItems({ ...agencyScope, limit: 200 }),
     listContractRescissions({ ...agencyScope, limit: 12 }),
+    listRentalCollections({ ...agencyScope, limit: 80 }),
+    listDelinquentTenants(agencyScope),
   ]);
 
   return (
@@ -38,6 +51,8 @@ export default async function LeasesPage() {
       ownerSettlements={ownerSettlements}
       ownerSettlementItems={ownerSettlementItems}
       rescissions={rescissions}
+      collections={collections}
+      delinquencies={delinquencies}
     />
   );
 }
