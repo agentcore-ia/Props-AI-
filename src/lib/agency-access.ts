@@ -90,9 +90,28 @@ export async function persistMessagingInstance(
   nextInstance: string
 ) {
   const admin = createAdminClient();
+  const normalized = normalizeInstanceSegment(nextInstance);
+
+  if (normalized && normalized !== "agentcore") {
+    const { data: ownerAgency, error: ownerAgencyError } = await admin
+      .from("agencies")
+      .select("id, name")
+      .eq("messaging_instance", normalized)
+      .neq("id", agencyId)
+      .maybeSingle();
+
+    if (ownerAgencyError) {
+      throw ownerAgencyError;
+    }
+
+    if (ownerAgency) {
+      throw new Error(`La instancia de WhatsApp ${normalized} ya esta asignada a ${ownerAgency.name}.`);
+    }
+  }
+
   const { data, error } = await admin
     .from("agencies")
-    .update({ messaging_instance: nextInstance })
+    .update({ messaging_instance: normalized })
     .eq("id", agencyId)
     .select("*")
     .single();

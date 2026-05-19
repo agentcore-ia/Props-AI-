@@ -37,6 +37,12 @@ create table if not exists public.agencies (
   updated_at timestamptz not null default timezone('utc'::text, now())
 );
 
+create unique index if not exists agencies_unique_messaging_instance_idx
+  on public.agencies (messaging_instance)
+  where messaging_instance is not null
+    and btrim(messaging_instance) <> ''
+    and messaging_instance <> 'agentcore';
+
 create table if not exists public.properties (
   id uuid primary key default gen_random_uuid(),
   agency_id uuid not null references public.agencies (id) on delete cascade,

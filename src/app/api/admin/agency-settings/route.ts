@@ -72,6 +72,29 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
+  if (messagingInstance && messagingInstance !== "agentcore") {
+    const { data: ownerAgency, error: ownerAgencyError } = await admin
+      .from("agencies")
+      .select("id, name")
+      .eq("messaging_instance", messagingInstance)
+      .neq("id", agency.id)
+      .maybeSingle();
+
+    if (ownerAgencyError) {
+      return NextResponse.json(
+        { error: "No pudimos validar si esa instancia de WhatsApp ya esta en uso." },
+        { status: 400 }
+      );
+    }
+
+    if (ownerAgency) {
+      return NextResponse.json(
+        { error: `Esa instancia de WhatsApp ya esta asignada a ${ownerAgency.name}. Usa una instancia unica para esta inmobiliaria.` },
+        { status: 409 }
+      );
+    }
+  }
+
   const basePayload = {
     email,
     phone,
@@ -115,6 +138,14 @@ export async function POST(request: Request) {
   }
 
   if (error || !updated) {
+    const message = String(error?.message ?? "");
+    if (/agencies_unique_messaging_instance_idx|messaging_instance/i.test(message)) {
+      return NextResponse.json(
+        { error: "Esa instancia de WhatsApp ya esta asignada a otra inmobiliaria." },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
       { error: "No se pudo guardar la configuracion de la inmobiliaria." },
       { status: 400 }
