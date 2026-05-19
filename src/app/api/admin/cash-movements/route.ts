@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { buildFinancialDocumentNumber, logFinancialAudit } from "@/lib/financial-audit";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
@@ -38,20 +39,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Falta la inmobiliaria." }, { status: 400 });
   }
 
-  const { error } = await admin.from("cash_movements").insert({
+  const amount = Number(body?.amount ?? 0);
+  const kind = body?.kind ?? "Ingreso";
+  const category = String(body?.category ?? "").trim();
+  const { data: inserted, error } = await admin.from("cash_movements").insert({
     agency_id: targetAgencyId,
     occurred_on: String(body?.occurredOn ?? new Date().toISOString().slice(0, 10)).slice(0, 10),
-    kind: body?.kind ?? "Ingreso",
-    category: String(body?.category ?? "").trim(),
-    amount: Number(body?.amount ?? 0),
+    kind,
+    category,
+    amount,
     reference: String(body?.reference ?? "").trim(),
     notes: String(body?.notes ?? "").trim(),
     created_by: current.user.id,
-  });
+  }).select("id, created_at").maybeSingle();
 
   if (error) {
     return NextResponse.json({ error: "No se pudo registrar el movimiento de caja." }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true });
+  const documentNumber = buildFinancialDocumentNumber("CJ", inserted?.created_at, inserted?.id);
+  if (inserted?.id) {
+    await admin.from("cash_movements").update({ movement_number: documentNumber }).eq("id", inserted.id);
+  }
+  await logFinancialAudit({
+    admin,
+    agencyId: targetAgencyId,
+    actorId: current.user.id,
+    action: "cash_movement_created",
+    entityTable: "cash_movements",
+    entityId: inserted?.id ?? null,
+    documentNumber,
+    amount,
+    summary: `${kind} de caja registrado en ${category || "Sin categoria"}`,
+    metadata: { kind, category },
+  });
+
+  return NextResponse.json({ ok: true, movementNumber: documentNumber });
 }

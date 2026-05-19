@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { buildFinancialDocumentNumber, logFinancialAudit } from "@/lib/financial-audit";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
         Number(contract.current_rent ?? 0) * ratio * (Number(contract.management_fee_percent ?? 0) / 100)
     );
 
-  const { error: insertError } = await admin.from("owner_transfers").insert({
+  const { data: inserted, error: insertError } = await admin.from("owner_transfers").insert({
     settlement_id: body?.settlementId || null,
     contract_id: contract.id,
     contract_owner_id: contractOwnerId,
@@ -95,13 +96,30 @@ export async function POST(request: Request) {
     status: body?.status ?? "Programada",
     notes: String(body?.notes ?? "").trim(),
     created_by: current.user.id,
-  });
+  }).select("id, agency_id, created_at").maybeSingle();
 
   if (insertError) {
     return NextResponse.json({ error: "No se pudo registrar la transferencia." }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true, amount });
+  const documentNumber = buildFinancialDocumentNumber("TP", inserted?.created_at, inserted?.id);
+  if (inserted?.id) {
+    await admin.from("owner_transfers").update({ transfer_number: documentNumber }).eq("id", inserted.id);
+  }
+  await logFinancialAudit({
+    admin,
+    agencyId: contract.agency_id,
+    actorId: current.user.id,
+    action: "owner_transfer_created",
+    entityTable: "owner_transfers",
+    entityId: inserted?.id ?? null,
+    documentNumber,
+    amount,
+    summary: `Pago a propietario registrado para ${contractOwner?.full_name ?? contract.owner_name}`,
+    metadata: { contractId, contractOwnerId, status: body?.status ?? "Programada" },
+  });
+
+  return NextResponse.json({ ok: true, amount, transferNumber: documentNumber });
 }
 
 export async function PATCH(request: Request) {
@@ -124,7 +142,14 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Falta la transferencia." }, { status: 400 });
   }
 
-  const { error } = await createAdminClient()
+  const admin = createAdminClient();
+  const { data: transferBefore } = await admin
+    .from("owner_transfers")
+    .select("id, agency_id, amount, owner_name")
+    .eq("id", transferId)
+    .maybeSingle();
+
+  const { error } = await admin
     .from("owner_transfers")
     .update({
       status: body?.status ?? "Confirmada",
@@ -135,6 +160,18 @@ export async function PATCH(request: Request) {
   if (error) {
     return NextResponse.json({ error: "No se pudo actualizar la transferencia." }, { status: 400 });
   }
+
+  await logFinancialAudit({
+    admin,
+    agencyId: transferBefore?.agency_id,
+    actorId: current.user.id,
+    action: "owner_transfer_updated",
+    entityTable: "owner_transfers",
+    entityId: transferId,
+    amount: Number(transferBefore?.amount ?? 0),
+    summary: `Pago a propietario actualizado a ${body?.status ?? "Confirmada"}`,
+    metadata: { ownerName: transferBefore?.owner_name, status: body?.status ?? "Confirmada" },
+  });
 
   return NextResponse.json({ ok: true });
 }

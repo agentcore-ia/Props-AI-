@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { logFinancialAudit } from "@/lib/financial-audit";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function currentMonthLabel() {
@@ -84,6 +85,17 @@ export async function POST(request: Request) {
   if (insertError) {
     return NextResponse.json({ error: "No se pudo preparar el periodo de cobranzas." }, { status: 400 });
   }
+
+  await logFinancialAudit({
+    admin,
+    agencyId: missing[0]?.agency_id,
+    actorId: current.user.id,
+    action: "rental_period_prepared",
+    entityTable: "rental_collections",
+    amount: missing.reduce((sum, contract) => sum + Number(contract.current_rent ?? 0), 0),
+    summary: `Periodo ${month} preparado con ${missing.length} cobranzas pendientes`,
+    metadata: { month, created: missing.length, skipped: rows.length - missing.length },
+  });
 
   return NextResponse.json({
     ok: true,

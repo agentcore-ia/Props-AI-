@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { buildFinancialDocumentNumber, logFinancialAudit } from "@/lib/financial-audit";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function startOfMonth(value: string) {
@@ -270,13 +271,30 @@ export async function POST(request: Request) {
   const { data: inserted, error: upsertError } = await admin
     .from("owner_settlements")
     .insert(multiOwnerPayload)
-    .select("id, owner_name, settlement_month, owner_payout_amount");
+    .select("id, agency_id, owner_name, settlement_month, owner_payout_amount, created_at");
 
   if (upsertError) {
     return NextResponse.json(
       { error: "No se pudo generar la liquidacion al propietario." },
       { status: 400 }
     );
+  }
+
+  for (const item of inserted ?? []) {
+    const documentNumber = buildFinancialDocumentNumber("LP", item.created_at, item.id);
+    await admin.from("owner_settlements").update({ settlement_number: documentNumber }).eq("id", item.id);
+    await logFinancialAudit({
+      admin,
+      agencyId: item.agency_id,
+      actorId: current.user.id,
+      action: "owner_settlement_issued",
+      entityTable: "owner_settlements",
+      entityId: item.id,
+      documentNumber,
+      amount: Number(item.owner_payout_amount ?? 0),
+      summary: `Liquidacion emitida para ${item.owner_name} del periodo ${item.settlement_month}`,
+      metadata: { settlementMonth: item.settlement_month, ownerName: item.owner_name },
+    });
   }
 
   return NextResponse.json({

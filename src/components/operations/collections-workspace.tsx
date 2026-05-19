@@ -141,8 +141,9 @@ export function CollectionsWorkspace({
 
   function exportCollectionsCsv() {
     const rows = [
-      ["Periodo", "Inquilino", "Propiedad", "Esperado", "Cobrado", "Saldo", "Metodo", "Estado", "Fecha de pago"],
+      ["Comprobante", "Periodo", "Inquilino", "Propiedad", "Esperado", "Cobrado", "Saldo", "Metodo", "Estado", "Fecha de pago"],
       ...collections.map((item) => [
+        buildDocumentNumber("RC", item.createdAt, item.id),
         item.collectionMonth,
         item.tenantName,
         item.propertyTitle,
@@ -159,6 +160,7 @@ export function CollectionsWorkspace({
 
   function printCollectionReceipt(item: RentalCollectionSummary) {
     const balance = Math.max(0, item.expectedRent - item.collectedAmount);
+    const receiptNumber = buildDocumentNumber("RC", item.createdAt, item.id);
     const html = `
       <html>
         <head>
@@ -177,7 +179,7 @@ export function CollectionsWorkspace({
         </head>
         <body>
           <div class="box">
-            <p class="label">Props - recibo de cobranza</p>
+            <p class="label">Props - recibo de cobranza ${receiptNumber}</p>
             <h1>${item.tenantName}</h1>
             <p class="muted">${item.propertyTitle} - ${item.propertyLocation}</p>
             <p>Periodo: <strong>${item.collectionMonth}</strong></p>
@@ -351,6 +353,9 @@ export function CollectionsWorkspace({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold">{item.tenantName}</p>
+                      <p className="text-xs uppercase tracking-[0.16em] text-primary/70">
+                        {buildDocumentNumber("RC", item.createdAt, item.id)}
+                      </p>
                       <p className="text-sm text-muted-foreground">
                         {item.propertyTitle} · {item.collectionMonth}
                       </p>
@@ -391,6 +396,11 @@ function downloadCsv(fileName: string, rows: string[][]) {
   link.download = fileName;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function buildDocumentNumber(prefix: string, dateLike: string, id: string) {
+  const datePart = new Date(dateLike).toISOString().slice(0, 10).replace(/-/g, "");
+  return `${prefix}-${datePart}-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 }
 
 function Step({

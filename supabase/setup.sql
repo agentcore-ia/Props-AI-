@@ -219,10 +219,10 @@ create table if not exists public.owner_settlements (
   status text not null default 'Emitida' check (status in ('Borrador', 'Emitida', 'Pagada')),
   sent_at timestamptz,
   paid_at timestamptz,
+  settlement_number text,
   created_by uuid references auth.users (id) on delete set null,
   created_at timestamptz not null default timezone('utc'::text, now()),
-  updated_at timestamptz not null default timezone('utc'::text, now()),
-  unique (contract_id, settlement_month)
+  updated_at timestamptz not null default timezone('utc'::text, now())
 );
 
 create table if not exists public.owner_settlement_items (
@@ -251,6 +251,7 @@ create table if not exists public.rental_collections (
   collected_amount numeric(14, 2) not null default 0,
   payment_method text not null default 'Transferencia',
   payment_date date,
+  receipt_number text,
   status text not null default 'Pendiente' check (status in ('Pendiente', 'Parcial', 'Cobrada', 'Mora')),
   notes text not null default '',
   created_by uuid references auth.users (id) on delete set null,
@@ -267,6 +268,7 @@ create table if not exists public.owner_transfers (
   agency_id uuid not null references public.agencies (id) on delete cascade,
   owner_name text not null,
   amount numeric(14, 2) not null default 0,
+  transfer_number text,
   destination_label text not null default '',
   transfer_date date,
   status text not null default 'Pendiente' check (status in ('Pendiente', 'Programada', 'Enviada', 'Confirmada')),
@@ -283,11 +285,27 @@ create table if not exists public.cash_movements (
   kind text not null check (kind in ('Ingreso', 'Egreso', 'Transferencia')),
   category text not null default '',
   amount numeric(14, 2) not null default 0,
+  movement_number text,
   reference text not null default '',
   notes text not null default '',
   created_by uuid references auth.users (id) on delete set null,
   created_at timestamptz not null default timezone('utc'::text, now()),
   updated_at timestamptz not null default timezone('utc'::text, now())
+);
+
+create table if not exists public.financial_audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  agency_id uuid references public.agencies (id) on delete cascade,
+  actor_id uuid references auth.users (id) on delete set null,
+  action text not null,
+  entity_table text not null,
+  entity_id uuid,
+  document_number text not null default '',
+  amount numeric(14, 2),
+  currency text not null default 'ARS',
+  summary text not null default '',
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default timezone('utc'::text, now())
 );
 
 create table if not exists public.suppliers (

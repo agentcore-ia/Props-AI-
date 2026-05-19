@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { buildFinancialDocumentNumber, logFinancialAudit } from "@/lib/financial-audit";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function currentMonthLabel() {
@@ -60,8 +61,7 @@ export async function POST(request: Request) {
     (collectedAmount >= expectedRent ? "Cobrada" : collectedAmount > 0 ? "Parcial" : "Pendiente");
   const notes = String(body?.notes ?? "").trim();
 
-  const { error: upsertError } = await admin.from("rental_collections").upsert(
-    {
+  const upsertPayload = {
       contract_id: contract.id,
       property_id: contract.property_id,
       agency_id: contract.agency_id,
@@ -73,15 +73,35 @@ export async function POST(request: Request) {
       status,
       notes,
       created_by: current.user.id,
-    },
+    };
+
+  const { data: upserted, error: upsertError } = await admin.from("rental_collections").upsert(
+    upsertPayload,
     { onConflict: "contract_id,collection_month" }
-  );
+  ).select("id, created_at").maybeSingle();
 
   if (upsertError) {
     return NextResponse.json({ error: "No se pudo registrar la cobranza." }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true, collectionMonth, status, collectedAmount });
+  const documentNumber = buildFinancialDocumentNumber("RC", upserted?.created_at, upserted?.id);
+  if (upserted?.id) {
+    await admin.from("rental_collections").update({ receipt_number: documentNumber }).eq("id", upserted.id);
+  }
+  await logFinancialAudit({
+    admin,
+    agencyId: contract.agency_id,
+    actorId: current.user.id,
+    action: "rental_collection_upserted",
+    entityTable: "rental_collections",
+    entityId: upserted?.id ?? null,
+    documentNumber,
+    amount: collectedAmount,
+    summary: `Cobranza ${status} del periodo ${collectionMonth}`,
+    metadata: { contractId, collectionMonth, paymentMethod, status },
+  });
+
+  return NextResponse.json({ ok: true, collectionMonth, status, collectedAmount, receiptNumber: documentNumber });
 }
 
 export async function PATCH(request: Request) {
@@ -100,6 +120,12 @@ export async function PATCH(request: Request) {
   }
 
   const admin = createAdminClient();
+  const { data: collectionBefore } = await admin
+    .from("rental_collections")
+    .select("id, agency_id, collected_amount, collection_month")
+    .eq("id", collectionId)
+    .maybeSingle();
+
   const { error } = await admin
     .from("rental_collections")
     .update({
@@ -111,6 +137,18 @@ export async function PATCH(request: Request) {
   if (error) {
     return NextResponse.json({ error: "No se pudo actualizar la cobranza." }, { status: 400 });
   }
+
+  await logFinancialAudit({
+    admin,
+    agencyId: collectionBefore?.agency_id,
+    actorId: current.user.id,
+    action: "rental_collection_updated",
+    entityTable: "rental_collections",
+    entityId: collectionId,
+    amount: Number(collectionBefore?.collected_amount ?? 0),
+    summary: `Cobranza actualizada a ${body?.status ?? "Cobrada"}`,
+    metadata: { collectionMonth: collectionBefore?.collection_month, status: body?.status ?? "Cobrada" },
+  });
 
   return NextResponse.json({ ok: true });
 }
