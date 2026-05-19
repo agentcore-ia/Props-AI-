@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { recordOutboundWhatsAppForContact } from "@/lib/crm-automation";
 import {
   normalizeEvolutionRecipient,
   sendEvolutionMediaMessage,
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
   const { data: collection, error: collectionError } = await admin
     .from("rental_collections")
     .select(
-      "id, contract_id, agency_id, collection_month, expected_rent, collected_amount, payment_method, payment_date, status, rental_contracts!inner(tenant_name, tenant_phone, tenant_email, agencies!inner(name, slug, messaging_instance), properties!inner(title, location))"
+      "id, contract_id, property_id, agency_id, collection_month, expected_rent, collected_amount, payment_method, payment_date, status, rental_contracts!inner(tenant_name, tenant_phone, tenant_email, agencies!inner(id, name, slug, messaging_instance), properties!inner(id, title, location))"
     )
     .eq("contract_id", contractId)
     .eq("collection_month", collectionMonth)
@@ -135,6 +136,30 @@ export async function POST(request: Request) {
       number,
       text: caption,
     });
+    try {
+      await recordOutboundWhatsAppForContact({
+        agencyId: collection.agency_id,
+        propertyId: collection.property_id,
+        fullName: contract?.tenant_name ?? "Inquilino",
+        phone: contract?.tenant_phone ?? number,
+        content: caption,
+        senderRole: "system",
+        source: "rental_receipt_whatsapp",
+        propertyTitle: property?.title ?? null,
+        propertyLocation: property?.location ?? null,
+        metadata: {
+          requestId,
+          receiptNumber: finalReceiptNumber,
+          collectionMonth,
+          delivery: "receipt_summary",
+        },
+      });
+    } catch (recordError) {
+      console.error("[rental-receipts] failed to record outgoing receipt text", {
+        requestId,
+        error: formatDeliveryError(recordError),
+      });
+    }
   } catch (textError) {
     console.error("[rental-receipts] WhatsApp text delivery failed", {
       requestId,
@@ -194,6 +219,30 @@ export async function POST(request: Request) {
       mimetype: "application/pdf",
       fileName: `comprobante-alquiler-${finalReceiptNumber}.pdf`,
     });
+    try {
+      await recordOutboundWhatsAppForContact({
+        agencyId: collection.agency_id,
+        propertyId: collection.property_id,
+        fullName: contract?.tenant_name ?? "Inquilino",
+        phone: contract?.tenant_phone ?? number,
+        content: `[documento] Comprobante de alquiler ${finalReceiptNumber}: ${receiptUrl}`,
+        senderRole: "system",
+        source: "rental_receipt_whatsapp_document",
+        propertyTitle: property?.title ?? null,
+        propertyLocation: property?.location ?? null,
+        metadata: {
+          requestId,
+          receiptNumber: finalReceiptNumber,
+          receiptUrl,
+          mediaType: "document",
+        },
+      });
+    } catch (recordError) {
+      console.error("[rental-receipts] failed to record outgoing receipt document", {
+        requestId,
+        error: formatDeliveryError(recordError),
+      });
+    }
 
     return NextResponse.json({ ok: true, delivery: "text_and_document", receiptUrl, requestId });
   } catch (mediaError) {
@@ -219,6 +268,30 @@ export async function POST(request: Request) {
         .filter(Boolean)
         .join("\n"),
     });
+    try {
+      await recordOutboundWhatsAppForContact({
+        agencyId: collection.agency_id,
+        propertyId: collection.property_id,
+        fullName: contract?.tenant_name ?? "Inquilino",
+        phone: contract?.tenant_phone ?? number,
+        content: `Link de comprobante de alquiler ${finalReceiptNumber}: ${receiptUrl}`,
+        senderRole: "system",
+        source: "rental_receipt_whatsapp_link_fallback",
+        propertyTitle: property?.title ?? null,
+        propertyLocation: property?.location ?? null,
+        metadata: {
+          requestId,
+          receiptNumber: finalReceiptNumber,
+          receiptUrl,
+          documentError,
+        },
+      });
+    } catch (recordError) {
+      console.error("[rental-receipts] failed to record outgoing receipt fallback", {
+        requestId,
+        error: formatDeliveryError(recordError),
+      });
+    }
   } catch (fallbackError) {
     linkFallbackError = formatDeliveryError(fallbackError);
     console.error("[rental-receipts] fallback WhatsApp delivery failed", {

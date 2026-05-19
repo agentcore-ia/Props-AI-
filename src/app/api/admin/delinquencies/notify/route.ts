@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
-import { getAgencyScopeFromUser } from "@/lib/crm-automation";
+import { getAgencyScopeFromUser, recordOutboundWhatsAppForContact } from "@/lib/crm-automation";
 import { normalizeEvolutionRecipient, sendEvolutionTextMessage } from "@/lib/evolution";
 import { getOpenAIEnv } from "@/lib/openai-env";
 import { listDelinquentTenants } from "@/lib/props-data";
@@ -152,6 +152,31 @@ export async function POST(request: Request) {
         number,
         text: message,
       });
+      try {
+        await recordOutboundWhatsAppForContact({
+          agencyId: item.agencyId,
+          propertyId: item.propertyId,
+          fullName: item.tenantName,
+          phone: item.tenantPhone,
+          content: message,
+          senderRole: "system",
+          source: "delinquency_whatsapp_notice",
+          propertyTitle: item.propertyTitle,
+          propertyLocation: item.propertyLocation,
+          metadata: {
+            contractId: item.contractId,
+            collectionMonth: item.collectionMonth,
+            totalDebtAmount: item.totalDebtAmount,
+            daysLate: item.daysLate,
+            risk: item.risk,
+          },
+        });
+      } catch (recordError) {
+        console.error("[delinquencies] failed to record outgoing WhatsApp", {
+          contractId: item.contractId,
+          error: recordError instanceof Error ? recordError.message : String(recordError),
+        });
+      }
       sent += 1;
     } catch (error) {
       failed.push({

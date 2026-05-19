@@ -364,6 +364,109 @@ export async function recordCrmLeadMessage(input: {
   return data.id as string;
 }
 
+export async function recordOutboundWhatsAppForContact(input: {
+  agencyId: string;
+  propertyId?: string | null;
+  fullName: string;
+  phone: string;
+  content: string;
+  senderRole?: "assistant" | "agent" | "system";
+  source: string;
+  propertyTitle?: string | null;
+  propertyLocation?: string | null;
+  metadata?: Record<string, unknown>;
+}) {
+  const admin = createAdminClient();
+  const content = String(input.content ?? "").trim();
+  const normalizedPhone = normalizeWhatsAppJid(input.phone);
+
+  if (!content || !normalizedPhone) {
+    return null;
+  }
+
+  const { data: possibleLeads, error: possibleLeadsError } = await admin
+    .from("crm_leads")
+    .select("*")
+    .eq("agency_id", input.agencyId)
+    .order("last_activity_at", { ascending: false })
+    .limit(80);
+
+  if (possibleLeadsError) {
+    throw possibleLeadsError;
+  }
+
+  const existing = ((possibleLeads ?? []) as LeadRow[]).find((lead) => {
+    const samePhone = normalizeWhatsAppJid(lead.phone) === normalizedPhone;
+    const sameProperty = input.propertyId ? lead.property_id === input.propertyId : true;
+    return samePhone && sameProperty;
+  }) ?? ((possibleLeads ?? []) as LeadRow[]).find(
+    (lead) => normalizeWhatsAppJid(lead.phone) === normalizedPhone
+  );
+
+  let leadId = existing?.id ?? null;
+
+  if (!leadId) {
+    const { data: created, error: createError } = await admin
+      .from("crm_leads")
+      .insert({
+        agency_id: input.agencyId,
+        property_id: input.propertyId ?? null,
+        full_name: input.fullName || "Cliente",
+        phone: normalizedPhone,
+        source: input.source,
+        stage: "Seguimiento",
+        priority: "Media",
+        score: 55,
+        qualification_summary: input.propertyTitle
+          ? `Contacto operativo asociado a ${input.propertyTitle}.`
+          : "Contacto operativo creado automaticamente por mensaje de WhatsApp.",
+        ai_reply_draft: content,
+        intent: "Gestion operativa",
+        desired_operation: "Alquiler",
+        desired_location: input.propertyLocation ?? null,
+        requirements_summary: null,
+        last_customer_message: "",
+        needs_response: false,
+        last_contacted_at: new Date().toISOString(),
+        last_activity_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+
+    if (createError) {
+      throw createError;
+    }
+
+    leadId = created.id as string;
+  } else {
+    await admin
+      .from("crm_leads")
+      .update({
+        ai_reply_draft: content,
+        needs_response: false,
+        last_contacted_at: new Date().toISOString(),
+        last_activity_at: new Date().toISOString(),
+      })
+      .eq("id", leadId);
+  }
+
+  return recordCrmLeadMessage({
+    leadId,
+    agencyId: input.agencyId,
+    propertyId: input.propertyId ?? existing?.property_id ?? null,
+    channel: "whatsapp",
+    content,
+    direction: "outgoing",
+    senderRole: input.senderRole ?? "system",
+    metadata: {
+      source: input.source,
+      phone: normalizedPhone,
+      propertyTitle: input.propertyTitle ?? null,
+      ...input.metadata,
+    },
+  });
+}
+
 export async function upsertLeadFromSignal(input: {
   agency: LeadAutomationInput["agency"];
   property?: Property | null;

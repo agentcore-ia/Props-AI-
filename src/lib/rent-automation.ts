@@ -2,6 +2,7 @@ import "server-only";
 
 import * as XLSX from "xlsx";
 
+import { recordOutboundWhatsAppForContact } from "@/lib/crm-automation";
 import { sendEvolutionTextMessage } from "@/lib/evolution";
 import type { RentIndexType, RentalContractSummary } from "@/lib/rental-types";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -352,7 +353,7 @@ export async function sendTestRentIncreaseMessage(contractId: string) {
   const { data, error } = await admin
     .from("rental_contracts")
     .select(
-      "id, tenant_name, tenant_phone, current_rent, index_type, adjustment_frequency_months, next_adjustment_date, auto_notify, agencies(name, slug, phone, messaging_instance), properties(title, location)"
+      "id, property_id, agency_id, tenant_name, tenant_phone, current_rent, index_type, adjustment_frequency_months, next_adjustment_date, auto_notify, agencies(id, name, slug, phone, messaging_instance), properties(id, title, location)"
     )
     .eq("id", contractId)
     .maybeSingle();
@@ -387,8 +388,8 @@ export async function sendTestRentIncreaseMessage(contractId: string) {
   const text = buildTenantMessage({
     contract: {
       id: data.id,
-      property_id: "",
-      agency_id: "",
+      property_id: data.property_id,
+      agency_id: data.agency_id,
       tenant_name: data.tenant_name,
       tenant_phone: data.tenant_phone,
       tenant_email: null,
@@ -413,7 +414,7 @@ export async function sendTestRentIncreaseMessage(contractId: string) {
       },
       properties: property
         ? {
-            id: "test-property",
+            id: property.id,
             title: property.title,
             location: property.location,
           }
@@ -437,6 +438,31 @@ export async function sendTestRentIncreaseMessage(contractId: string) {
 
   if (!notification.ok) {
     throw new Error("El servicio de WhatsApp rechazo la prueba.");
+  }
+
+  try {
+    await recordOutboundWhatsAppForContact({
+      agencyId: data.agency_id,
+      propertyId: data.property_id,
+      fullName: data.tenant_name,
+      phone: data.tenant_phone,
+      content: text,
+      senderRole: "system",
+      source: "rent_adjustment_test_whatsapp",
+      propertyTitle: property?.title ?? null,
+      propertyLocation: property?.location ?? null,
+      metadata: {
+        contractId,
+        transport: notification.transport,
+        previousRent,
+        newRent,
+      },
+    });
+  } catch (recordError) {
+    console.error("[rent-automation] failed to record test WhatsApp", {
+      contractId,
+      error: recordError instanceof Error ? recordError.message : String(recordError),
+    });
   }
 
   return {
@@ -555,6 +581,37 @@ export async function runDueRentAdjustments(options?: {
         notificationStatus = notification.ok ? "Enviado" : "Fallido";
         notificationResponse = notification;
         notifiedAt = notification.ok ? new Date().toISOString() : null;
+
+        if (notification.ok) {
+          try {
+            await recordOutboundWhatsAppForContact({
+              agencyId: contract.agency_id,
+              propertyId: contract.property_id,
+              fullName: contract.tenant_name,
+              phone: contract.tenant_phone,
+              content: messageBody,
+              senderRole: "system",
+              source: "rent_adjustment_whatsapp",
+              propertyTitle: property?.title ?? null,
+              propertyLocation: property?.location ?? null,
+              metadata: {
+                contractId: contract.id,
+                adjustmentId: adjustment.id,
+                transport: notification.transport,
+                previousRent,
+                newRent,
+                nextAdjustmentDate,
+                indexType: contract.index_type,
+              },
+            });
+          } catch (recordError) {
+            console.error("[rent-automation] failed to record adjustment WhatsApp", {
+              contractId: contract.id,
+              adjustmentId: adjustment.id,
+              error: recordError instanceof Error ? recordError.message : String(recordError),
+            });
+          }
+        }
       }
 
       const { error: updateContractError } = await admin
