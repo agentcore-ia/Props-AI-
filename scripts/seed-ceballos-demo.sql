@@ -94,6 +94,29 @@ begin
     updated_at = now()
   where email = 'ceballos@demo.com';
 
+  update public.crm_leads
+  set
+    full_name = case
+      when full_name ilike '%debug cliente 2%' then 'Sofia Cabrera'
+      when full_name ilike '%debug cliente%' then 'Nicolas Herrera'
+      when full_name = 'por la tarde' then 'Rodrigo Alvarez'
+      else full_name
+    end,
+    email = case
+      when full_name ilike '%debug cliente 2%' then 'sofia.cabrera@email.com'
+      when full_name ilike '%debug cliente%' then 'nicolas.herrera@email.com'
+      when full_name = 'por la tarde' then 'rodrigo.alvarez@email.com'
+      else email
+    end,
+    phone = case
+      when full_name ilike '%debug cliente 2%' then '5491167894321'
+      when full_name ilike '%debug cliente%' then '5491132457788'
+      else phone
+    end,
+    updated_at = now()
+  where agency_id = v_agency_id
+    and (full_name ilike '%debug cliente%' or full_name = 'por la tarde');
+
   delete from public.employee_tasks where agency_id = v_agency_id and details like '[DEMO PROPS]%';
   delete from public.crm_leads where agency_id = v_agency_id and qualification_summary like '[DEMO PROPS]%';
   delete from public.supplier_invoices where agency_id = v_agency_id and notes like '[DEMO PROPS]%';
