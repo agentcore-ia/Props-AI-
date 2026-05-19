@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   const { data: collection, error: collectionError } = await admin
     .from("rental_collections")
     .select(
-      "id, contract_id, agency_id, collection_month, expected_rent, collected_amount, payment_method, payment_date, status, receipt_number, rental_contracts!inner(tenant_name, tenant_phone, tenant_email, agencies!inner(name, slug, messaging_instance), properties!inner(title, location))"
+      "id, contract_id, agency_id, collection_month, expected_rent, collected_amount, payment_method, payment_date, status, rental_contracts!inner(tenant_name, tenant_phone, tenant_email, agencies!inner(name, slug, messaging_instance), properties!inner(title, location))"
     )
     .eq("contract_id", contractId)
     .eq("collection_month", collectionMonth)
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
   }
 
   const balance = Math.max(0, Number(collection.expected_rent ?? 0) - Number(collection.collected_amount ?? 0));
-  const finalReceiptNumber = receiptNumber || collection.receipt_number || collection.id;
+  const finalReceiptNumber = receiptNumber || collection.id;
   const receiptInput = {
     agencyName: agency?.name ?? "Inmobiliaria",
     receiptNumber: finalReceiptNumber,

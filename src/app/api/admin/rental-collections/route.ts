@@ -86,7 +86,13 @@ export async function POST(request: Request) {
 
   const documentNumber = buildFinancialDocumentNumber("RC", upserted?.created_at, upserted?.id);
   if (upserted?.id) {
-    await admin.from("rental_collections").update({ receipt_number: documentNumber }).eq("id", upserted.id);
+    const { error: receiptNumberError } = await admin
+      .from("rental_collections")
+      .update({ receipt_number: documentNumber })
+      .eq("id", upserted.id);
+    if (receiptNumberError && !/receipt_number/i.test(receiptNumberError.message ?? "")) {
+      return NextResponse.json({ error: "No se pudo numerar el comprobante." }, { status: 400 });
+    }
   }
   await logFinancialAudit({
     admin,
