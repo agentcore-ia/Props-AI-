@@ -9,9 +9,11 @@ import {
   CheckCircle2,
   CircleDollarSign,
   ClipboardList,
+  Download,
   FileText,
   Loader2,
   Phone,
+  Printer,
   Search,
   Send,
   Sparkles,
@@ -382,6 +384,113 @@ export function LeasesWorkspace({
     });
   }
 
+  function exportAccountStatements() {
+    const rows = [
+      [
+        "Contrato",
+        "Inquilino",
+        "Propiedad",
+        "Propietario",
+        "Alquiler actual",
+        "Periodo ultima cobranza",
+        "Cobrado",
+        "Saldo alquiler",
+        "Punitorios",
+        "Saldo total",
+        "Ultima liquidacion",
+        "Neto propietario",
+        "Proximo aumento",
+      ],
+      ...filteredLeases.map((lease) => {
+        const collection = collectionsByContract.get(lease.contractId);
+        const delinquency = delinquenciesByContract.get(lease.contractId);
+        const settlement = settlementsByContract.get(lease.contractId);
+        const expectedRent = collection?.expectedRent ?? lease.currentRent;
+        const collected = collection?.collectedAmount ?? 0;
+        const rentBalance = Math.max(0, expectedRent - collected);
+        const lateFees = delinquency?.lateFeeAmount ?? 0;
+        const totalBalance = delinquency?.totalDebtAmount ?? rentBalance;
+
+        return [
+          lease.contractId,
+          lease.tenantName,
+          lease.propertyTitle,
+          lease.ownerName ?? "",
+          String(lease.currentRent),
+          collection?.collectionMonth ?? "",
+          String(collected),
+          String(rentBalance),
+          String(lateFees),
+          String(totalBalance),
+          settlement?.settlementMonth ?? "",
+          settlement ? String(settlement.ownerPayoutAmount) : "",
+          lease.nextAdjustmentDate,
+        ];
+      }),
+    ];
+
+    downloadCsv(`cuenta-corriente-props-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+  }
+
+  function printOwnerSettlement(settlement: OwnerSettlementSummary, items: OwnerSettlementItemSummary[]) {
+    const concepts = items
+      .map(
+        (item) => `
+          <tr>
+            <td>${item.label}</td>
+            <td>${item.effect}</td>
+            <td>${formatMoney(item.amount, "ARS")}</td>
+          </tr>
+        `
+      )
+      .join("");
+    const html = `
+      <html>
+        <head>
+          <title>Liquidacion propietario - ${settlement.ownerName}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 32px; color: #0f172a; }
+            .box { border: 1px solid #cbd5e1; border-radius: 18px; padding: 24px; }
+            h1 { margin: 0 0 8px; font-size: 24px; }
+            p { margin: 6px 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border-bottom: 1px solid #e2e8f0; padding: 10px; text-align: left; }
+            .muted { color: #64748b; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px; }
+            .metric { border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; }
+            .label { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: #64748b; }
+            .value { margin-top: 8px; font-size: 20px; font-weight: 700; }
+          </style>
+        </head>
+        <body>
+          <div class="box">
+            <p class="label">Props - liquidacion al propietario</p>
+            <h1>${settlement.ownerName}</h1>
+            <p class="muted">${settlement.propertyTitle} - ${settlement.propertyLocation}</p>
+            <p>Periodo: <strong>${settlement.settlementMonth}</strong></p>
+            <p>Participacion: <strong>${settlement.participationPercent}%</strong></p>
+            <div class="grid">
+              <div class="metric"><div class="label">Alquiler cobrado</div><div class="value">${formatMoney(settlement.rentCollected, "ARS")}</div></div>
+              <div class="metric"><div class="label">Comision</div><div class="value">${formatMoney(settlement.managementFeeAmount, "ARS")}</div></div>
+              <div class="metric"><div class="label">Gastos</div><div class="value">${formatMoney(settlement.monthlyOwnerCosts + settlement.otherChargesAmount, "ARS")}</div></div>
+              <div class="metric"><div class="label">Neto a transferir</div><div class="value">${formatMoney(settlement.ownerPayoutAmount, "ARS")}</div></div>
+            </div>
+            ${
+              concepts
+                ? `<table><thead><tr><th>Concepto</th><th>Efecto</th><th>Monto</th></tr></thead><tbody>${concepts}</tbody></table>`
+                : ""
+            }
+            <p class="muted" style="margin-top:24px;">Emitido desde Props Control Inmobiliario.</p>
+          </div>
+          <script>window.print(); window.close();</script>
+        </body>
+      </html>
+    `;
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    printWindow?.document.write(html);
+    printWindow?.document.close();
+  }
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -482,6 +591,10 @@ export function LeasesWorkspace({
                     Expedientes
                   </button>
                 </div>
+                <Button variant="outline" className="rounded-2xl" onClick={exportAccountStatements}>
+                  <Download className="size-4" />
+                  Exportar cuenta corriente
+                </Button>
               </div>
             </div>
 
@@ -601,6 +714,51 @@ export function LeasesWorkspace({
                           {settlement.otherChargesDetail ? ` · ${settlement.otherChargesDetail}` : ""}
                         </p>
                       ) : null}
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-2xl"
+                          onClick={() => printOwnerSettlement(settlement, items)}
+                        >
+                          <Printer className="size-4" />
+                          Imprimir liquidacion
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-2xl"
+                          onClick={() =>
+                            downloadCsv(`liquidacion-${settlement.ownerName}-${settlement.settlementMonth}.csv`, [
+                              ["Propietario", "Propiedad", "Periodo", "Alquiler", "Comision", "Gastos", "Otros cargos", "Neto"],
+                              [
+                                settlement.ownerName,
+                                settlement.propertyTitle,
+                                settlement.settlementMonth,
+                                String(settlement.rentCollected),
+                                String(settlement.managementFeeAmount),
+                                String(settlement.monthlyOwnerCosts),
+                                String(settlement.otherChargesAmount),
+                                String(settlement.ownerPayoutAmount),
+                              ],
+                              ...items.map((item) => [
+                                item.label,
+                                item.effect,
+                                "",
+                                "",
+                                "",
+                                "",
+                                String(item.amount),
+                                item.notes,
+                              ]),
+                            ])
+                          }
+                        >
+                          <Download className="size-4" />
+                          Exportar
+                        </Button>
+                      </div>
 
                       <div className="mt-4 rounded-2xl border bg-muted/15 p-4">
                         <div className="flex items-center justify-between gap-3">
@@ -1334,4 +1492,17 @@ function InfoMetric({ label, value }: { label: string; value: string }) {
       <p className="mt-1 font-semibold">{value}</p>
     </div>
   );
+}
+
+function downloadCsv(fileName: string, rows: string[][]) {
+  const csv = rows
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
 }
