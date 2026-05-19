@@ -99,6 +99,10 @@ export function LeasesWorkspace({
   const [sendingTestId, setSendingTestId] = useState<string | null>(null);
   const [generatingSettlementId, setGeneratingSettlementId] = useState<string | null>(null);
   const [rescindingContractId, setRescindingContractId] = useState<string | null>(null);
+  const [receiptDeliveryStatus, setReceiptDeliveryStatus] = useState<null | {
+    type: "info" | "success" | "error";
+    message: string;
+  }>(null);
   const [editingSettlementId, setEditingSettlementId] = useState<string | null>(null);
   const [conceptForm, setConceptForm] = useState({
     label: "",
@@ -335,6 +339,7 @@ export function LeasesWorkspace({
   function openRentRegistration(contractId?: string) {
     const lease = leases.find((item) => item.contractId === contractId) ?? selectedRentLease ?? leases[0] ?? null;
     setRentReceipt(null);
+    setReceiptDeliveryStatus(null);
     setRentFormOpen(true);
     if (lease) {
       setRentForm((current) => ({
@@ -474,6 +479,10 @@ export function LeasesWorkspace({
   async function sendRentReceiptByWhatsApp() {
     if (!rentReceipt) return;
     setSendingReceiptChannel("whatsapp");
+    setReceiptDeliveryStatus({
+      type: "info",
+      message: `Enviando WhatsApp a ${rentReceipt.tenantName} (${rentReceipt.tenantPhone || "sin telefono"})...`,
+    });
     setFeedback(null);
 
     try {
@@ -489,27 +498,46 @@ export function LeasesWorkspace({
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
+        const errorMessage = payload?.requestId
+          ? `${payload?.error ?? "No se pudo enviar el comprobante por WhatsApp."} ID: ${payload.requestId}${
+              payload?.detail ? `. Detalle: ${payload.detail}` : ""
+            }`
+          : payload?.detail
+            ? `${payload?.error ?? "No se pudo enviar el comprobante por WhatsApp."} Detalle: ${payload.detail}`
+            : payload?.error ?? "No se pudo enviar el comprobante por WhatsApp.";
+        setReceiptDeliveryStatus({
+          type: "error",
+          message: errorMessage,
+        });
         setFeedback({
           type: "error",
-          message: payload?.detail
-            ? `${payload?.error ?? "No se pudo enviar el comprobante por WhatsApp."} Detalle: ${payload.detail}`
-            : payload?.error ?? "No se pudo enviar el comprobante por WhatsApp.",
+          message: errorMessage,
         });
         return;
       }
 
+      const successMessage =
+        payload?.warning ??
+        `Comprobante ${rentReceipt.receiptNumber} enviado por WhatsApp a ${rentReceipt.tenantName}.`;
+      setReceiptDeliveryStatus({
+        type: payload?.warning ? "error" : "success",
+        message: payload?.requestId ? `${successMessage} ID: ${payload.requestId}` : successMessage,
+      });
       setFeedback({
         type: payload?.warning ? "error" : "success",
-        message:
-          payload?.warning ??
-          `Comprobante ${rentReceipt.receiptNumber} enviado por WhatsApp a ${rentReceipt.tenantName}.`,
+        message: successMessage,
       });
     } catch (error) {
+      const errorMessage = `No se pudo contactar al servidor para enviar WhatsApp. Detalle: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+      setReceiptDeliveryStatus({
+        type: "error",
+        message: errorMessage,
+      });
       setFeedback({
         type: "error",
-        message: `No se pudo contactar al servidor para enviar WhatsApp. Detalle: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        message: errorMessage,
       });
     } finally {
       setSendingReceiptChannel(null);
@@ -1616,6 +1644,19 @@ export function LeasesWorkspace({
                     <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
                       <p className="font-semibold">Comprobante {rentReceipt.receiptNumber}</p>
                       <p className="mt-1">Listo para imprimir o enviar al inquilino por WhatsApp/email.</p>
+                    </div>
+                  ) : null}
+                  {receiptDeliveryStatus ? (
+                    <div
+                      className={`mt-3 rounded-2xl border p-3 text-sm ${
+                        receiptDeliveryStatus.type === "success"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : receiptDeliveryStatus.type === "info"
+                            ? "border-blue-200 bg-blue-50 text-blue-800"
+                            : "border-red-200 bg-red-50 text-red-800"
+                      }`}
+                    >
+                      {receiptDeliveryStatus.message}
                     </div>
                   ) : null}
                 </div>

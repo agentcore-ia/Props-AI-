@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
 import {
@@ -17,10 +18,11 @@ function formatDeliveryError(error: unknown) {
 }
 
 export async function POST(request: Request) {
+  const requestId = randomUUID();
   const current = await getCurrentUserContext();
-  if (!current) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+  if (!current) return NextResponse.json({ error: "No autorizado.", requestId }, { status: 401 });
   if (!["superadmin", "agency_admin", "agent"].includes(current.profile.role)) {
-    return NextResponse.json({ error: "Sin permisos." }, { status: 403 });
+    return NextResponse.json({ error: "Sin permisos.", requestId }, { status: 403 });
   }
 
   const body = (await request.json().catch(() => null)) as
@@ -35,8 +37,17 @@ export async function POST(request: Request) {
   const collectionMonth = String(body?.collectionMonth ?? "").slice(0, 7);
   const receiptNumber = String(body?.receiptNumber ?? "").trim();
 
+  console.info("[rental-receipts] WhatsApp receipt request started", {
+    requestId,
+    contractId,
+    collectionMonth,
+    receiptNumber,
+    actorRole: current.profile.role,
+    actorAgency: current.profile.agency_slug,
+  });
+
   if (!contractId || !collectionMonth) {
-    return NextResponse.json({ error: "Falta contrato o periodo del comprobante." }, { status: 400 });
+    return NextResponse.json({ error: "Falta contrato o periodo del comprobante.", requestId }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -50,7 +61,19 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (collectionError || !collection) {
-    return NextResponse.json({ error: "No encontramos el comprobante de alquiler." }, { status: 404 });
+    console.error("[rental-receipts] receipt lookup failed", {
+      requestId,
+      contractId,
+      collectionMonth,
+      receiptNumber,
+      error: collectionError?.message ?? null,
+    });
+
+    return NextResponse.json({
+      error: "No encontramos el comprobante de alquiler.",
+      detail: collectionError?.message ?? "No existe una cobranza registrada para ese contrato y periodo.",
+      requestId,
+    }, { status: 404 });
   }
 
   const contract = Array.isArray(collection.rental_contracts)
@@ -60,17 +83,17 @@ export async function POST(request: Request) {
   const property = Array.isArray(contract?.properties) ? contract?.properties[0] : contract?.properties;
 
   if (current.profile.role !== "superadmin" && agency?.slug !== current.profile.agency_slug) {
-    return NextResponse.json({ error: "No puedes enviar comprobantes de otra inmobiliaria." }, { status: 403 });
+    return NextResponse.json({ error: "No puedes enviar comprobantes de otra inmobiliaria.", requestId }, { status: 403 });
   }
 
   const instanceName = String(agency?.messaging_instance ?? "").trim();
   const number = normalizeEvolutionRecipient(contract?.tenant_phone);
 
   if (!instanceName) {
-    return NextResponse.json({ error: "La inmobiliaria no tiene WhatsApp conectado." }, { status: 400 });
+    return NextResponse.json({ error: "La inmobiliaria no tiene WhatsApp conectado.", requestId }, { status: 400 });
   }
   if (!number) {
-    return NextResponse.json({ error: "El inquilino no tiene WhatsApp cargado." }, { status: 400 });
+    return NextResponse.json({ error: "El inquilino no tiene WhatsApp cargado.", requestId }, { status: 400 });
   }
 
   const balance = Math.max(0, Number(collection.expected_rent ?? 0) - Number(collection.collected_amount ?? 0));
@@ -101,6 +124,12 @@ export async function POST(request: Request) {
   let linkFallbackError: string | null = null;
 
   try {
+    console.info("[rental-receipts] sending receipt text", {
+      requestId,
+      instanceName,
+      number,
+      collectionId: collection.id,
+    });
     await sendEvolutionTextMessage({
       instanceName,
       number,
@@ -108,6 +137,7 @@ export async function POST(request: Request) {
     });
   } catch (textError) {
     console.error("[rental-receipts] WhatsApp text delivery failed", {
+      requestId,
       contractId,
       collectionMonth,
       instanceName,
@@ -119,15 +149,21 @@ export async function POST(request: Request) {
       {
         error: "No se pudo enviar el mensaje por WhatsApp.",
         detail: formatDeliveryError(textError),
+        requestId,
       },
       { status: 502 }
     );
   }
 
   try {
+    console.info("[rental-receipts] uploading receipt PDF", {
+      requestId,
+      collectionId: collection.id,
+    });
     receiptUrl = await uploadTenantRentReceiptPdf(receiptInput);
   } catch (uploadError) {
     console.error("[rental-receipts] receipt PDF upload failed", {
+      requestId,
       contractId,
       collectionMonth,
       error: formatDeliveryError(uploadError),
@@ -138,10 +174,17 @@ export async function POST(request: Request) {
       delivery: "text_only",
       warning: "Se envio el mensaje, pero no se pudo generar el PDF adjunto.",
       detail: formatDeliveryError(uploadError),
+      requestId,
     });
   }
 
   try {
+    console.info("[rental-receipts] sending receipt document", {
+      requestId,
+      instanceName,
+      number,
+      receiptUrl,
+    });
     await sendEvolutionMediaMessage({
       instanceName,
       number,
@@ -152,7 +195,7 @@ export async function POST(request: Request) {
       fileName: `comprobante-alquiler-${finalReceiptNumber}.pdf`,
     });
 
-    return NextResponse.json({ ok: true, delivery: "text_and_document", receiptUrl });
+    return NextResponse.json({ ok: true, delivery: "text_and_document", receiptUrl, requestId });
   } catch (mediaError) {
     documentError = formatDeliveryError(mediaError);
     console.error("[rental-receipts] document WhatsApp delivery failed", {
@@ -196,5 +239,6 @@ export async function POST(request: Request) {
       ? "Se envio el mensaje inicial, pero fallo el adjunto y tambien el link de respaldo."
       : "Se envio el mensaje y el link de respaldo porque WhatsApp rechazo el PDF adjunto.",
     detail: documentError,
+    requestId,
   });
 }
