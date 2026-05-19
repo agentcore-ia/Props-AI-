@@ -476,30 +476,44 @@ export function LeasesWorkspace({
     setSendingReceiptChannel("whatsapp");
     setFeedback(null);
 
-    const response = await fetch("/api/admin/rental-receipts/whatsapp", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        contractId: rentReceipt.contractId,
-        collectionMonth: rentReceipt.collectionMonth,
-        receiptNumber: rentReceipt.receiptNumber,
-      }),
-    });
-    const payload = await response.json().catch(() => null);
-    setSendingReceiptChannel(null);
+    try {
+      const response = await fetch("/api/admin/rental-receipts/whatsapp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          contractId: rentReceipt.contractId,
+          collectionMonth: rentReceipt.collectionMonth,
+          receiptNumber: rentReceipt.receiptNumber,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
 
-    if (!response.ok) {
+      if (!response.ok) {
+        setFeedback({
+          type: "error",
+          message: payload?.detail
+            ? `${payload?.error ?? "No se pudo enviar el comprobante por WhatsApp."} Detalle: ${payload.detail}`
+            : payload?.error ?? "No se pudo enviar el comprobante por WhatsApp.",
+        });
+        return;
+      }
+
+      setFeedback({
+        type: payload?.warning ? "error" : "success",
+        message:
+          payload?.warning ??
+          `Comprobante ${rentReceipt.receiptNumber} enviado por WhatsApp a ${rentReceipt.tenantName}.`,
+      });
+    } catch (error) {
       setFeedback({
         type: "error",
-        message: payload?.error ?? "No se pudo enviar el comprobante por WhatsApp.",
+        message: `No se pudo contactar al servidor para enviar WhatsApp. Detalle: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       });
-      return;
+    } finally {
+      setSendingReceiptChannel(null);
     }
-
-    setFeedback({
-      type: "success",
-      message: `Comprobante ${rentReceipt.receiptNumber} enviado por WhatsApp a ${rentReceipt.tenantName}.`,
-    });
   }
 
   function buildRentReceiptEmailHref() {

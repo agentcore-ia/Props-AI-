@@ -7,11 +7,14 @@ import {
   sendEvolutionTextMessage,
 } from "@/lib/evolution";
 import {
-  buildTenantRentReceiptPdfDataUri,
   uploadTenantRentReceiptPdf,
 } from "@/lib/rental-receipts";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatMoney } from "@/lib/utils";
+
+function formatDeliveryError(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
 
 export async function POST(request: Request) {
   const current = await getCurrentUserContext();
@@ -85,7 +88,6 @@ export async function POST(request: Request) {
     collectedAmount: Number(collection.collected_amount ?? 0),
     balance,
   };
-  const receiptDataUri = buildTenantRentReceiptPdfDataUri(receiptInput);
   const caption = [
     `Hola ${contract?.tenant_name ?? ""}, te enviamos adjunto el comprobante de alquiler ${finalReceiptNumber}.`,
     `Importe abonado: ${formatMoney(Number(collection.collected_amount ?? 0), "ARS")}.`,
@@ -95,52 +97,104 @@ export async function POST(request: Request) {
     .join("\n");
 
   let receiptUrl: string | null = null;
+  let documentError: string | null = null;
+  let linkFallbackError: string | null = null;
+
+  try {
+    await sendEvolutionTextMessage({
+      instanceName,
+      number,
+      text: caption,
+    });
+  } catch (textError) {
+    console.error("[rental-receipts] WhatsApp text delivery failed", {
+      contractId,
+      collectionMonth,
+      instanceName,
+      number,
+      error: formatDeliveryError(textError),
+    });
+
+    return NextResponse.json(
+      {
+        error: "No se pudo enviar el mensaje por WhatsApp.",
+        detail: formatDeliveryError(textError),
+      },
+      { status: 502 }
+    );
+  }
+
+  try {
+    receiptUrl = await uploadTenantRentReceiptPdf(receiptInput);
+  } catch (uploadError) {
+    console.error("[rental-receipts] receipt PDF upload failed", {
+      contractId,
+      collectionMonth,
+      error: formatDeliveryError(uploadError),
+    });
+
+    return NextResponse.json({
+      ok: true,
+      delivery: "text_only",
+      warning: "Se envio el mensaje, pero no se pudo generar el PDF adjunto.",
+      detail: formatDeliveryError(uploadError),
+    });
+  }
 
   try {
     await sendEvolutionMediaMessage({
       instanceName,
       number,
-      mediaUrl: receiptDataUri,
-      caption,
+      mediaUrl: receiptUrl,
+      caption: `Comprobante de alquiler ${finalReceiptNumber}`,
       mediaType: "document",
       mimetype: "application/pdf",
       fileName: `comprobante-alquiler-${finalReceiptNumber}.pdf`,
     });
 
-    return NextResponse.json({ ok: true, delivery: "document" });
+    return NextResponse.json({ ok: true, delivery: "text_and_document", receiptUrl });
   } catch (mediaError) {
+    documentError = formatDeliveryError(mediaError);
     console.error("[rental-receipts] document WhatsApp delivery failed", {
       contractId,
       collectionMonth,
-      error: mediaError instanceof Error ? mediaError.message : String(mediaError),
+      instanceName,
+      number,
+      receiptUrl,
+      error: documentError,
     });
   }
 
   try {
-    receiptUrl = await uploadTenantRentReceiptPdf(receiptInput);
     await sendEvolutionTextMessage({
       instanceName,
       number,
       text: [
-        `Hola ${contract?.tenant_name ?? ""}, no pudimos adjuntar el PDF automaticamente.`,
+        `No pudimos adjuntar el PDF automaticamente desde WhatsApp.`,
         `Te dejamos el comprobante de alquiler ${finalReceiptNumber} para descargar: ${receiptUrl}`,
-        `Gracias. ${agency?.name ?? ""}`,
       ]
         .filter(Boolean)
         .join("\n"),
     });
   } catch (fallbackError) {
+    linkFallbackError = formatDeliveryError(fallbackError);
     console.error("[rental-receipts] fallback WhatsApp delivery failed", {
       contractId,
       collectionMonth,
-      error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+      instanceName,
+      number,
+      receiptUrl,
+      error: linkFallbackError,
     });
-
-    return NextResponse.json(
-      { error: "No se pudo enviar el comprobante por WhatsApp." },
-      { status: 502 }
-    );
   }
 
-  return NextResponse.json({ ok: true, delivery: "link_fallback", receiptUrl });
+  return NextResponse.json({
+    ok: true,
+    delivery: linkFallbackError ? "text_only" : "text_and_link_fallback",
+    receiptUrl,
+    warning: linkFallbackError
+      ? "Se envio el mensaje inicial, pero fallo el adjunto y tambien el link de respaldo."
+      : "Se envio el mensaje y el link de respaldo porque WhatsApp rechazo el PDF adjunto.",
+    detail: documentError,
+  });
 }
