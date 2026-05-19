@@ -194,7 +194,7 @@ export function LeadsWorkspace({
       ) : null}
 
       {leads.length > 0 ? (
-        <section className="grid gap-4 2xl:grid-cols-2">
+        <section className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
           {leads.map((lead) => {
             const thread = messagesByLead.get(lead.id) ?? [];
             const relatedLeads =
@@ -212,21 +212,27 @@ export function LeadsWorkspace({
             const similarProperties = findSimilarProperties(lead, properties, 3);
 
             return (
-              <article key={lead.id} className="rounded-[30px] border bg-card p-5 shadow-sm">
+              <article key={lead.id} className="rounded-[24px] border bg-card p-4 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-xl font-semibold">{lead.fullName}</h3>
+                      <h3 className="truncate text-base font-semibold">{lead.fullName}</h3>
                       <Badge className={`border-0 ${stageStyles[lead.stage]}`}>{lead.stage}</Badge>
                       <Badge className="border-0 bg-primary/10 text-primary">{lead.priority}</Badge>
                       <Badge className="border-0 bg-muted text-foreground">Score {lead.score}</Badge>
                     </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
+                    <p className="mt-1 truncate text-xs text-muted-foreground">
                       {lead.email || "Sin email"} · {lead.phone || "Sin telefono"}
+                    </p>
+                    <p className="mt-2 line-clamp-1 text-sm font-medium">
+                      {lead.propertyTitle || "Consulta general"}
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                      {lead.lastCustomerMessage || lead.qualificationSummary}
                     </p>
                   </div>
 
-                  <div className="grid min-w-[220px] gap-2">
+                  <div className="grid w-full gap-2 sm:w-[180px]">
                     <select
                       className="h-10 rounded-xl border bg-background px-3 text-sm"
                       value={lead.stage}
@@ -250,7 +256,7 @@ export function LeadsWorkspace({
                       ) : (
                         <MessageCircleMore className="size-4" />
                       )}
-                      Enviar WhatsApp
+                      WhatsApp
                     </Button>
                     <Button
                       variant="outline"
@@ -259,7 +265,7 @@ export function LeadsWorkspace({
                       disabled={busyLeadId === lead.id}
                     >
                       <CalendarPlus2 className="size-4" />
-                      Agendar visita
+                      Visita
                     </Button>
                     <Link
                       href="/mensajes"
@@ -267,12 +273,16 @@ export function LeadsWorkspace({
                         className: "rounded-2xl",
                       })}
                     >
-                      Abrir en bandeja
+                      Bandeja
                     </Link>
                   </div>
                 </div>
 
-                <div className="mt-5 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+                <details className="group mt-4">
+                  <summary className="cursor-pointer rounded-2xl border bg-muted/20 px-4 py-3 text-sm font-medium text-muted-foreground transition hover:text-foreground">
+                    Ver análisis del lead
+                  </summary>
+                <div className="mt-4 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
                   <div className="space-y-4">
                     <InfoBlock title="Que busca">
                       <p className="text-sm leading-6 text-muted-foreground">{profile.whatTheySeek}</p>
@@ -408,6 +418,7 @@ export function LeadsWorkspace({
                     </InfoBlock>
                   </div>
                 </div>
+                </details>
               </article>
             );
           })}
