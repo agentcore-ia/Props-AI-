@@ -88,6 +88,7 @@ type PropertyRow = {
 const PROPERTY_IMAGE_BUCKET = "property-images";
 const FALLBACK_PROPERTY_IMAGE =
   "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80";
+const MARKETPLACE_PROPERTY_STATUSES: Property["status"][] = ["Disponible", "Reservada"];
 
 function normalizePropertyImageUrl(value: string | null | undefined) {
   const rawValue = String(value ?? "").trim();
@@ -1164,6 +1165,7 @@ export async function listProperties(options?: { tenantSlug?: string; marketplac
 
   if (options?.marketplaceOnly) {
     query = query.eq("publish_marketplace", true);
+    query = query.in("status", MARKETPLACE_PROPERTY_STATUSES);
   }
 
   const { data, error } = await query;
@@ -1255,6 +1257,7 @@ export async function getPropertyBySlugAndId(
 
   if (options?.marketplaceOnly) {
     query = query.eq("publish_marketplace", true);
+    query = query.in("status", MARKETPLACE_PROPERTY_STATUSES);
   }
 
   const { data, error } = await query.maybeSingle();

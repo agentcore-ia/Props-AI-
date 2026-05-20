@@ -29,6 +29,21 @@ type RentalContractDraft = {
   autoNotify: boolean;
 };
 
+async function markPropertyAsRented(input: {
+  admin: ReturnType<typeof createAdminClient>;
+  propertyId: string;
+}) {
+  const { error } = await input.admin
+    .from("properties")
+    .update({
+      status: "Alquilada",
+      publish_marketplace: false,
+    })
+    .eq("id", input.propertyId);
+
+  if (error) throw error;
+}
+
 function parseRentalContract(raw: FormDataEntryValue | null): RentalContractDraft | null {
   if (typeof raw !== "string" || !raw.trim()) {
     return null;
@@ -430,6 +445,10 @@ async function handleUpsertProperty(request: Request, mode: "create" | "update")
     }
 
     if (savedContract?.id) {
+      if (safeStatus === "Activo") {
+        await markPropertyAsRented({ admin, propertyId: property.id });
+      }
+
       await syncRentalContractMemory({
         agencyId: agency.id,
         contractId: savedContract.id,

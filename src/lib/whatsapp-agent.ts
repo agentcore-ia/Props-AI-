@@ -199,6 +199,10 @@ function summarizeThread(messages: CrmLeadMessageSummary[]) {
     .join("\n");
 }
 
+function isOfferableProperty(property: Property) {
+  return property.status !== "Alquilada" && property.status !== "Vendida";
+}
+
 export async function resolveAgencyByMessagingInstance(instanceName: string) {
   const requested = String(instanceName ?? "").trim();
 
@@ -232,7 +236,7 @@ export async function buildAgencyCatalogContext(options: {
   selectedPropertyId?: string | null;
   messageText?: string | null;
 }) {
-  const properties = await listProperties({ tenantSlug: options.agencySlug });
+  const properties = (await listProperties({ tenantSlug: options.agencySlug })).filter(isOfferableProperty);
   const selectedProperty = options.selectedPropertyId
     ? properties.find((property) => property.id === options.selectedPropertyId) ?? null
     : matchPropertyFromMessage(properties, options.messageText ?? "", null) ?? null;

@@ -118,6 +118,24 @@ async function syncContractOwners({
   }
 }
 
+async function syncPropertyStatusFromContract(input: {
+  admin: ReturnType<typeof createAdminClient>;
+  propertyId: string;
+  contractStatus: string;
+}) {
+  if (input.contractStatus === "Activo") {
+    const { error } = await input.admin
+      .from("properties")
+      .update({
+        status: "Alquilada",
+        publish_marketplace: false,
+      })
+      .eq("id", input.propertyId);
+
+    if (error) throw error;
+  }
+}
+
 export async function POST(request: Request) {
   const current = await getCurrentUserContext();
 
@@ -412,6 +430,11 @@ export async function POST(request: Request) {
 
   if (savedContract) {
     try {
+      await syncPropertyStatusFromContract({
+        admin,
+        propertyId: property.id,
+        contractStatus: safeStatus,
+      });
       await syncContractOwners({
         admin,
         contractId: savedContract.id,
@@ -613,6 +636,11 @@ export async function PATCH(request: Request) {
   }
 
   try {
+    await syncPropertyStatusFromContract({
+      admin,
+      propertyId: contract.property_id,
+      contractStatus: "Activo",
+    });
     await syncContractOwners({
       admin,
       contractId,

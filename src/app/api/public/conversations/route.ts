@@ -78,6 +78,7 @@ export async function POST(request: Request) {
     .eq("id", propertyId)
     .eq("agency_id", agency.id)
     .eq("publish_marketplace", true)
+    .in("status", ["Disponible", "Reservada"])
     .maybeSingle<PropertyRecord>();
 
   if (propertyError || !property) {
