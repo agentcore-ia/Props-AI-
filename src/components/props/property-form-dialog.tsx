@@ -54,6 +54,7 @@ const initialState = {
   status: "Disponible" as Property["status"],
   operation: "Venta" as Property["operation"],
   manualImageUrl: "",
+  publishMarketplace: true,
   rentEnabled: false,
   tenantName: "",
   tenantPhone: "",
@@ -172,6 +173,7 @@ export function PropertyFormDialog({
     status: property?.status ?? ("Disponible" as Property["status"]),
     operation: property?.operation ?? ("Venta" as Property["operation"]),
     manualImageUrl: "",
+    publishMarketplace: property?.publishMarketplace ?? true,
     rentEnabled: Boolean(property?.rentalContract),
     tenantName: property?.rentalContract?.tenantName ?? "",
     tenantPhone: property?.rentalContract?.tenantPhone ?? "",
@@ -405,6 +407,7 @@ export function PropertyFormDialog({
     body.set("status", form.status);
     body.set("operation", form.operation);
     body.set("manualImageUrl", form.manualImageUrl);
+    body.set("publishMarketplace", String(form.publishMarketplace));
     body.set("keepExistingImages", String(imageFiles.length === 0 && !form.manualImageUrl.trim()));
     body.set(
       "rentalContract",
@@ -808,6 +811,25 @@ export function PropertyFormDialog({
                       value={form.description}
                       onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
                     />
+                  </div>
+
+                  <div className="xl:col-span-12 rounded-[22px] border bg-muted/20 p-4">
+                    <label className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={form.publishMarketplace}
+                        onChange={(event) =>
+                          setForm((prev) => ({ ...prev, publishMarketplace: event.target.checked }))
+                        }
+                      />
+                      <span>
+                        <span className="block text-sm font-semibold">Publicar en Props marketplace</span>
+                        <span className="mt-1 block text-sm text-muted-foreground">
+                          Activado por defecto. Si lo desactivas, la propiedad queda guardada para gestion interna y no aparece en props.com.ar.
+                        </span>
+                      </span>
+                    </label>
                   </div>
                 </div>
               </section>

@@ -51,6 +51,7 @@ export async function POST(request: Request) {
       phone: "",
       tagline: "",
       messagingInstance: instanceName,
+      whatsappAiEnabled: true,
     };
 
   const recentMessages = await listCrmLeadMessages({
@@ -124,6 +125,7 @@ export async function POST(request: Request) {
     memorySessionId: `lead-${lead.id}`,
     targetPhone: String(contactPhone).replace(/@s\.whatsapp\.net$/i, ""),
     instanceName: instanceName || agency.messagingInstance || "",
+    whatsappAiEnabled: agency.whatsappAiEnabled !== false,
     systemPrompt,
     agentInput: buildWhatsappAgentInput({
       lead,

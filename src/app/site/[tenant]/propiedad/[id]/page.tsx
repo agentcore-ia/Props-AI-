@@ -10,8 +10,8 @@ export default async function TenantPropertyPage({
 }) {
   const [agency, property, properties] = await Promise.all([
     getAgencyBySlug(params.tenant),
-    getPropertyBySlugAndId(params.tenant, params.id),
-    listProperties({ tenantSlug: params.tenant }),
+    getPropertyBySlugAndId(params.tenant, params.id, { marketplaceOnly: true }),
+    listProperties({ tenantSlug: params.tenant, marketplaceOnly: true }),
   ]);
 
   const relatedProperties = properties.filter((item) => item.id !== params.id).slice(0, 3);

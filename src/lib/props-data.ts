@@ -44,6 +44,7 @@ type AgencyRow = {
   city: string;
   tagline: string;
   messaging_instance: string;
+  whatsapp_ai_enabled?: boolean;
   website_url?: string | null;
   instagram_url?: string | null;
   facebook_url?: string | null;
@@ -76,6 +77,7 @@ type PropertyRow = {
   pets_policy: string | null;
   requirements: string | null;
   amenities: string[] | null;
+  publish_marketplace?: boolean | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -546,6 +548,7 @@ const PROPERTY_SELECT = `
   pets_policy,
   requirements,
   amenities,
+  publish_marketplace,
   created_by,
   created_at,
   updated_at,
@@ -715,6 +718,7 @@ function mapAgency(row: AgencyRow): Agency {
     city: row.city,
     tagline: row.tagline,
     messagingInstance: row.messaging_instance,
+    whatsappAiEnabled: row.whatsapp_ai_enabled ?? true,
     websiteUrl: row.website_url ?? null,
     instagramUrl: row.instagram_url ?? null,
     facebookUrl: row.facebook_url ?? null,
@@ -1021,6 +1025,7 @@ function mapProperty(
     petsPolicy: row.pets_policy ?? "",
     requirements: row.requirements ?? "",
     amenities: row.amenities ?? [],
+    publishMarketplace: row.publish_marketplace ?? true,
     rentalContract,
   };
 }
@@ -1144,7 +1149,7 @@ export async function listAgencySummaries() {
   }));
 }
 
-export async function listProperties(options?: { tenantSlug?: string }) {
+export async function listProperties(options?: { tenantSlug?: string; marketplaceOnly?: boolean }) {
   const admin = createAdminClient();
   let query = admin
     .from("properties")
@@ -1153,6 +1158,10 @@ export async function listProperties(options?: { tenantSlug?: string }) {
 
   if (options?.tenantSlug) {
     query = query.eq("agencies.slug", options.tenantSlug);
+  }
+
+  if (options?.marketplaceOnly) {
+    query = query.eq("publish_marketplace", true);
   }
 
   const { data, error } = await query;
@@ -1230,14 +1239,23 @@ export async function getAgencyBySlug(slug: string) {
   return data ? mapAgency(data as AgencyRow) : null;
 }
 
-export async function getPropertyBySlugAndId(slug: string, propertyId: string) {
+export async function getPropertyBySlugAndId(
+  slug: string,
+  propertyId: string,
+  options?: { marketplaceOnly?: boolean }
+) {
   const admin = createAdminClient();
-  const { data, error } = await admin
+  let query = admin
     .from("properties")
     .select(PROPERTY_SELECT)
     .eq("id", propertyId)
-    .eq("agencies.slug", slug)
-    .maybeSingle();
+    .eq("agencies.slug", slug);
+
+  if (options?.marketplaceOnly) {
+    query = query.eq("publish_marketplace", true);
+  }
+
+  const { data, error } = await query.maybeSingle();
 
   if (error) {
     throw error;

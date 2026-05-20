@@ -66,6 +66,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No encontramos ese lead." }, { status: 404 });
   }
 
+  const admin = createAdminClient();
+  const { data: agencySettings, error: agencySettingsError } = await admin
+    .from("agencies")
+    .select("whatsapp_ai_enabled")
+    .eq("id", lead.agencyId)
+    .maybeSingle();
+
+  if (agencySettingsError) {
+    return NextResponse.json(
+      { error: "No pudimos validar si la IA de WhatsApp esta activa." },
+      { status: 400 }
+    );
+  }
+
+  if (agencySettings?.whatsapp_ai_enabled === false) {
+    return NextResponse.json(
+      { error: "La IA automatica de WhatsApp esta desactivada para esta inmobiliaria." },
+      { status: 409 }
+    );
+  }
+
   const number = rawPhone.replace(/[^\d]/g, "");
   const customerAskedForImages = wantsPropertyImages(lead.lastCustomerMessage || "");
   let property =
@@ -81,7 +102,9 @@ export async function POST(request: Request) {
 
   const propertyUrl =
     selectedPropertyUrl ||
-    (property && lead.agencySlug ? buildPublicPropertyUrl(lead.agencySlug, property.id) : "");
+    (property && lead.agencySlug && property.publishMarketplace !== false
+      ? buildPublicPropertyUrl(lead.agencySlug, property.id)
+      : "");
   const propertyImages = property?.images.filter(Boolean).slice(0, 3) ?? [];
   let replyWithLink = stripImageLinksFromReply(reply);
 
@@ -216,7 +239,6 @@ export async function POST(request: Request) {
     }
   }
 
-  const admin = createAdminClient();
   await admin
     .from("crm_leads")
     .update({

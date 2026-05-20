@@ -228,12 +228,12 @@ export function InboxWorkspace({
     );
   }
 
-  async function sendMessage(input?: { directText?: string; resetDraft?: boolean }) {
+  async function sendMessage(input?: { directText?: string; customPrompt?: string; resetDraft?: boolean }) {
     setBusy(true);
     setFeedback(null);
 
-    const directText = input?.directText ?? null;
-    const customPrompt = directText ? null : draft.trim() || null;
+    const directText = input?.directText ?? (input?.customPrompt ? null : draft.trim() || null);
+    const customPrompt = input?.customPrompt ?? null;
 
     const response = await fetch(`/api/admin/leads/${selectedLead.id}/whatsapp`, {
       method: "POST",
@@ -502,13 +502,13 @@ export function InboxWorkspace({
             <div className="rounded-[22px] border bg-background p-2.5">
               <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Bot className="size-4 text-primary" />
-                Respuesta asistida
+                Mensaje manual
               </div>
               <div className="flex items-center gap-2">
                 <Input
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
-                  placeholder="Ej. proponé visita, aclará requisitos y ofrecé dos opciones parecidas..."
+                  placeholder="Escribi el mensaje exacto que queres enviar por WhatsApp..."
                   className="border-0 shadow-none focus-visible:ring-0"
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && !event.shiftKey) {
@@ -517,7 +517,15 @@ export function InboxWorkspace({
                     }
                   }}
                 />
-                <Button className="rounded-2xl" disabled={busy} onClick={() => void sendMessage()}>
+                <Button
+                  variant="outline"
+                  className="rounded-2xl"
+                  disabled={busy || !draft.trim()}
+                  onClick={() => void sendMessage({ customPrompt: draft.trim(), resetDraft: false })}
+                >
+                  IA
+                </Button>
+                <Button className="rounded-2xl" disabled={busy || !draft.trim()} onClick={() => void sendMessage()}>
                   {busy ? <Loader2 className="size-4 animate-spin" /> : <SendHorizonal className="size-4" />}
                   Enviar
                 </Button>

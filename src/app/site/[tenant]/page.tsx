@@ -10,7 +10,7 @@ export default async function TenantCatalogPage({
 }) {
   const [agency, properties] = await Promise.all([
     getAgencyBySlug(params.tenant),
-    listProperties({ tenantSlug: params.tenant }),
+    listProperties({ tenantSlug: params.tenant, marketplaceOnly: true }),
   ]);
 
   return <TenantCatalog agency={agency} properties={properties} />;

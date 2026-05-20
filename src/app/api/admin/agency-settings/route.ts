@@ -59,6 +59,7 @@ export async function POST(request: Request) {
   const websiteUrl = normalizeOptionalUrl(body.websiteUrl);
   const instagramUrl = normalizeOptionalUrl(body.instagramUrl);
   const facebookUrl = normalizeOptionalUrl(body.facebookUrl);
+  const whatsappAiEnabled = body.whatsappAiEnabled !== false;
   const messagingInstanceInput = String(body.messagingInstance ?? "").trim();
   const messagingInstance = messagingInstanceInput
     ? normalizeMessagingInstance(messagingInstanceInput)
@@ -101,6 +102,7 @@ export async function POST(request: Request) {
     city,
     tagline,
     messaging_instance: messagingInstance,
+    whatsapp_ai_enabled: whatsappAiEnabled,
   };
   const extendedPayload = {
     ...basePayload,

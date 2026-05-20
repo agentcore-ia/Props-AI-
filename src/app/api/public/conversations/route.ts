@@ -77,6 +77,7 @@ export async function POST(request: Request) {
     )
     .eq("id", propertyId)
     .eq("agency_id", agency.id)
+    .eq("publish_marketplace", true)
     .maybeSingle<PropertyRecord>();
 
   if (propertyError || !property) {
@@ -162,7 +163,7 @@ export async function POST(request: Request) {
     .single();
 
   const openAI = getOpenAIEnv();
-  const relatedProperties = await listProperties({ tenantSlug });
+  const relatedProperties = await listProperties({ tenantSlug, marketplaceOnly: true });
   const conversationContext = recentMessages
     .map((item) => `${item.senderRole === "customer" ? "Cliente" : "IA"}: ${item.content}`)
     .join("\n");

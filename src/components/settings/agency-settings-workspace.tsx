@@ -40,6 +40,7 @@ type ManagedAgency = {
   owner_name: string;
   owner_email: string;
   messaging_instance: string;
+  whatsapp_ai_enabled?: boolean;
   website_url?: string | null;
   instagram_url?: string | null;
   facebook_url?: string | null;
@@ -93,6 +94,7 @@ function buildInitialForm(agency: ManagedAgency | null) {
     city: agency?.city ?? "",
     tagline: agency?.tagline ?? "",
     messagingInstance: agency?.messaging_instance ?? "",
+    whatsappAiEnabled: agency?.whatsapp_ai_enabled ?? true,
     websiteUrl: agency?.website_url ?? "",
     instagramUrl: agency?.instagram_url ?? "",
     facebookUrl: agency?.facebook_url ?? "",
@@ -295,6 +297,7 @@ export function AgencySettingsWorkspace({
         instagramUrl: form.instagramUrl,
         facebookUrl: form.facebookUrl,
         messagingInstance: normalizeInstance(form.messagingInstance),
+        whatsappAiEnabled: form.whatsappAiEnabled,
       }),
     });
 
@@ -464,6 +467,24 @@ export function AgencySettingsWorkspace({
               <p className="text-xs text-muted-foreground">
                 Props usa este codigo interno para mantener conectados los mensajes de WhatsApp.
               </p>
+            </div>
+            <div className="md:col-span-2 rounded-[22px] border bg-muted/20 p-4">
+              <label className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={form.whatsappAiEnabled}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, whatsappAiEnabled: event.target.checked }))
+                  }
+                />
+                <span>
+                  <span className="block text-sm font-semibold">Responder WhatsApp automaticamente con IA</span>
+                  <span className="mt-1 block text-sm text-muted-foreground">
+                    Si esta apagado, Props sigue recibiendo mensajes y mostrandolos en Mensajes, pero no contesta solo. El equipo puede responder manualmente.
+                  </span>
+                </span>
+              </label>
             </div>
 
             {saveError ? (

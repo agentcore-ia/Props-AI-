@@ -94,6 +94,7 @@ async function handleUpsertProperty(request: Request, mode: "create" | "update")
   const manualImageUrl = String(formData.get("manualImageUrl") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
   const operation = String(formData.get("operation") ?? "").trim();
+  const publishMarketplace = String(formData.get("publishMarketplace") ?? "true") !== "false";
   const rentalContract = parseRentalContract(formData.get("rentalContract"));
   const keepExistingImages = String(formData.get("keepExistingImages") ?? "false") === "true";
 
@@ -238,6 +239,7 @@ async function handleUpsertProperty(request: Request, mode: "create" | "update")
     pets_policy: petsPolicy,
     requirements,
     amenities,
+    publish_marketplace: publishMarketplace,
   };
 
   const propertyQuery = isUpdate

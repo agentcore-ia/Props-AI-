@@ -77,7 +77,7 @@ export async function POST(request: Request) {
 
   const property =
     validPropertyId && tenantSlug
-      ? (await listProperties({ tenantSlug })).find((item) => item.id === validPropertyId) ?? null
+      ? (await listProperties({ tenantSlug, marketplaceOnly: true })).find((item) => item.id === validPropertyId) ?? null
       : null;
 
   await upsertLeadFromSignal({

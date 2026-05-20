@@ -30,6 +30,7 @@ export type Agency = {
   city: string;
   tagline: string;
   messagingInstance?: string;
+  whatsappAiEnabled?: boolean;
   websiteUrl?: string | null;
   instagramUrl?: string | null;
   facebookUrl?: string | null;
@@ -61,6 +62,7 @@ export type Property = {
   petsPolicy: string;
   requirements: string;
   amenities: string[];
+  publishMarketplace?: boolean;
   rentalContract?: RentalContractSummary | null;
 };
 

@@ -12,7 +12,7 @@ export default async function HomePage({
 }) {
   const [agencies, properties, current] = await Promise.all([
     listAgencies(),
-    listProperties(),
+    listProperties({ marketplaceOnly: true }),
     getCurrentUserContext(),
   ]);
 

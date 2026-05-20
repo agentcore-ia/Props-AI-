@@ -30,6 +30,7 @@ create table if not exists public.agencies (
   city text not null,
   tagline text not null default '',
   messaging_instance text not null default 'agentcore',
+  whatsapp_ai_enabled boolean not null default true,
   website_url text,
   instagram_url text,
   facebook_url text,
@@ -68,6 +69,7 @@ create table if not exists public.properties (
   pets_policy text not null default '',
   requirements text not null default '',
   amenities jsonb not null default '[]'::jsonb,
+  publish_marketplace boolean not null default true,
   created_by uuid references auth.users (id) on delete set null,
   created_at timestamptz not null default timezone('utc'::text, now()),
   updated_at timestamptz not null default timezone('utc'::text, now())
@@ -87,7 +89,8 @@ alter table public.properties
   add column if not exists available_from date,
   add column if not exists pets_policy text not null default '',
   add column if not exists requirements text not null default '',
-  add column if not exists amenities jsonb not null default '[]'::jsonb;
+  add column if not exists amenities jsonb not null default '[]'::jsonb,
+  add column if not exists publish_marketplace boolean not null default true;
 
 alter table public.properties drop constraint if exists properties_currency_check;
 alter table public.properties drop constraint if exists properties_expenses_currency_check;
@@ -100,6 +103,9 @@ alter table public.properties
     check (expenses_currency is null or expenses_currency in ('USD', 'ARS')),
   add constraint properties_property_type_check
     check (property_type in ('Departamento', 'Casa', 'PH', 'Loft', 'Townhouse', 'Oficina', 'Local'));
+
+create index if not exists properties_marketplace_visible_idx
+  on public.properties (publish_marketplace, status, created_at desc);
 
 create table if not exists public.catalog_inquiries (
   id uuid primary key default gen_random_uuid(),
@@ -524,6 +530,7 @@ create index if not exists client_memory_links_entity_idx
 
 alter table public.agencies
   add column if not exists messaging_instance text not null default 'agentcore',
+  add column if not exists whatsapp_ai_enabled boolean not null default true,
   add column if not exists website_url text,
   add column if not exists instagram_url text,
   add column if not exists facebook_url text;

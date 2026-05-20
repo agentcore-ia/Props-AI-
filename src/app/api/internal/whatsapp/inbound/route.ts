@@ -349,6 +349,7 @@ async function generateWhatsappReply(input: {
         phone: "",
         tagline: "",
         messagingInstance: "",
+        whatsappAiEnabled: true,
       },
       lead,
       selectedProperty: catalog.selectedProperty,
@@ -647,6 +648,31 @@ export async function POST(request: Request) {
   const latestLead = await getCrmLeadById(signal.lead.id);
   let aiReply: string | null = null;
   let aiError: string | null = null;
+
+  if (agency.whatsappAiEnabled === false) {
+    await createAdminClient()
+      .from("crm_leads")
+      .update({
+        needs_response: true,
+        ai_reply_draft: "IA automatica apagada: responder manualmente desde Mensajes.",
+        last_activity_at: new Date().toISOString(),
+      })
+      .eq("id", signal.lead.id);
+
+    return NextResponse.json({
+      ok: true,
+      ai_active: false,
+      ai_sent: false,
+      ai_disabled: true,
+      leadId: signal.lead.id,
+      agencySlug: agency.slug,
+      agencyName: agency.name,
+      propertyId: latestLead?.propertyId ?? null,
+      propertyTitle: latestLead?.propertyTitle ?? null,
+      customerName: latestLead?.fullName ?? signal.lead.full_name,
+      normalizedPhone: remoteJid.split("@")[0],
+    });
+  }
 
   try {
     aiReply = await generateWhatsappReply({

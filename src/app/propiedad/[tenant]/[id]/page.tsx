@@ -16,9 +16,9 @@ export default async function MarketplacePropertyPage({
 }) {
   const [agency, property, allAgencies, sameAgencyProperties, current] = await Promise.all([
     getAgencyBySlug(params.tenant),
-    getPropertyBySlugAndId(params.tenant, params.id),
+    getPropertyBySlugAndId(params.tenant, params.id, { marketplaceOnly: true }),
     listAgencies(),
-    listProperties({ tenantSlug: params.tenant }),
+    listProperties({ tenantSlug: params.tenant, marketplaceOnly: true }),
     getCurrentUserContext(),
   ]);
 

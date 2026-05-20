@@ -16,12 +16,13 @@ type MessagingAgencyRow = {
   phone: string;
   tagline: string;
   messaging_instance: string;
+  whatsapp_ai_enabled?: boolean;
 };
 
 export type MessagingAgency = Pick<
   Agency,
   "id" | "slug" | "name" | "city" | "email" | "phone" | "tagline" | "messagingInstance"
->;
+> & { whatsappAiEnabled: boolean };
 
 function mapMessagingAgency(row: MessagingAgencyRow): MessagingAgency {
   return {
@@ -33,6 +34,7 @@ function mapMessagingAgency(row: MessagingAgencyRow): MessagingAgency {
     phone: row.phone,
     tagline: row.tagline,
     messagingInstance: row.messaging_instance,
+    whatsappAiEnabled: row.whatsapp_ai_enabled ?? true,
   };
 }
 
@@ -132,7 +134,10 @@ export function matchPropertyFromMessage(
 }
 
 function summarizeProperty(property: Property) {
-  const publicUrl = buildShortPropertyUrl(property.tenantSlug, property.id);
+  const publicUrl =
+    property.publishMarketplace === false
+      ? ""
+      : buildShortPropertyUrl(property.tenantSlug, property.id);
   const imageCount = property.images.filter(Boolean).length;
   const blocks = [
     property.title,
@@ -150,7 +155,7 @@ function summarizeProperty(property: Property) {
     property.requirements ? `requisitos: ${property.requirements}` : "",
     property.amenities.length ? `amenities: ${property.amenities.join(", ")}` : "",
     property.description ? `descripcion: ${property.description}` : "",
-    `link: ${publicUrl}`,
+    publicUrl ? `link: ${publicUrl}` : "sin link publico: propiedad solo interna",
     imageCount > 0 ? `imagenes disponibles: ${imageCount}` : "",
   ].filter(Boolean);
 
@@ -189,7 +194,7 @@ export async function resolveAgencyByMessagingInstance(instanceName: string) {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("agencies")
-    .select("id, slug, name, city, email, phone, tagline, messaging_instance");
+    .select("id, slug, name, city, email, phone, tagline, messaging_instance, whatsapp_ai_enabled");
 
   if (error) {
     throw error;
@@ -239,7 +244,9 @@ export function buildWhatsappSystemPrompt(input: {
     ? summarizeProperty(input.selectedProperty)
     : "No hay una propiedad puntual asociada todavia; puedes guiarte por el portafolio y por lo que pida el cliente.";
   const selectedPropertyPublicUrl = input.selectedProperty
-    ? buildShortPropertyUrl(input.selectedProperty.tenantSlug, input.selectedProperty.id)
+    ? input.selectedProperty.publishMarketplace === false
+      ? ""
+      : buildShortPropertyUrl(input.selectedProperty.tenantSlug, input.selectedProperty.id)
     : "";
   const selectedPropertyImages = input.selectedProperty?.images
     .filter(Boolean)
@@ -281,7 +288,7 @@ export function buildWhatsappSystemPrompt(input: {
     `Propiedad asociada: ${selectedPropertySummary}`,
     selectedPropertyPublicUrl
       ? `Link publico de la propiedad asociada: ${selectedPropertyPublicUrl}`
-      : "No hay link publico asociado porque todavia no tenemos una propiedad seleccionada.",
+      : "No hay link publico asociado. Si la propiedad es interna o todavia no hay propiedad seleccionada, no inventes URLs.",
     selectedPropertyImages
       ? `Imagenes de la propiedad asociada disponibles para envio: ${selectedPropertyImages}`
       : "No hay imagenes adicionales cargadas para la propiedad asociada.",

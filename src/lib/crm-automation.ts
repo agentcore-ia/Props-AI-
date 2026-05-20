@@ -784,6 +784,13 @@ export async function sendLeadWhatsApp(input: {
 }) {
   const text =
     String(input.directText ?? "").trim() ||
+    (input.customPrompt
+      ? await generateLeadReply({
+          lead: input.lead,
+          property: input.property,
+          customPrompt: input.customPrompt,
+        })
+      : "") ||
     (input.lead.stage === "Visita" || input.lead.stage === "Seguimiento"
       ? buildAutomaticFollowUpMessage({ lead: input.lead, property: input.property ?? null })
       : "") ||

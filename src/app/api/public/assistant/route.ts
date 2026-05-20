@@ -17,7 +17,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const properties = await listProperties(tenantSlug ? { tenantSlug } : undefined);
+  const properties = await listProperties(
+    tenantSlug ? { tenantSlug, marketplaceOnly: true } : { marketplaceOnly: true }
+  );
 
   if (properties.length === 0) {
     return NextResponse.json({
