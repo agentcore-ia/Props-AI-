@@ -25,7 +25,6 @@ import {
   Users,
 } from "lucide-react";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -231,11 +230,6 @@ export function AppShell({
               <Separator orientation="vertical" className="hidden h-10 sm:block" />
 
               <div className="flex items-center gap-3">
-                <Avatar className="size-10 rounded-2xl border">
-                  <AvatarFallback className="rounded-2xl bg-primary/10 font-semibold text-primary">
-                    AI
-                  </AvatarFallback>
-                </Avatar>
                 <div className="hidden sm:block">
                   <p className="text-sm font-semibold">{accountLabel ?? "Cuenta activa"}</p>
                   <p className="text-xs text-muted-foreground">{accountSubLabel ?? userEmail ?? "Sesion activa"}</p>
