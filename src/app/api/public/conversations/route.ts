@@ -176,17 +176,19 @@ export async function POST(request: Request) {
     propertyTitle: property.title,
     agencyName: agency.name,
   });
+  const petPolicyReply = buildPetPolicyReply({ property, message, recentMessages });
 
   let reply = visitState.reply
     ? visitState.reply
-    : buildPropertyChatFallback({
+    : petPolicyReply ??
+      buildPropertyChatFallback({
         property,
         agencyName: agency.name,
         message,
         recentMessages,
       });
 
-  if (!visitState.reply && openAI.configured) {
+  if (!visitState.reply && !petPolicyReply && openAI.configured) {
     const aiResponse = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
@@ -202,7 +204,7 @@ export async function POST(request: Request) {
               {
                 type: "input_text",
                 text:
-                  "Sos la IA de captacion de Props para compradores e inquilinos. Responde en espanol rioplatense, breve, amable y comercial. Estas dentro de la ficha de una sola propiedad: responde solo sobre esa propiedad y no recomiendes otras salvo que el usuario lo pida de forma explicita. Responde solo lo que preguntaron, sin volcar toda la ficha ni hacer listas largas. Si el usuario responde algo como 'si', 'si por favor' o 'dale', interpreta el contexto inmediato de la conversacion y contesta solo a eso. Si preguntan por precio, expensas, mascotas, ubicacion, disponibilidad, requisitos o ambientes, da ese dato puntual. Como maximo cierra con una sola pregunta corta para avanzar.",
+                  "Sos la IA de captacion de Props para compradores e inquilinos. Responde en espanol rioplatense, breve, amable y comercial. Estas dentro de la ficha de una sola propiedad: responde solo sobre esa propiedad y no recomiendes otras salvo que el usuario lo pida de forma explicita. Responde solo lo que preguntaron, sin volcar toda la ficha ni hacer listas largas. Si el usuario responde algo como 'si', 'si por favor' o 'dale', interpreta el contexto inmediato de la conversacion y contesta solo a eso. Si preguntan por precio, expensas, mascotas, ubicacion, disponibilidad, requisitos o ambientes, da ese dato puntual. No ofrezcas consultar excepciones a requisitos o mascotas: si la ficha dice 'solo gatos', 'no perros', 'no mascotas' o una restriccion concreta, responde esa restriccion con claridad y no prometas excepciones. Como maximo cierra con una sola pregunta corta para avanzar.",
               },
             ],
           },
@@ -430,6 +432,55 @@ function extractResponseText(payload: Record<string, unknown>) {
   }
 
   return "";
+}
+
+function buildPetPolicyReply({
+  property,
+  message,
+  recentMessages,
+}: {
+  property: PropertyRecord;
+  message: string;
+  recentMessages: RecentMessage[];
+}) {
+  const normalized = normalizeForIntent(message);
+  const lastAssistantMessage = [...recentMessages]
+    .reverse()
+    .find((item) => item.senderRole === "assistant")?.content;
+  const lastAssistantPetContext = lastAssistantMessage
+    ? /mascota|perro|caniche|gato|excepcion/i.test(normalizeForIntent(lastAssistantMessage))
+    : false;
+  const affirmativeFollowUp = /^(si|si por favor|dale|perfecto|ok|oka|por favor)$/.test(
+    normalized.replace(/[!.?]+/g, "").trim()
+  );
+  const asksAboutPets = /mascota|perro|caniche|gato|animal/.test(normalized);
+
+  if (!asksAboutPets && !(affirmativeFollowUp && lastAssistantPetContext)) {
+    return null;
+  }
+
+  const policy = (property.pets_policy ?? "").trim();
+
+  if (!policy) {
+    return "En esta publicacion no hay una politica de mascotas cargada. Para no inventar, mejor lo confirma la inmobiliaria.";
+  }
+
+  const normalizedPolicy = normalizeForIntent(policy);
+  const onlyCats =
+    /solo.*gato|gato.*solo|unicamente.*gato|solo acepta gato/.test(normalizedPolicy) ||
+    (normalizedPolicy.includes("gato") && !normalizedPolicy.includes("perro"));
+  const rejectsPets = /no acepta|no se acepta|sin mascotas|no mascotas|no admite/.test(normalizedPolicy);
+  const asksDog = /perro|caniche/.test(normalized) || (affirmativeFollowUp && lastAssistantPetContext);
+
+  if (onlyCats && asksDog) {
+    return `Segun la publicacion, la politica de mascotas es: ${policy}. No figura apto para perros o caniches.`;
+  }
+
+  if (rejectsPets) {
+    return `No. Segun la publicacion, la politica de mascotas es: ${policy}.`;
+  }
+
+  return `La politica de mascotas cargada es: ${policy}.`;
 }
 
 function buildPropertyChatFallback({

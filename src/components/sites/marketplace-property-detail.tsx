@@ -193,10 +193,10 @@ export function MarketplacePropertyDetail({
             <PropertyGallery title={listing.title} images={listing.images} />
 
             <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">
-              <SpecCard icon={<BedDouble className="size-4" />} label="Dormitorios" value={formatDetailCount(listing.bedrooms)} hint={listing.suites > 0 ? `${listing.suites} en suite` : "segun ficha"} />
-              <SpecCard icon={<Bath className="size-4" />} label="Baños" value={formatDetailCount(listing.bathrooms)} hint="configuracion actual" />
-              <SpecCard icon={<Ruler className="size-4" />} label="Construccion" value={formatDetailArea(listing.area)} hint={listing.lotArea > 0 ? `${listing.lotArea} m2 totales` : "a confirmar"} />
-              <SpecCard icon={<CalendarDays className="size-4" />} label="Disponible" value={listing.availableFrom || "Inmediata"} hint="fecha estimada" />
+              <SpecCard icon={<BedDouble className="size-4" />} label="Dormitorios" value={formatDetailCount(listing.bedrooms)} />
+              <SpecCard icon={<Bath className="size-4" />} label="Baños" value={formatDetailCount(listing.bathrooms)} />
+              <SpecCard icon={<Ruler className="size-4" />} label="Construccion" value={formatDetailArea(listing.area)} />
+              <SpecCard icon={<CalendarDays className="size-4" />} label="Disponible" value={listing.availableFrom || "Inmediata"} />
             </div>
           </div>
 
@@ -421,12 +421,10 @@ function SpecCard({
   icon,
   label,
   value,
-  hint,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
-  hint: string;
 }) {
   return (
     <div className="min-w-0 overflow-hidden rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-[0_20px_50px_-40px_rgba(15,23,42,0.2)]">
@@ -435,7 +433,6 @@ function SpecCard({
       </div>
       <p className="mt-4 text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
       <p className="mt-2 break-words text-xl font-semibold text-slate-950">{value}</p>
-      <p className="mt-1 break-words text-sm text-slate-500">{hint}</p>
     </div>
   );
 }
