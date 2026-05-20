@@ -134,7 +134,7 @@ function SidebarContent({ userRole = "agency_admin" }: { userRole?: AppRole | nu
             width={160}
             height={100}
             priority
-            className="h-auto w-32"
+            className="h-auto w-40 max-w-full"
           />
         </Link>
       </div>
