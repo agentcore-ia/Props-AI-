@@ -12,6 +12,7 @@ import type {
 import { getEffectiveMessagingInstance } from "@/lib/agency-access";
 import { ensureEvolutionInstance, sendEvolutionTextMessage } from "@/lib/evolution";
 import { buildAutomaticFollowUpMessage } from "@/lib/crm-insights";
+import { rememberClientInteraction } from "@/lib/client-memory";
 import { getOpenAIEnv } from "@/lib/openai-env";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -491,10 +492,11 @@ export async function recordOutboundWhatsAppForContact(input: {
       .eq("id", leadId);
   }
 
-  return recordCrmLeadMessage({
+  const propertyId = input.propertyId ?? existing?.property_id ?? null;
+  const messageId = await recordCrmLeadMessage({
     leadId,
     agencyId: input.agencyId,
-    propertyId: input.propertyId ?? existing?.property_id ?? null,
+    propertyId,
     channel: "whatsapp",
     content,
     direction: "outgoing",
@@ -506,6 +508,46 @@ export async function recordOutboundWhatsAppForContact(input: {
       ...input.metadata,
     },
   });
+
+  const contractId =
+    typeof input.metadata?.contractId === "string"
+      ? input.metadata.contractId
+      : typeof input.metadata?.rentalContractId === "string"
+        ? input.metadata.rentalContractId
+        : null;
+
+  await rememberClientInteraction({
+    agencyId: input.agencyId,
+    displayName: input.fullName || existing?.full_name || "Cliente",
+    phone: normalizedPhone,
+    leadId,
+    propertyId,
+    propertyTitle: input.propertyTitle ?? null,
+    contractId,
+    sourceType: input.source,
+    sourceId: messageId,
+    messages: [
+      {
+        direction: "outgoing",
+        role: input.senderRole ?? "system",
+        content,
+        metadata: {
+          source: input.source,
+          phone: normalizedPhone,
+          propertyTitle: input.propertyTitle ?? null,
+          ...input.metadata,
+        },
+      },
+    ],
+  }).catch((error) => {
+    console.error("[crm-automation] outbound memory write failed", {
+      leadId,
+      source: input.source,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
+
+  return messageId;
 }
 
 export async function upsertLeadFromSignal(input: {
@@ -774,7 +816,7 @@ export async function sendLeadWhatsApp(input: {
     })
     .eq("id", input.lead.id);
 
-  await recordCrmLeadMessage({
+  const messageId = await recordCrmLeadMessage({
     leadId: input.lead.id,
     agencyId: input.lead.agencyId,
     propertyId: input.lead.propertyId,
@@ -785,6 +827,34 @@ export async function sendLeadWhatsApp(input: {
       source: "crm_manual",
       propertyTitle: input.property?.title ?? input.lead.propertyTitle,
     },
+  });
+
+  await rememberClientInteraction({
+    agencyId: input.lead.agencyId,
+    displayName: input.lead.fullName,
+    phone: input.lead.phone,
+    email: input.lead.email,
+    leadId: input.lead.id,
+    propertyId: input.lead.propertyId,
+    propertyTitle: input.property?.title ?? input.lead.propertyTitle,
+    sourceType: "crm_manual",
+    sourceId: messageId,
+    messages: [
+      {
+        direction: "outgoing",
+        role: "agent",
+        content: text,
+        metadata: {
+          source: "crm_manual",
+          propertyTitle: input.property?.title ?? input.lead.propertyTitle,
+        },
+      },
+    ],
+  }).catch((error) => {
+    console.error("[crm-automation] lead whatsapp memory write failed", {
+      leadId: input.lead.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
   });
 
   await ensureLeadTask({

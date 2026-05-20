@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isAutomationRequest } from "@/lib/automation-auth";
+import { rememberClientInteraction } from "@/lib/client-memory";
 import { ensureLeadTask, recordCrmLeadMessage } from "@/lib/crm-automation";
 import { sendEvolutionMediaMessage, sendEvolutionTextMessage } from "@/lib/evolution";
 import { buildShortPropertyUrl } from "@/lib/property-links";
@@ -110,7 +111,7 @@ export async function POST(request: Request) {
     text: replyWithLink,
   });
 
-  await recordCrmLeadMessage({
+  const textMessageId = await recordCrmLeadMessage({
     leadId: lead.id,
     agencyId: lead.agencyId,
     propertyId: property?.id ?? lead.propertyId,
@@ -122,6 +123,35 @@ export async function POST(request: Request) {
       instanceName,
       propertyUrl: propertyUrl || null,
     },
+  });
+
+  await rememberClientInteraction({
+    agencyId: lead.agencyId,
+    displayName: lead.fullName,
+    phone: rawPhone,
+    email: lead.email,
+    leadId: lead.id,
+    propertyId: property?.id ?? lead.propertyId,
+    propertyTitle: property?.title ?? lead.propertyTitle,
+    sourceType: "whatsapp_ai_agent",
+    sourceId: textMessageId,
+    messages: [
+      {
+        direction: "outgoing",
+        role: "assistant",
+        content: replyWithLink,
+        metadata: {
+          source: "whatsapp_ai_agent",
+          instanceName,
+          propertyUrl: propertyUrl || null,
+        },
+      },
+    ],
+  }).catch((error) => {
+    console.error("[whatsapp-outbound] memory text write failed", {
+      leadId: lead.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
   });
 
   if (customerAskedForImages && propertyImages.length > 0) {
@@ -138,7 +168,7 @@ export async function POST(request: Request) {
             : property?.title ?? "",
       });
 
-      await recordCrmLeadMessage({
+      const mediaMessageId = await recordCrmLeadMessage({
         leadId: lead.id,
         agencyId: lead.agencyId,
         propertyId: property?.id ?? lead.propertyId,
@@ -152,6 +182,36 @@ export async function POST(request: Request) {
           imageUrl,
           propertyUrl: propertyUrl || null,
         },
+      });
+
+      await rememberClientInteraction({
+        agencyId: lead.agencyId,
+        displayName: lead.fullName,
+        phone: rawPhone,
+        email: lead.email,
+        leadId: lead.id,
+        propertyId: property?.id ?? lead.propertyId,
+        propertyTitle: property?.title ?? lead.propertyTitle,
+        sourceType: "whatsapp_ai_agent_media",
+        sourceId: mediaMessageId,
+        messages: [
+          {
+            direction: "outgoing",
+            role: "assistant",
+            content: `[imagen] ${property?.title ?? "Propiedad"} ${index + 1}`,
+            metadata: {
+              source: "whatsapp_ai_agent_media",
+              instanceName,
+              imageUrl,
+              propertyUrl: propertyUrl || null,
+            },
+          },
+        ],
+      }).catch((error) => {
+        console.error("[whatsapp-outbound] memory media write failed", {
+          leadId: lead.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
       });
     }
   }

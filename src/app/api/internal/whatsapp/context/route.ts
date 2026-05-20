@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { isAutomationRequest } from "@/lib/automation-auth";
+import {
+  buildClientMemoryContext,
+  findOwnerMemoryContext,
+  findTenantRentalContext,
+} from "@/lib/client-memory";
 import { buildShortPropertyUrl } from "@/lib/property-links";
 import { getCrmLeadById, listCrmLeadMessages } from "@/lib/props-data";
 import {
@@ -21,6 +26,7 @@ export async function POST(request: Request) {
   const leadId = String(body?.leadId ?? "").trim();
   const messageText = String(body?.messageText ?? "").trim();
   const instanceName = String(body?.instanceName ?? "").trim();
+  const remoteJid = String(body?.remoteJid ?? body?.number ?? "").trim();
 
   if (!leadId || !messageText) {
     return NextResponse.json(
@@ -50,6 +56,43 @@ export async function POST(request: Request) {
   const recentMessages = await listCrmLeadMessages({
     leadIds: [lead.id],
   });
+  const contactPhone = remoteJid || lead.phone || "";
+  const [rentalContext, ownerContext] = await Promise.all([
+    findTenantRentalContext({
+      agencyId: lead.agencyId,
+      phone: contactPhone,
+    }).catch((error) => {
+      console.error("[whatsapp-context] tenant memory lookup failed", {
+        leadId: lead.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }),
+    findOwnerMemoryContext({
+      agencyId: lead.agencyId,
+      phone: contactPhone,
+    }).catch((error) => {
+      console.error("[whatsapp-context] owner memory lookup failed", {
+        leadId: lead.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }),
+  ]);
+  const memoryContext = await buildClientMemoryContext({
+    agencyId: lead.agencyId,
+    phone: contactPhone,
+    email: lead.email,
+    leadId: lead.id,
+    rentalContext,
+    ownerContext,
+  }).catch((error) => {
+    console.error("[whatsapp-context] memory context failed", {
+      leadId: lead.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { contextText: "Memoria Props: no se pudo leer el contexto persistente." };
+  });
 
   const catalog = await buildAgencyCatalogContext({
     agencySlug: lead.agencySlug,
@@ -57,19 +100,31 @@ export async function POST(request: Request) {
     messageText,
   });
 
-  return NextResponse.json({
-    ok: true,
-    leadId: lead.id,
-    memorySessionId: `lead-${lead.id}`,
-    targetPhone: String(lead.phone ?? body?.remoteJid ?? "").replace(/@s\.whatsapp\.net$/i, ""),
-    instanceName: instanceName || agency.messagingInstance || "",
-    systemPrompt: buildWhatsappSystemPrompt({
+  const systemPrompt = [
+    buildWhatsappSystemPrompt({
       agency,
       lead,
       selectedProperty: catalog.selectedProperty,
       catalogSummary: catalog.catalogSummary,
       recentMessages,
     }),
+    "Memoria persistente Props:",
+    memoryContext.contextText,
+    rentalContext
+      ? `Contrato de inquilino detectado: ${rentalContext.tenantName} alquila ${rentalContext.propertyTitle}. Alquiler actual ARS ${rentalContext.currentRent}. Proximo ajuste ${rentalContext.nextAdjustmentDate} por ${rentalContext.indexType}. Si consulta por pago/alquiler/ajuste, responde con este contexto y no como lead nuevo.`
+      : "No hay contrato de inquilino detectado por telefono.",
+    ownerContext
+      ? `Propietario detectado: ${ownerContext.ownerName} de ${ownerContext.propertyTitle}. Participacion ${ownerContext.participationPercent}%. Ultima liquidacion: ${ownerContext.latestSettlement ? `${ownerContext.latestSettlement.settlementMonth} por ARS ${ownerContext.latestSettlement.ownerPayoutAmount}, estado ${ownerContext.latestSettlement.status}` : "sin liquidacion reciente"}. Si consulta por liquidacion/transferencia/pago al propietario, responde con este contexto y no como lead nuevo.`
+      : "No hay propietario detectado por telefono.",
+  ].join("\n\n");
+
+  return NextResponse.json({
+    ok: true,
+    leadId: lead.id,
+    memorySessionId: `lead-${lead.id}`,
+    targetPhone: String(contactPhone).replace(/@s\.whatsapp\.net$/i, ""),
+    instanceName: instanceName || agency.messagingInstance || "",
+    systemPrompt,
     agentInput: buildWhatsappAgentInput({
       lead,
       messageText,
@@ -80,6 +135,10 @@ export async function POST(request: Request) {
     selectedPropertyUrl: catalog.selectedProperty
       ? buildShortPropertyUrl(catalog.selectedProperty.tenantSlug, catalog.selectedProperty.id)
       : null,
+    memoryContext: memoryContext.contextText,
+    tenantContractId: rentalContext?.contractId ?? null,
+    ownerContractId: ownerContext?.contractId ?? null,
+    contractOwnerId: ownerContext?.contractOwnerId ?? null,
     recentMessagesCount: recentMessages.length,
   });
 }

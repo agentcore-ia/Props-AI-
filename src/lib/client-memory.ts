@@ -56,6 +56,42 @@ export type TenantRentalMemoryContext = {
   exactAddress: string;
 };
 
+export type OwnerMemoryContext = {
+  contractOwnerId: string | null;
+  contractId: string;
+  propertyId: string;
+  ownerName: string;
+  ownerPhone: string | null;
+  ownerEmail: string | null;
+  participationPercent: number;
+  bankAlias: string | null;
+  bankAccount: string | null;
+  notes: string;
+  currentRent: number;
+  currency: "ARS";
+  managementFeePercent: number;
+  monthlyOwnerCosts: number;
+  status: "Activo" | "Pausado" | "Finalizado";
+  tenantName: string;
+  propertyTitle: string;
+  propertyLocation: string;
+  exactAddress: string;
+  latestSettlement: {
+    id: string;
+    settlementMonth: string;
+    ownerPayoutAmount: number;
+    status: "Borrador" | "Emitida" | "Pagada";
+    paidAt: string | null;
+  } | null;
+  latestTransfer: {
+    id: string;
+    amount: number;
+    status: "Pendiente" | "Programada" | "Enviada" | "Confirmada";
+    transferDate: string | null;
+    destinationLabel: string;
+  } | null;
+};
+
 export function normalizeMemoryPhone(phone: string | null | undefined) {
   const raw = String(phone ?? "")
     .trim()
@@ -123,6 +159,7 @@ function buildHeuristicSummary(input: {
   events: MemoryEventRow[];
   links: MemoryLinkRow[];
   rentalContext?: TenantRentalMemoryContext | null;
+  ownerContext?: OwnerMemoryContext | null;
 }) {
   const lastCustomerMessages = input.events
     .filter((event) => event.role === "customer")
@@ -138,10 +175,19 @@ function buildHeuristicSummary(input: {
   const rentalLine = input.rentalContext
     ? `Es inquilino/a de ${input.rentalContext.propertyTitle}; alquiler actual ${formatArs(input.rentalContext.currentRent)}, ajuste ${input.rentalContext.indexType} cada ${input.rentalContext.adjustmentFrequencyMonths} meses, proximo ajuste ${formatDate(input.rentalContext.nextAdjustmentDate)}.`
     : "";
+  const ownerLine = input.ownerContext
+    ? [
+        `Es propietario/a de ${input.ownerContext.propertyTitle}; participacion ${input.ownerContext.participationPercent}%, alquiler base ${formatArs(input.ownerContext.currentRent)}.`,
+        input.ownerContext.latestSettlement
+          ? `Ultima liquidacion ${input.ownerContext.latestSettlement.settlementMonth}: ${formatArs(input.ownerContext.latestSettlement.ownerPayoutAmount)} (${input.ownerContext.latestSettlement.status}).`
+          : "Sin liquidacion reciente detectada.",
+      ].join(" ")
+    : "";
 
   return [
     `${input.profile.display_name || "Cliente"} tiene memoria activa en Props.`,
     rentalLine,
+    ownerLine,
     linkedProperties.length ? `Propiedades vinculadas: ${linkedProperties.join(", ")}.` : "",
     topics.length ? `Temas frecuentes: ${topics.join(", ")}.` : "",
     lastCustomerMessages.length
@@ -162,6 +208,7 @@ function mergeFacts(
     propertyId?: string | null;
     contractId?: string | null;
     rentalContext?: TenantRentalMemoryContext | null;
+    ownerContext?: OwnerMemoryContext | null;
   }
 ) {
   const topics = new Set<string>(Array.isArray(previous.topics) ? previous.topics as string[] : []);
@@ -176,7 +223,7 @@ function mergeFacts(
     email: input.email || previous.email || null,
     propertyId: input.propertyId ?? previous.propertyId ?? null,
     contractId: input.contractId ?? previous.contractId ?? null,
-    isTenant: Boolean(input.contractId || previous.isTenant),
+    isTenant: Boolean(input.rentalContext || (!input.ownerContext && previous.isTenant)),
     rental: input.rentalContext
       ? {
           contractId: input.rentalContext.contractId,
@@ -189,6 +236,21 @@ function mergeFacts(
           lateFeeGraceDays: input.rentalContext.lateFeeGraceDays,
         }
       : previous.rental ?? null,
+    isOwner: Boolean(input.ownerContext || previous.isOwner),
+    owner: input.ownerContext
+      ? {
+          contractOwnerId: input.ownerContext.contractOwnerId,
+          contractId: input.ownerContext.contractId,
+          propertyId: input.ownerContext.propertyId,
+          propertyTitle: input.ownerContext.propertyTitle,
+          participationPercent: input.ownerContext.participationPercent,
+          currentRent: input.ownerContext.currentRent,
+          latestSettlementMonth: input.ownerContext.latestSettlement?.settlementMonth ?? null,
+          latestSettlementStatus: input.ownerContext.latestSettlement?.status ?? null,
+          latestSettlementPayout: input.ownerContext.latestSettlement?.ownerPayoutAmount ?? null,
+          latestTransferStatus: input.ownerContext.latestTransfer?.status ?? null,
+        }
+      : previous.owner ?? null,
     topics: Array.from(topics).slice(0, 24),
     lastMemoryUpdateAt: new Date().toISOString(),
   };
@@ -214,6 +276,7 @@ async function summarizeWithOpenAI(input: {
   preferences: Record<string, unknown>;
   events: MemoryEventRow[];
   rentalContext?: TenantRentalMemoryContext | null;
+  ownerContext?: OwnerMemoryContext | null;
 }) {
   const openAI = getOpenAIEnv();
   if (!openAI.configured) return null;
@@ -249,6 +312,9 @@ async function summarizeWithOpenAI(input: {
                 input.rentalContext
                   ? `Contrato detectado: ${input.rentalContext.tenantName}, ${input.rentalContext.propertyTitle}, alquiler ${formatArs(input.rentalContext.currentRent)}, ajuste ${input.rentalContext.indexType}, proximo ${formatDate(input.rentalContext.nextAdjustmentDate)}.`
                   : "Sin contrato detectado.",
+                input.ownerContext
+                  ? `Propietario detectado: ${input.ownerContext.ownerName}, propiedad ${input.ownerContext.propertyTitle}, participacion ${input.ownerContext.participationPercent}%, ultima liquidacion ${input.ownerContext.latestSettlement ? `${input.ownerContext.latestSettlement.settlementMonth} por ${formatArs(input.ownerContext.latestSettlement.ownerPayoutAmount)} (${input.ownerContext.latestSettlement.status})` : "sin liquidacion reciente"}.`
+                  : "Sin propietario detectado.",
                 "Eventos recientes:",
                 input.events
                   .slice(0, 18)
@@ -354,6 +420,7 @@ export async function rememberClientInteraction(input: {
   sourceType: string;
   sourceId?: string | null;
   rentalContext?: TenantRentalMemoryContext | null;
+  ownerContext?: OwnerMemoryContext | null;
   messages: Array<{
     direction: MemoryDirection;
     role: MemoryRole;
@@ -425,6 +492,22 @@ export async function rememberClientInteraction(input: {
     upsertMemoryLink({
       memoryId: profile.id,
       agencyId: input.agencyId,
+      entityType: "owner",
+      entityId: input.ownerContext
+        ? input.ownerContext.contractOwnerId ?? `owner:${normalizedPhone || email || input.ownerContext.ownerName}`
+        : null,
+      label: input.ownerContext?.ownerName ?? input.displayName,
+      metadata: input.ownerContext
+        ? {
+            contractId: input.ownerContext.contractId,
+            propertyId: input.ownerContext.propertyId,
+            participationPercent: input.ownerContext.participationPercent,
+          }
+        : {},
+    }),
+    upsertMemoryLink({
+      memoryId: profile.id,
+      agencyId: input.agencyId,
       entityType: "conversation",
       entityId: input.conversationId,
       label: input.sourceType,
@@ -475,6 +558,7 @@ export async function rememberClientInteraction(input: {
     propertyId: input.propertyId,
     contractId: input.contractId,
     rentalContext: input.rentalContext,
+    ownerContext: input.ownerContext,
   });
   const aiMemory = await summarizeWithOpenAI({
     previousSummary: profile.summary,
@@ -482,6 +566,7 @@ export async function rememberClientInteraction(input: {
     preferences: profile.preferences ?? {},
     events,
     rentalContext: input.rentalContext,
+    ownerContext: input.ownerContext,
   }).catch(() => null);
   const nextSummary =
     aiMemory?.summary?.trim() ||
@@ -490,6 +575,7 @@ export async function rememberClientInteraction(input: {
       events,
       links,
       rentalContext: input.rentalContext,
+      ownerContext: input.ownerContext,
     });
 
   const { data: updatedProfile, error: updateError } = await admin
@@ -509,7 +595,8 @@ export async function rememberClientInteraction(input: {
           ...(Array.isArray(profile.tags) ? profile.tags : []),
           ...(Array.isArray(aiMemory?.tags) ? aiMemory.tags : []),
           ...detectTopics(input.messages.map((message) => message.content).join(" ")),
-          input.contractId ? "inquilino" : "",
+          input.rentalContext ? "inquilino" : "",
+          input.ownerContext ? "propietario" : "",
         ].filter(Boolean))
       ).slice(0, 24),
     })
@@ -527,6 +614,7 @@ export async function buildClientMemoryContext(input: {
   email?: string | null;
   leadId?: string | null;
   rentalContext?: TenantRentalMemoryContext | null;
+  ownerContext?: OwnerMemoryContext | null;
 }) {
   const profile = await findProfile({
     agencyId: input.agencyId,
@@ -540,7 +628,9 @@ export async function buildClientMemoryContext(input: {
       profile: null,
       contextText: input.rentalContext
         ? `Memoria Props: sin nota previa, pero se detecto contrato activo. ${input.rentalContext.tenantName} alquila ${input.rentalContext.propertyTitle}. Alquiler actual ${formatArs(input.rentalContext.currentRent)}. Proximo ajuste ${formatDate(input.rentalContext.nextAdjustmentDate)} por ${input.rentalContext.indexType}.`
-        : "Memoria Props: no hay memoria previa para este contacto.",
+        : input.ownerContext
+          ? `Memoria Props: sin nota previa, pero se detecto propietario. ${input.ownerContext.ownerName} es propietario/a de ${input.ownerContext.propertyTitle} con participacion ${input.ownerContext.participationPercent}%. ${input.ownerContext.latestSettlement ? `Ultima liquidacion ${input.ownerContext.latestSettlement.settlementMonth}: ${formatArs(input.ownerContext.latestSettlement.ownerPayoutAmount)} (${input.ownerContext.latestSettlement.status}).` : "Sin liquidacion reciente detectada."}`
+          : "Memoria Props: no hay memoria previa para este contacto.",
     };
   }
 
@@ -574,6 +664,18 @@ export async function buildClientMemoryContext(input: {
   const rentalText = input.rentalContext
     ? `Contrato activo detectado: ${input.rentalContext.tenantName} alquila ${input.rentalContext.propertyTitle}. Alquiler actual ${formatArs(input.rentalContext.currentRent)}. Ajuste ${input.rentalContext.indexType} cada ${input.rentalContext.adjustmentFrequencyMonths} meses. Proximo ajuste ${formatDate(input.rentalContext.nextAdjustmentDate)}. Punitorios ${formatArs(input.rentalContext.lateFeeDailyAmount)} por dia despues de ${input.rentalContext.lateFeeGraceDays} dias de gracia.`
     : "Sin contrato activo detectado por telefono.";
+  const ownerText = input.ownerContext
+    ? [
+        `Propietario detectado: ${input.ownerContext.ownerName} de ${input.ownerContext.propertyTitle}.`,
+        `Participacion: ${input.ownerContext.participationPercent}%. Alquiler base del contrato: ${formatArs(input.ownerContext.currentRent)}. Honorarios admin: ${input.ownerContext.managementFeePercent}%. Gastos mensuales propietario: ${formatArs(input.ownerContext.monthlyOwnerCosts)}.`,
+        input.ownerContext.latestSettlement
+          ? `Ultima liquidacion: ${input.ownerContext.latestSettlement.settlementMonth}, ${formatArs(input.ownerContext.latestSettlement.ownerPayoutAmount)}, estado ${input.ownerContext.latestSettlement.status}, pagada ${formatDate(input.ownerContext.latestSettlement.paidAt)}.`
+          : "Sin liquidacion reciente detectada.",
+        input.ownerContext.latestTransfer
+          ? `Ultima transferencia: ${formatArs(input.ownerContext.latestTransfer.amount)}, estado ${input.ownerContext.latestTransfer.status}, fecha ${formatDate(input.ownerContext.latestTransfer.transferDate)}, destino ${input.ownerContext.latestTransfer.destinationLabel || "sin destino cargado"}.`
+          : "Sin transferencia reciente detectada.",
+      ].join(" ")
+    : "Sin propietario detectado por telefono.";
 
   return {
     profile,
@@ -584,6 +686,7 @@ export async function buildClientMemoryContext(input: {
       `Tags: ${(profile.tags ?? []).join(", ") || "sin tags"}`,
       `Vinculos: ${linkText}`,
       rentalText,
+      ownerText,
       "Eventos recientes:",
       recentText,
     ].join("\n"),
@@ -659,5 +762,250 @@ export async function findTenantRentalContext(input: {
     propertyTitle: property?.title ?? "la propiedad alquilada",
     propertyLocation: property?.location ?? "",
     exactAddress: property?.exact_address ?? "",
+  };
+}
+
+async function findLatestOwnerFinancials(input: {
+  agencyId: string;
+  contractId: string;
+  contractOwnerId?: string | null;
+  ownerPhone?: string | null;
+  ownerName: string;
+}) {
+  const admin = createAdminClient();
+  const normalizedOwnerPhone = normalizeMemoryPhone(input.ownerPhone);
+
+  const [{ data: settlementRows }, { data: transferRows }] = await Promise.all([
+    admin
+      .from("owner_settlements")
+      .select("id, contract_owner_id, owner_name, owner_phone, settlement_month, owner_payout_amount, status, paid_at, created_at")
+      .eq("agency_id", input.agencyId)
+      .eq("contract_id", input.contractId)
+      .order("created_at", { ascending: false })
+      .limit(30),
+    admin
+      .from("owner_transfers")
+      .select("id, contract_owner_id, owner_name, amount, status, transfer_date, destination_label, created_at")
+      .eq("agency_id", input.agencyId)
+      .eq("contract_id", input.contractId)
+      .order("created_at", { ascending: false })
+      .limit(30),
+  ]);
+
+  const settlements = (settlementRows ?? []) as Array<{
+    id: string;
+    contract_owner_id: string | null;
+    owner_name: string;
+    owner_phone: string | null;
+    settlement_month: string;
+    owner_payout_amount: number;
+    status: "Borrador" | "Emitida" | "Pagada";
+    paid_at: string | null;
+  }>;
+  const transfers = (transferRows ?? []) as Array<{
+    id: string;
+    contract_owner_id: string | null;
+    owner_name: string;
+    amount: number;
+    status: "Pendiente" | "Programada" | "Enviada" | "Confirmada";
+    transfer_date: string | null;
+    destination_label: string;
+  }>;
+  const normalizedOwnerName = input.ownerName.trim().toLowerCase();
+
+  const latestSettlement =
+    settlements.find((settlement) => input.contractOwnerId && settlement.contract_owner_id === input.contractOwnerId) ??
+    settlements.find((settlement) => normalizedOwnerPhone && normalizeMemoryPhone(settlement.owner_phone) === normalizedOwnerPhone) ??
+    settlements.find((settlement) => settlement.owner_name.trim().toLowerCase() === normalizedOwnerName) ??
+    null;
+  const latestTransfer =
+    transfers.find((transfer) => input.contractOwnerId && transfer.contract_owner_id === input.contractOwnerId) ??
+    transfers.find((transfer) => transfer.owner_name.trim().toLowerCase() === normalizedOwnerName) ??
+    null;
+
+  return {
+    latestSettlement: latestSettlement
+      ? {
+          id: latestSettlement.id,
+          settlementMonth: latestSettlement.settlement_month,
+          ownerPayoutAmount: Number(latestSettlement.owner_payout_amount ?? 0),
+          status: latestSettlement.status,
+          paidAt: latestSettlement.paid_at,
+        }
+      : null,
+    latestTransfer: latestTransfer
+      ? {
+          id: latestTransfer.id,
+          amount: Number(latestTransfer.amount ?? 0),
+          status: latestTransfer.status,
+          transferDate: latestTransfer.transfer_date,
+          destinationLabel: latestTransfer.destination_label ?? "",
+        }
+      : null,
+  };
+}
+
+export async function findOwnerMemoryContext(input: {
+  agencyId: string;
+  phone?: string | null;
+}): Promise<OwnerMemoryContext | null> {
+  const normalizedPhone = normalizeMemoryPhone(input.phone);
+  if (!normalizedPhone) return null;
+
+  const admin = createAdminClient();
+  const { data: ownerRows, error: ownerError } = await admin
+    .from("rental_contract_owners")
+    .select(
+      "id, contract_id, property_id, agency_id, full_name, email, phone, participation_percent, bank_alias, bank_account, notes, rental_contracts!inner(current_rent, currency, status, tenant_name, management_fee_percent, monthly_owner_costs), properties!inner(title, location, exact_address)"
+    )
+    .eq("agency_id", input.agencyId)
+    .limit(250);
+
+  if (ownerError && !/rental_contract_owners/i.test(ownerError.message ?? "")) {
+    console.error("[client-memory] owner lookup failed", {
+      agencyId: input.agencyId,
+      error: ownerError.message,
+    });
+  }
+
+  const ownerMatches = (ownerRows ?? []) as Array<{
+    id: string;
+    contract_id: string;
+    property_id: string;
+    full_name: string;
+    email: string | null;
+    phone: string | null;
+    participation_percent: number;
+    bank_alias: string | null;
+    bank_account: string | null;
+    notes: string | null;
+    rental_contracts:
+      | {
+          current_rent: number;
+          currency: "ARS";
+          status: "Activo" | "Pausado" | "Finalizado";
+          tenant_name: string;
+          management_fee_percent: number | null;
+          monthly_owner_costs: number | null;
+        }
+      | Array<{
+          current_rent: number;
+          currency: "ARS";
+          status: "Activo" | "Pausado" | "Finalizado";
+          tenant_name: string;
+          management_fee_percent: number | null;
+          monthly_owner_costs: number | null;
+        }>;
+    properties:
+      | { title: string; location: string; exact_address: string | null }
+      | { title: string; location: string; exact_address: string | null }[];
+  }>;
+
+  const ownerMatch = ownerMatches.find((owner) => normalizeMemoryPhone(owner.phone) === normalizedPhone);
+
+  if (ownerMatch) {
+    const contract = Array.isArray(ownerMatch.rental_contracts)
+      ? ownerMatch.rental_contracts[0]
+      : ownerMatch.rental_contracts;
+    const property = Array.isArray(ownerMatch.properties) ? ownerMatch.properties[0] : ownerMatch.properties;
+    const financials = await findLatestOwnerFinancials({
+      agencyId: input.agencyId,
+      contractId: ownerMatch.contract_id,
+      contractOwnerId: ownerMatch.id,
+      ownerPhone: ownerMatch.phone,
+      ownerName: ownerMatch.full_name,
+    });
+
+    return {
+      contractOwnerId: ownerMatch.id,
+      contractId: ownerMatch.contract_id,
+      propertyId: ownerMatch.property_id,
+      ownerName: ownerMatch.full_name,
+      ownerPhone: ownerMatch.phone,
+      ownerEmail: ownerMatch.email,
+      participationPercent: Number(ownerMatch.participation_percent ?? 100),
+      bankAlias: ownerMatch.bank_alias,
+      bankAccount: ownerMatch.bank_account,
+      notes: ownerMatch.notes ?? "",
+      currentRent: Number(contract?.current_rent ?? 0),
+      currency: contract?.currency ?? "ARS",
+      managementFeePercent: Number(contract?.management_fee_percent ?? 0),
+      monthlyOwnerCosts: Number(contract?.monthly_owner_costs ?? 0),
+      status: contract?.status ?? "Activo",
+      tenantName: contract?.tenant_name ?? "",
+      propertyTitle: property?.title ?? "la propiedad administrada",
+      propertyLocation: property?.location ?? "",
+      exactAddress: property?.exact_address ?? "",
+      ...financials,
+    };
+  }
+
+  const { data: legacyContracts, error: legacyError } = await admin
+    .from("rental_contracts")
+    .select(
+      "id, property_id, owner_name, owner_phone, owner_email, current_rent, currency, status, tenant_name, management_fee_percent, monthly_owner_costs, owner_notes, properties!inner(title, location, exact_address)"
+    )
+    .eq("agency_id", input.agencyId)
+    .neq("status", "Finalizado")
+    .limit(250);
+
+  if (legacyError) {
+    console.error("[client-memory] legacy owner lookup failed", {
+      agencyId: input.agencyId,
+      error: legacyError.message,
+    });
+    return null;
+  }
+
+  const legacyRows = (legacyContracts ?? []) as Array<{
+    id: string;
+    property_id: string;
+    owner_name: string | null;
+    owner_phone: string | null;
+    owner_email: string | null;
+    current_rent: number;
+    currency: "ARS";
+    status: "Activo" | "Pausado" | "Finalizado";
+    tenant_name: string;
+    management_fee_percent: number | null;
+    monthly_owner_costs: number | null;
+    owner_notes: string | null;
+    properties:
+      | { title: string; location: string; exact_address: string | null }
+      | { title: string; location: string; exact_address: string | null }[];
+  }>;
+
+  const legacyMatch = legacyRows.find((contract) => normalizeMemoryPhone(contract.owner_phone) === normalizedPhone);
+  if (!legacyMatch || !legacyMatch.owner_name?.trim()) return null;
+
+  const property = Array.isArray(legacyMatch.properties) ? legacyMatch.properties[0] : legacyMatch.properties;
+  const financials = await findLatestOwnerFinancials({
+    agencyId: input.agencyId,
+    contractId: legacyMatch.id,
+    ownerPhone: legacyMatch.owner_phone,
+    ownerName: legacyMatch.owner_name,
+  });
+
+  return {
+    contractOwnerId: null,
+    contractId: legacyMatch.id,
+    propertyId: legacyMatch.property_id,
+    ownerName: legacyMatch.owner_name,
+    ownerPhone: legacyMatch.owner_phone,
+    ownerEmail: legacyMatch.owner_email,
+    participationPercent: 100,
+    bankAlias: null,
+    bankAccount: null,
+    notes: legacyMatch.owner_notes ?? "",
+    currentRent: Number(legacyMatch.current_rent ?? 0),
+    currency: legacyMatch.currency,
+    managementFeePercent: Number(legacyMatch.management_fee_percent ?? 0),
+    monthlyOwnerCosts: Number(legacyMatch.monthly_owner_costs ?? 0),
+    status: legacyMatch.status,
+    tenantName: legacyMatch.tenant_name,
+    propertyTitle: property?.title ?? "la propiedad administrada",
+    propertyLocation: property?.location ?? "",
+    exactAddress: property?.exact_address ?? "",
+    ...financials,
   };
 }
