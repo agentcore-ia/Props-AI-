@@ -95,7 +95,7 @@ export function CreateAgencyDialog() {
           <DialogHeader>
             <DialogTitle>Crear inmobiliaria</DialogTitle>
             <DialogDescription>
-              Se crea el usuario real en Supabase, su perfil de acceso y el portafolio publico bajo el subdominio correspondiente.
+              Se crea el usuario real, su perfil de acceso y el portafolio publico bajo el subdominio correspondiente.
             </DialogDescription>
           </DialogHeader>
 
