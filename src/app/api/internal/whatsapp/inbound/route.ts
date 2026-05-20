@@ -10,7 +10,7 @@ import {
   type TenantRentalMemoryContext,
 } from "@/lib/client-memory";
 import type { CrmLeadMessageSummary, CrmLeadSummary } from "@/lib/crm-types";
-import { recordCrmLeadMessage, upsertLeadFromSignal } from "@/lib/crm-automation";
+import { ensureLeadTask, recordCrmLeadMessage, upsertLeadFromSignal } from "@/lib/crm-automation";
 import { sendEvolutionTextMessage } from "@/lib/evolution";
 import { getOpenAIEnv } from "@/lib/openai-env";
 import { buildShortPropertyUrl } from "@/lib/property-links";
@@ -309,6 +309,41 @@ function extractOpenAIResponseText(payload: unknown) {
     .trim();
 }
 
+function shouldEscalateToAdministration(messageText: string, replyText: string) {
+  const combined = normalizeTextForIntent(`${messageText}\n${replyText}`);
+  const reply = normalizeTextForIntent(replyText);
+  const hasAdminPromise =
+    /administracion|equipo|asesor|persona|humano|te contacte|te confirmen|lo revisen|lo calculen|derivo|paso la consulta|dejo asentado|tomo nota/.test(
+      reply
+    );
+  const needsOperationalAnswer =
+    /monto exacto|importe exacto|alquiler actualizado|aumento|rescision|rescisi[oó]n|finalizacion|fin del contrato|contrato|deuda|comprobante|pago|liquidacion|transferencia|garantia|reparacion|arreglo|mantenimiento/.test(
+      combined
+    );
+
+  return hasAdminPromise && needsOperationalAnswer;
+}
+
+function buildAdministrationTaskDetails(input: {
+  messageText: string;
+  replyText: string;
+  rentalContext?: TenantRentalMemoryContext | null;
+  ownerContext?: OwnerMemoryContext | null;
+}) {
+  const context = input.rentalContext
+    ? `Contrato: ${input.rentalContext.propertyTitle}. Inquilino: ${input.rentalContext.tenantName}. Alquiler actual: ${formatArs(input.rentalContext.currentRent)}. Proximo ajuste: ${formatDate(input.rentalContext.nextAdjustmentDate)}.`
+    : input.ownerContext
+      ? `Propietario: ${input.ownerContext.ownerName}. Propiedad: ${input.ownerContext.propertyTitle}.`
+      : "Sin contrato/propietario asociado con certeza.";
+
+  return [
+    context,
+    `Ultimo mensaje del cliente: ${input.messageText}`,
+    `La IA respondio: ${input.replyText}`,
+    "Accion: revisar y responder manualmente desde Mensajes.",
+  ].join("\n");
+}
+
 async function generateWhatsappReply(input: {
   agency: Awaited<ReturnType<typeof resolveAgencyByMessagingInstance>>;
   leadId: string;
@@ -358,6 +393,7 @@ async function generateWhatsappReply(input: {
     }),
     "Memoria persistente Props:",
     input.memoryContextText ?? "Sin memoria persistente previa.",
+    "Si prometes derivar a administracion, pedir que lo revise una persona, confirmar monto exacto o tomar nota para seguimiento humano, dilo solo cuando sea realmente necesario y redactalo como una tarea concreta para administracion.",
     input.rentalContext
       ? [
           "Contrato operativo detectado por telefono:",
@@ -750,6 +786,36 @@ export async function POST(request: Request) {
         last_activity_at: new Date().toISOString(),
       })
       .eq("id", signal.lead.id);
+
+    if (shouldEscalateToAdministration(messageText, aiReply)) {
+      await createAdminClient()
+        .from("crm_leads")
+        .update({
+          needs_response: true,
+          priority: "Alta",
+          ai_reply_draft: "Requiere administración: revisar la consulta operativa del cliente.",
+          next_follow_up_at: new Date().toISOString(),
+          last_activity_at: new Date().toISOString(),
+        })
+        .eq("id", signal.lead.id);
+
+      await ensureLeadTask({
+        agencyId: signal.lead.agency_id,
+        leadId: signal.lead.id,
+        propertyId: rentalContext?.propertyId ?? ownerContext?.propertyId ?? signal.lead.property_id,
+        title: `Administracion: responder a ${rentalContext?.tenantName ?? ownerContext?.ownerName ?? senderName}`,
+        details: buildAdministrationTaskDetails({
+          messageText,
+          replyText: aiReply,
+          rentalContext,
+          ownerContext,
+        }),
+        dueAt: new Date().toISOString(),
+        taskType: "Responder",
+        priority: "Alta",
+        automationSource: "whatsapp_admin_escalation",
+      });
+    }
   } catch (error) {
     aiError = error instanceof Error ? error.message : String(error);
     console.error("[whatsapp-inbound] automatic reply failed", {
