@@ -89,6 +89,7 @@ const PROPERTY_IMAGE_BUCKET = "property-images";
 const FALLBACK_PROPERTY_IMAGE =
   "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80";
 const MARKETPLACE_PROPERTY_STATUSES: Property["status"][] = ["Disponible", "Reservada"];
+const TEST_MARKETPLACE_PATTERNS = [/^prueba$/i, /\bdepto\s+qa\b/i, /\bqa\s+inmobiliaria\b/i];
 
 function normalizePropertyImageUrl(value: string | null | undefined) {
   const rawValue = String(value ?? "").trim();
@@ -123,6 +124,24 @@ function normalizePropertyImages(image: string, images: string[] | null) {
   }
 
   return normalizedImages;
+}
+
+function isPublicMarketplaceCandidate(row: PropertyRow) {
+  const agency = Array.isArray(row.agencies) ? row.agencies[0] : row.agencies;
+  const searchable = [row.title, row.location, agency?.slug, agency?.name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  if (!row.publish_marketplace || !MARKETPLACE_PROPERTY_STATUSES.includes(row.status)) {
+    return false;
+  }
+
+  if (agency?.slug?.startsWith("qa-")) {
+    return false;
+  }
+
+  return !TEST_MARKETPLACE_PATTERNS.some((pattern) => pattern.test(searchable));
 }
 
 type RentalContractRow = {
@@ -1225,7 +1244,9 @@ export async function listProperties(options?: { tenantSlug?: string; marketplac
       );
   }
 
-  return rows.map((row) => mapProperty(row, rentalByPropertyId.get(row.id) ?? null));
+  const visibleRows = options?.marketplaceOnly ? rows.filter(isPublicMarketplaceCandidate) : rows;
+
+  return visibleRows.map((row) => mapProperty(row, rentalByPropertyId.get(row.id) ?? null));
 }
 
 export async function getAgencyBySlug(slug: string) {
@@ -1267,6 +1288,10 @@ export async function getPropertyBySlugAndId(
   }
 
   if (!data) {
+    return null;
+  }
+
+  if (options?.marketplaceOnly && !isPublicMarketplaceCandidate(data as unknown as PropertyRow)) {
     return null;
   }
 

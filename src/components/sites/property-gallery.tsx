@@ -42,10 +42,9 @@ export function PropertyGallery({
             onClick={() => setLightboxOpen(true)}
             className="group relative block h-[220px] w-full bg-slate-100 sm:h-[420px] xl:h-[540px]"
           >
-            <Image
+            <GalleryImage
               src={activeImage}
               alt={`${title} - imagen ${activeIndex + 1}`}
-              fill
               className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
             />
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/55 via-slate-950/10 to-transparent px-4 py-4 text-left text-white">
@@ -98,10 +97,9 @@ export function PropertyGallery({
                   index === activeIndex ? "border-slate-950 ring-2 ring-slate-950/10" : "border-slate-200"
                 )}
               >
-                <Image
+                <GalleryImage
                   src={image}
                   alt={`${title} - miniatura ${index + 1}`}
-                  fill
                   className="object-cover"
                 />
               </button>
@@ -132,10 +130,9 @@ export function PropertyGallery({
 
             <div className="mx-auto mt-4 flex w-full max-w-6xl flex-1 items-center justify-center">
               <div className="relative h-full min-h-[280px] w-full overflow-hidden rounded-[24px] bg-slate-900 sm:rounded-[28px]">
-                <Image
+                <GalleryImage
                   src={activeImage}
                   alt={`${title} - ampliada ${activeIndex + 1}`}
-                  fill
                   className="object-contain"
                 />
                 {gallery.length > 1 ? (
@@ -193,5 +190,36 @@ export function PropertyGallery({
         </div>
       ) : null}
     </>
+  );
+}
+
+function GalleryImage({
+  src,
+  alt,
+  className,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed || !src) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-slate-100 px-6 text-center text-sm font-semibold text-slate-500">
+        Imagen no disponible
+      </div>
+    );
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      sizes="(max-width: 768px) 100vw, 900px"
+      className={className}
+      onError={() => setFailed(true)}
+    />
   );
 }

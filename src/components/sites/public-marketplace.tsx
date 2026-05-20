@@ -351,18 +351,25 @@ export function PublicMarketplace({
               title="Propiedades destacadas"
               description={`${filteredListings.length} resultados para explorar, ordenar y abrir en detalle.`}
             />
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-2 2xl:grid-cols-3">
-              {filteredListings.map((listing) => (
-                <MarketplacePropertyCard
-                  key={listing.id}
-                  listing={listing}
-                  isFavorite={favoriteIds.includes(listing.id)}
-                  isInComparison={comparisonIds.includes(listing.id)}
-                  onToggleFavorite={toggleFavorite}
-                  onToggleComparison={toggleComparison}
-                />
-              ))}
-            </div>
+            {filteredListings.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                {filteredListings.map((listing) => (
+                  <MarketplacePropertyCard
+                    key={listing.id}
+                    listing={listing}
+                    isFavorite={favoriteIds.includes(listing.id)}
+                    isInComparison={comparisonIds.includes(listing.id)}
+                    onToggleFavorite={toggleFavorite}
+                    onToggleComparison={toggleComparison}
+                  />
+                ))}
+              </div>
+            ) : (
+              <EmptyPanel
+                title="No encontramos propiedades con esos filtros"
+                description="Prueba con otra zona, cambia entre venta y alquiler o borra la busqueda para ver todas las publicaciones activas."
+              />
+            )}
           </section>
         ) : null}
 
@@ -408,19 +415,19 @@ export function PublicMarketplace({
                         <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
                           <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Dorm.</p>
                           <p className="mt-1 text-base font-semibold text-slate-950">
-                            {selectedMapListing.bedrooms}
+                            {formatCountValue(selectedMapListing.bedrooms)}
                           </p>
                         </div>
                         <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
-                          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Banos</p>
+                          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Baños</p>
                           <p className="mt-1 text-base font-semibold text-slate-950">
-                            {selectedMapListing.bathrooms}
+                            {formatCountValue(selectedMapListing.bathrooms)}
                           </p>
                         </div>
                         <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
                           <p className="text-xs uppercase tracking-[0.18em] text-slate-400">m2</p>
                           <p className="mt-1 text-base font-semibold text-slate-950">
-                            {selectedMapListing.area}
+                            {formatAreaValue(selectedMapListing.area, false)}
                           </p>
                         </div>
                       </div>
@@ -516,19 +523,19 @@ export function PublicMarketplace({
                       <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
                         <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Dorm.</p>
                         <p className="mt-1 text-base font-semibold text-slate-950">
-                          {selectedMapListing.bedrooms}
+                          {formatCountValue(selectedMapListing.bedrooms)}
                         </p>
                       </div>
                       <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Banos</p>
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Baños</p>
                         <p className="mt-1 text-base font-semibold text-slate-950">
-                          {selectedMapListing.bathrooms}
+                          {formatCountValue(selectedMapListing.bathrooms)}
                         </p>
                       </div>
                       <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
                         <p className="text-xs uppercase tracking-[0.18em] text-slate-400">m2</p>
                         <p className="mt-1 text-base font-semibold text-slate-950">
-                          {selectedMapListing.area}
+                          {formatAreaValue(selectedMapListing.area, false)}
                         </p>
                       </div>
                     </div>
@@ -621,7 +628,7 @@ export function PublicMarketplace({
                           <th key={listing.id} className="min-w-[280px] px-5 py-4 text-left sm:px-6">
                             <div className="space-y-3">
                               <div className="relative h-28 overflow-hidden rounded-[22px] border border-slate-200">
-                                <Image src={listing.image} alt={listing.title} fill className="object-cover" />
+                                <SafePropertyImage src={listing.image} alt={listing.title} className="object-cover" />
                               </div>
                               <div>
                                 <p className="text-lg font-semibold text-slate-950">{listing.title}</p>
@@ -705,7 +712,7 @@ export function PublicMarketplace({
                       className="grid gap-4 rounded-[26px] border border-slate-200 bg-slate-50 p-4 md:grid-cols-[120px_1fr_auto]"
                     >
                       <div className="relative h-24 overflow-hidden rounded-[18px]">
-                        <Image src={listing.image} alt={listing.title} fill className="object-cover" />
+                        <SafePropertyImage src={listing.image} alt={listing.title} className="object-cover" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
@@ -717,7 +724,13 @@ export function PublicMarketplace({
                         <div className="mt-3 flex flex-wrap gap-2">
                           <MetricBadge label={`${listing.yieldPercent}% yield`} />
                           <MetricBadge label={`${listing.appreciationPercent}% apreciacion`} />
-                          <MetricBadge label={`${listing.currency} ${listing.pricePerSquareMeter}/m2`} />
+                          <MetricBadge
+                            label={
+                              listing.pricePerSquareMeter > 0
+                                ? `${listing.currency} ${listing.pricePerSquareMeter}/m2`
+                                : "m2 a confirmar"
+                            }
+                          />
                         </div>
                       </div>
                       <div className="flex flex-col items-start gap-2 md:items-end">
@@ -796,10 +809,9 @@ function MarketplacePropertyCard({
     <article className="overflow-hidden rounded-[18px] border border-slate-200 bg-white shadow-[0_24px_60px_-50px_rgba(15,23,42,0.24)] transition-transform duration-300 hover:-translate-y-1 sm:rounded-[24px]">
       <div className="relative h-32 overflow-hidden sm:h-64">
         <Link href={listing.routeHref} className="block h-full">
-          <Image
+          <SafePropertyImage
             src={listing.image}
             alt={listing.title}
-            fill
             className="object-cover transition-transform duration-500 hover:scale-[1.03]"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/55 via-transparent to-transparent" />
@@ -846,18 +858,20 @@ function MarketplacePropertyCard({
             </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-2 py-2 text-right">
             <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">m2</p>
-            <p className="mt-1 text-xs font-semibold text-slate-950 sm:text-sm">{listing.area}</p>
+            <p className="mt-1 text-xs font-semibold text-slate-950 sm:text-sm">
+              {formatAreaValue(listing.area, false)}
+            </p>
           </div>
         </div>
 
           <div className="flex flex-wrap gap-2 border-y border-slate-100 py-2 text-[11px] text-slate-600 sm:text-sm">
           <div className="inline-flex items-center gap-2">
             <BedDouble className="size-4" />
-            {listing.bedrooms}
+            {formatCountValue(listing.bedrooms)}
           </div>
           <div className="inline-flex items-center gap-2">
             <Bath className="size-4" />
-            {listing.bathrooms}
+            {formatCountValue(listing.bathrooms)}
           </div>
           <div className="inline-flex items-center gap-2">
             <Layers3 className="size-4" />
@@ -924,7 +938,7 @@ function CompactMapListing({
       >
         <div className="grid gap-3 sm:grid-cols-[96px_1fr]">
           <div className="relative h-24 overflow-hidden rounded-[16px]">
-            <Image src={listing.image} alt={listing.title} fill className="object-cover" />
+            <SafePropertyImage src={listing.image} alt={listing.title} className="object-cover" />
           </div>
           <div className="min-w-0">
             <div className="flex items-start justify-between gap-3">
@@ -960,9 +974,9 @@ function CompactMapListing({
             </div>
             <p className="mt-2 line-clamp-2 text-xs text-slate-500">{listing.location}</p>
             <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-600">
-              <span>{listing.bedrooms} dorm.</span>
-              <span>{listing.bathrooms} banos</span>
-              <span>{listing.area} m2</span>
+              <span>{formatCountValue(listing.bedrooms)} dorm.</span>
+              <span>{formatCountValue(listing.bathrooms)} baños</span>
+              <span>{formatAreaValue(listing.area)}</span>
             </div>
           </div>
         </div>
@@ -1038,6 +1052,52 @@ function MetricBadge({ label, dark = false }: { label: string; dark?: boolean })
   );
 }
 
+function SafePropertyImage({
+  src,
+  alt,
+  className,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed || !src) {
+    return (
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-slate-100 to-slate-200 text-center text-slate-500">
+        <Building2 className="size-6" />
+        <span className="px-4 text-xs font-semibold uppercase tracking-[0.18em]">
+          Imagen no disponible
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 420px"
+      className={className}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+function formatCountValue(value: number) {
+  return value > 0 ? String(value) : "Consultar";
+}
+
+function formatAreaValue(value: number, withUnit = true) {
+  if (value <= 0) {
+    return "Consultar";
+  }
+
+  return withUnit ? `${value} m2` : String(value);
+}
+
 function comparisonRows(listings: PublicListing[]) {
   return [
     {
@@ -1046,15 +1106,17 @@ function comparisonRows(listings: PublicListing[]) {
     },
     {
       label: "Precio / m2",
-      values: listings.map((listing) => `${listing.currency} ${listing.pricePerSquareMeter}`),
+      values: listings.map((listing) =>
+        listing.pricePerSquareMeter > 0 ? `${listing.currency} ${listing.pricePerSquareMeter}` : "Consultar"
+      ),
     },
     {
       label: "Superficie total",
-      values: listings.map((listing) => `${listing.area} m2`),
+      values: listings.map((listing) => formatAreaValue(listing.area)),
     },
     {
       label: "Dormitorios",
-      values: listings.map((listing) => String(listing.bedrooms)),
+      values: listings.map((listing) => formatCountValue(listing.bedrooms)),
     },
     {
       label: "Disponible desde",

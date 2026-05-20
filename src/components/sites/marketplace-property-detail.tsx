@@ -96,7 +96,7 @@ export function MarketplacePropertyDetail({
     {
       icon: <Ruler className="size-4" />,
       label: "Superficie",
-      value: `${listing.area} m2`,
+      value: formatDetailArea(listing.area),
       show: true,
     },
     {
@@ -183,7 +183,9 @@ export function MarketplacePropertyDetail({
                   {formatMoney(listing.price, listing.currency)}
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  {listing.currency} {listing.pricePerSquareMeter} / m2
+                  {listing.pricePerSquareMeter > 0
+                    ? `${listing.currency} ${listing.pricePerSquareMeter} / m2`
+                    : "Superficie a confirmar"}
                 </p>
               </div>
             </div>
@@ -191,9 +193,9 @@ export function MarketplacePropertyDetail({
             <PropertyGallery title={listing.title} images={listing.images} />
 
             <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">
-              <SpecCard icon={<BedDouble className="size-4" />} label="Dormitorios" value={`${listing.bedrooms}`} hint={`${listing.suites} en suite`} />
-              <SpecCard icon={<Bath className="size-4" />} label="Banos" value={`${listing.bathrooms}`} hint="configuracion actual" />
-              <SpecCard icon={<Ruler className="size-4" />} label="Construccion" value={`${listing.area} m2`} hint={`${listing.lotArea} m2 totales`} />
+              <SpecCard icon={<BedDouble className="size-4" />} label="Dormitorios" value={formatDetailCount(listing.bedrooms)} hint={listing.suites > 0 ? `${listing.suites} en suite` : "segun ficha"} />
+              <SpecCard icon={<Bath className="size-4" />} label="Baños" value={formatDetailCount(listing.bathrooms)} hint="configuracion actual" />
+              <SpecCard icon={<Ruler className="size-4" />} label="Construccion" value={formatDetailArea(listing.area)} hint={listing.lotArea > 0 ? `${listing.lotArea} m2 totales` : "a confirmar"} />
               <SpecCard icon={<CalendarDays className="size-4" />} label="Disponible" value={listing.availableFrom || "Inmediata"} hint="fecha estimada" />
             </div>
           </div>
@@ -405,6 +407,14 @@ function buildAgencySocialLinks(agency: Agency) {
       ? { label: "Facebook", href: agency.facebookUrl, icon: <Building2 className="size-3.5" /> }
       : null,
   ].filter(Boolean) as Array<{ label: string; href: string; icon: ReactNode }>;
+}
+
+function formatDetailCount(value: number) {
+  return value > 0 ? String(value) : "Consultar";
+}
+
+function formatDetailArea(value: number) {
+  return value > 0 ? `${value} m2` : "A confirmar";
 }
 
 function SpecCard({
