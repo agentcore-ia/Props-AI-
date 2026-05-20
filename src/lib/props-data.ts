@@ -45,6 +45,7 @@ type AgencyRow = {
   tagline: string;
   messaging_instance: string;
   whatsapp_ai_enabled?: boolean;
+  business_hours?: string | null;
   website_url?: string | null;
   instagram_url?: string | null;
   facebook_url?: string | null;
@@ -719,6 +720,7 @@ function mapAgency(row: AgencyRow): Agency {
     tagline: row.tagline,
     messagingInstance: row.messaging_instance,
     whatsappAiEnabled: row.whatsapp_ai_enabled ?? true,
+    businessHours: row.business_hours ?? null,
     websiteUrl: row.website_url ?? null,
     instagramUrl: row.instagram_url ?? null,
     facebookUrl: row.facebook_url ?? null,

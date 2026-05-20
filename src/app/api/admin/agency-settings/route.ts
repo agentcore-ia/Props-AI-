@@ -56,6 +56,7 @@ export async function POST(request: Request) {
   const phone = String(body.phone ?? "").trim();
   const city = String(body.city ?? "").trim();
   const tagline = String(body.tagline ?? "").trim();
+  const businessHours = String(body.businessHours ?? "").trim();
   const websiteUrl = normalizeOptionalUrl(body.websiteUrl);
   const instagramUrl = normalizeOptionalUrl(body.instagramUrl);
   const facebookUrl = normalizeOptionalUrl(body.facebookUrl);
@@ -106,6 +107,7 @@ export async function POST(request: Request) {
   };
   const extendedPayload = {
     ...basePayload,
+    business_hours: businessHours,
     website_url: websiteUrl,
     instagram_url: instagramUrl,
     facebook_url: facebookUrl,
@@ -126,7 +128,7 @@ export async function POST(request: Request) {
 
   if (
     error?.message &&
-    /(website_url|instagram_url|facebook_url)/i.test(error.message)
+    /(business_hours|website_url|instagram_url|facebook_url)/i.test(error.message)
   ) {
     const fallbackAttempt = await admin
       .from("agencies")

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
+  Clock3,
   Loader2,
   MessageCircle,
   QrCode,
@@ -41,6 +42,7 @@ type ManagedAgency = {
   owner_email: string;
   messaging_instance: string;
   whatsapp_ai_enabled?: boolean;
+  business_hours?: string | null;
   website_url?: string | null;
   instagram_url?: string | null;
   facebook_url?: string | null;
@@ -95,6 +97,7 @@ function buildInitialForm(agency: ManagedAgency | null) {
     tagline: agency?.tagline ?? "",
     messagingInstance: agency?.messaging_instance ?? "",
     whatsappAiEnabled: agency?.whatsapp_ai_enabled ?? true,
+    businessHours: agency?.business_hours ?? "",
     websiteUrl: agency?.website_url ?? "",
     instagramUrl: agency?.instagram_url ?? "",
     facebookUrl: agency?.facebook_url ?? "",
@@ -296,6 +299,7 @@ export function AgencySettingsWorkspace({
         websiteUrl: form.websiteUrl,
         instagramUrl: form.instagramUrl,
         facebookUrl: form.facebookUrl,
+        businessHours: form.businessHours,
         messagingInstance: normalizeInstance(form.messagingInstance),
         whatsappAiEnabled: form.whatsappAiEnabled,
       }),
@@ -421,6 +425,27 @@ export function AgencySettingsWorkspace({
                 value={form.tagline}
                 onChange={(event) => setForm((prev) => ({ ...prev, tagline: event.target.value }))}
               />
+            </div>
+            <div className="space-y-2 md:col-span-2 rounded-[24px] border bg-muted/20 p-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-2xl bg-primary/10 p-2 text-primary">
+                  <Clock3 className="size-4" />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <label className="text-sm font-semibold">Horarios de atencion</label>
+                  <Textarea
+                    rows={4}
+                    value={form.businessHours}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, businessHours: event.target.value }))
+                    }
+                    placeholder="Ej: Lunes a viernes de 9 a 18 hs. Sabados de 9 a 13 hs. Domingos cerrado."
+                  />
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    La IA usa este horario solo para responder si la inmobiliaria esta abierta o cerrada. Las consultas se siguen atendiendo igual fuera de horario.
+                  </p>
+                </div>
+              </div>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Sitio web</label>

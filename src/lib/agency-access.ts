@@ -15,6 +15,7 @@ export type ManagedAgency = {
   owner_email: string;
   messaging_instance: string;
   whatsapp_ai_enabled?: boolean;
+  business_hours?: string | null;
   website_url?: string | null;
   instagram_url?: string | null;
   facebook_url?: string | null;

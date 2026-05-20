@@ -31,6 +31,7 @@ export type Agency = {
   tagline: string;
   messagingInstance?: string;
   whatsappAiEnabled?: boolean;
+  businessHours?: string | null;
   websiteUrl?: string | null;
   instagramUrl?: string | null;
   facebookUrl?: string | null;

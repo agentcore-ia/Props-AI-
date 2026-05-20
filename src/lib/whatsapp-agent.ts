@@ -17,12 +17,13 @@ type MessagingAgencyRow = {
   tagline: string;
   messaging_instance: string;
   whatsapp_ai_enabled?: boolean;
+  business_hours?: string | null;
 };
 
 export type MessagingAgency = Pick<
   Agency,
   "id" | "slug" | "name" | "city" | "email" | "phone" | "tagline" | "messagingInstance"
-> & { whatsappAiEnabled: boolean };
+> & { whatsappAiEnabled: boolean; businessHours?: string | null };
 
 function mapMessagingAgency(row: MessagingAgencyRow): MessagingAgency {
   return {
@@ -35,7 +36,21 @@ function mapMessagingAgency(row: MessagingAgencyRow): MessagingAgency {
     tagline: row.tagline,
     messagingInstance: row.messaging_instance,
     whatsappAiEnabled: row.whatsapp_ai_enabled ?? true,
+    businessHours: row.business_hours ?? null,
   };
+}
+
+function formatBuenosAiresNow() {
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    weekday: "long",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date());
 }
 
 function normalizeMessageText(value: string) {
@@ -194,7 +209,7 @@ export async function resolveAgencyByMessagingInstance(instanceName: string) {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("agencies")
-    .select("id, slug, name, city, email, phone, tagline, messaging_instance, whatsapp_ai_enabled");
+    .select("id, slug, name, city, email, phone, tagline, messaging_instance, whatsapp_ai_enabled, business_hours");
 
   if (error) {
     throw error;
@@ -251,6 +266,7 @@ export function buildWhatsappSystemPrompt(input: {
   const selectedPropertyImages = input.selectedProperty?.images
     .filter(Boolean)
     .length;
+  const businessHours = input.agency.businessHours?.trim();
   const hasFixedProperty = Boolean(input.selectedProperty || input.lead.propertyId);
   const isVisitFlow =
     input.lead.stage === "Visita" ||
@@ -269,6 +285,9 @@ export function buildWhatsappSystemPrompt(input: {
     "Hablas en espanol rioplatense, con tono humano, claro y comercial. Nunca digas que eres un bot salvo que te lo pregunten.",
     "Tu trabajo es responder consultas de compra o alquiler, aclarar precio, ubicacion, requisitos, mascotas, expensas, disponibilidad, amenities y proximo paso.",
     "Tambien atiendes mensajes operativos de inquilinos: pagos, comprobantes, demoras, aumentos, contratos y administracion. Si el cliente habla de pagar alquiler, enviar comprobante, deuda o demora, no lo trates como lead nuevo ni le preguntes presupuesto/zona: responde como administracion y toma nota del aviso.",
+    businessHours
+      ? `Horarios de atencion de la inmobiliaria: ${businessHours}. Fecha y hora actual en Buenos Aires: ${formatBuenosAiresNow()}. Si preguntan si estan abiertos, responde abierto/cerrado segun este horario. Aunque este cerrado, igual responde consultas, toma datos y deja claro que el equipo lo retoma en horario de atencion.`
+      : `La inmobiliaria no cargo horarios de atencion. Fecha y hora actual en Buenos Aires: ${formatBuenosAiresNow()}. Si preguntan si estan abiertos, deci que no tenes el horario exacto cargado, pero igual podes tomar la consulta para que el equipo responda.`,
     "Solo puedes afirmar datos que esten en el contexto. Si no aparece algo, dilo con honestidad y ofrece derivarlo al equipo.",
     "Si no sabes con certeza de que propiedad o contrato habla el cliente, dilo explicitamente. Nunca inventes una propiedad, nunca mezcles inmobiliarias y nunca pases links de propiedades fuera de esta inmobiliaria.",
     "Cuando el cliente muestra interes concreto, invita a dejar horario, presupuesto o coordinar visita. Cuando haga falta, pide una sola aclaracion a la vez.",

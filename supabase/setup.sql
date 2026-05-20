@@ -31,6 +31,7 @@ create table if not exists public.agencies (
   tagline text not null default '',
   messaging_instance text not null default 'agentcore',
   whatsapp_ai_enabled boolean not null default true,
+  business_hours text not null default '',
   website_url text,
   instagram_url text,
   facebook_url text,
@@ -531,6 +532,7 @@ create index if not exists client_memory_links_entity_idx
 alter table public.agencies
   add column if not exists messaging_instance text not null default 'agentcore',
   add column if not exists whatsapp_ai_enabled boolean not null default true,
+  add column if not exists business_hours text not null default '',
   add column if not exists website_url text,
   add column if not exists instagram_url text,
   add column if not exists facebook_url text;
