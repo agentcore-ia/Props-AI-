@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -128,10 +129,14 @@ function SidebarContent({ userRole = "agency_admin" }: { userRole?: AppRole | nu
     <div className="flex h-full flex-col">
       <div className="px-3 py-3">
         <Link href="/dashboard" className="block transition-opacity hover:opacity-80">
-          <span className="block text-xl font-semibold tracking-tight text-slate-950">PROPS</span>
-          <span className="mt-0.5 block text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            Control inmobiliario
-          </span>
+          <Image
+            src="/props-control-logo.svg"
+            alt="Props Control Inmobiliario"
+            width={160}
+            height={100}
+            priority
+            className="h-auto w-32"
+          />
         </Link>
       </div>
 

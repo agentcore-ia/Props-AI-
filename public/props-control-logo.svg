@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+<g fill="none" stroke="#111820" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+<path d="M335 190 L335 60 L395 25 L395 190"/>
+<path d="M405 80 L455 110 L455 190"/>
+</g>
+
+<text x="400" y="320" text-anchor="middle"
+font-family="Montserrat, Arial, sans-serif"
+font-size="115" font-weight="300" fill="#111820" letter-spacing="8">PROPS</text>
+
+<text x="400" y="410" text-anchor="middle"
+font-family="Montserrat, Arial, sans-serif"
+font-size="36" font-weight="300" fill="#7A7F86" letter-spacing="9">CONTROL INMOBILIARIO</text>
+</svg>
