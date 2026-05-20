@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { isAutomationRequest } from "@/lib/automation-auth";
+import {
+  buildClientMemoryContext,
+  findTenantRentalContext,
+  rememberClientInteraction,
+  type TenantRentalMemoryContext,
+} from "@/lib/client-memory";
 import type { CrmLeadMessageSummary, CrmLeadSummary } from "@/lib/crm-types";
 import { recordCrmLeadMessage, upsertLeadFromSignal } from "@/lib/crm-automation";
 import { sendEvolutionTextMessage } from "@/lib/evolution";
@@ -118,18 +124,47 @@ function firstName(value: string) {
   return value.trim().split(/\s+/)[0] || "ahi";
 }
 
+function formatArs(value: number) {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "sin fecha";
+  const [year, month, day] = value.slice(0, 10).split("-");
+  if (!year || !month || !day) return value;
+  return `${day}/${month}/${year}`;
+}
+
 function threadContains(messages: CrmLeadMessageSummary[], pattern: RegExp) {
   return messages.some((message) => pattern.test(normalizeTextForIntent(message.content)));
+}
+
+function isRentAmountQuestion(messageText: string) {
+  const normalized = normalizeTextForIntent(messageText);
+  return (
+    /cuanto|valor|monto|importe|pagar|sale|debo/.test(normalized) &&
+    /alquiler|mes|proximo|viene|contrato|deuda/.test(normalized)
+  );
 }
 
 function formatKnownContext(input: {
   lead: CrmLeadSummary;
   agencyName: string;
   recentMessages: CrmLeadMessageSummary[];
+  rentalContext?: TenantRentalMemoryContext | null;
 }) {
-  const propertyLine = input.lead.propertyTitle
+  const propertyLine = input.rentalContext
+    ? `Tengo un contrato activo asociado a ${input.rentalContext.propertyTitle}${input.rentalContext.propertyLocation ? ` en ${input.rentalContext.propertyLocation}` : ""}.`
+    : input.lead.propertyTitle
     ? `Estamos hablando de ${input.lead.propertyTitle}${input.lead.propertyLocation ? ` en ${input.lead.propertyLocation}` : ""}.`
     : "No tengo una propiedad puntual asociada con certeza en este chat.";
+  const rentalLine = input.rentalContext
+    ? `Alquiler actual: ${formatArs(input.rentalContext.currentRent)}. Ajuste: ${input.rentalContext.indexType} cada ${input.rentalContext.adjustmentFrequencyMonths} meses. Proximo ajuste: ${formatDate(input.rentalContext.nextAdjustmentDate)}.`
+    : "";
   const customerMessages = input.recentMessages
     .filter((message) => message.senderRole === "customer")
     .slice(-4)
@@ -139,7 +174,9 @@ function formatKnownContext(input: {
     ? `Lo ultimo que tengo registrado es: ${customerMessages.join(" / ")}.`
     : "Todavia no tengo muchos mensajes previos tuyos en este hilo.";
 
-  return `${propertyLine} Estas hablando con ${input.agencyName}. ${historyLine}`;
+  return [propertyLine, rentalLine, `Estas hablando con ${input.agencyName}.`, historyLine]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function buildContextualFallbackReply(input: {
@@ -147,6 +184,8 @@ function buildContextualFallbackReply(input: {
   lead: CrmLeadSummary;
   messageText: string;
   recentMessages: CrmLeadMessageSummary[];
+  rentalContext?: TenantRentalMemoryContext | null;
+  memoryContextText?: string | null;
 }) {
   const normalized = normalizeTextForIntent(input.messageText);
   const name = firstName(input.lead.fullName);
@@ -168,6 +207,17 @@ function buildContextualFallbackReply(input: {
   }
 
   if (hasPaymentContext) {
+    if (
+      input.rentalContext &&
+      /cuanto|valor|monto|importe|pagar|alquiler|mes que viene|proximo mes|proximo/.test(normalized)
+    ) {
+      const adjustmentLine = input.rentalContext.nextAdjustmentDate
+        ? `El proximo ajuste figura para el ${formatDate(input.rentalContext.nextAdjustmentDate)} por ${input.rentalContext.indexType}.`
+        : "No veo una fecha de ajuste cargada.";
+
+      return `${name}, tu alquiler actual registrado para ${input.rentalContext.propertyTitle} es ${formatArs(input.rentalContext.currentRent)}. ${adjustmentLine} Si el mes que viene cae antes del ajuste, el importe base es ese mismo monto; si coincide con el ajuste, ${input.agencyName} lo recalcula con el indice oficial y te avisa.`;
+    }
+
     if (/comprobante|transfer/.test(normalized)) {
       return `Gracias, ${name}. Cuando tengas el comprobante, mandalo por aca y ${input.agencyName} lo registra en tu cuenta.`;
     }
@@ -221,6 +271,8 @@ async function generateWhatsappReply(input: {
   leadId: string;
   messageText: string;
   fallback: string;
+  rentalContext?: TenantRentalMemoryContext | null;
+  memoryContextText?: string | null;
 }) {
   const openAI = getOpenAIEnv();
   const lead = await getCrmLeadById(input.leadId);
@@ -238,28 +290,55 @@ async function generateWhatsappReply(input: {
     lead,
     messageText: input.messageText,
     recentMessages,
+    rentalContext: input.rentalContext,
+    memoryContextText: input.memoryContextText,
   });
-  const systemPrompt = buildWhatsappSystemPrompt({
-    agency: input.agency ?? {
-      id: lead.agencyId,
-      slug: lead.agencySlug,
-      name: lead.agencyName,
-      city: lead.desiredLocation ?? "",
-      email: "",
-      phone: "",
-      tagline: "",
-      messagingInstance: "",
-    },
-    lead,
-    selectedProperty: catalog.selectedProperty,
-    catalogSummary: catalog.catalogSummary,
-    recentMessages,
-  });
-  const agentInput = buildWhatsappAgentInput({
-    lead,
-    messageText: input.messageText,
-    selectedProperty: catalog.selectedProperty,
-  });
+  const systemPrompt = [
+    buildWhatsappSystemPrompt({
+      agency: input.agency ?? {
+        id: lead.agencyId,
+        slug: lead.agencySlug,
+        name: lead.agencyName,
+        city: lead.desiredLocation ?? "",
+        email: "",
+        phone: "",
+        tagline: "",
+        messagingInstance: "",
+      },
+      lead,
+      selectedProperty: catalog.selectedProperty,
+      catalogSummary: catalog.catalogSummary,
+      recentMessages,
+    }),
+    "Memoria persistente Props:",
+    input.memoryContextText ?? "Sin memoria persistente previa.",
+    input.rentalContext
+      ? [
+          "Contrato operativo detectado por telefono:",
+          `Inquilino: ${input.rentalContext.tenantName}.`,
+          `Propiedad alquilada: ${input.rentalContext.propertyTitle} | ${input.rentalContext.propertyLocation} | ${input.rentalContext.exactAddress || "sin direccion exacta"}.`,
+          `Alquiler actual registrado: ${formatArs(input.rentalContext.currentRent)}.`,
+          `Indice: ${input.rentalContext.indexType}. Frecuencia: cada ${input.rentalContext.adjustmentFrequencyMonths} meses.`,
+          `Inicio: ${formatDate(input.rentalContext.contractStartDate)}. Ultimo ajuste: ${formatDate(input.rentalContext.lastAdjustmentDate)}. Proximo ajuste: ${formatDate(input.rentalContext.nextAdjustmentDate)}.`,
+          `Punitorios: ${formatArs(input.rentalContext.lateFeeDailyAmount)} por dia despues de ${input.rentalContext.lateFeeGraceDays} dias de gracia.`,
+          "Si pregunta por su alquiler, pago, deuda, comprobante, proximo mes o ajuste, responde como administracion con estos datos duros. No preguntes presupuesto ni zona.",
+        ].join("\n")
+      : "No hay contrato operativo detectado por telefono.",
+  ].join("\n\n");
+  const agentInput = [
+    buildWhatsappAgentInput({
+      lead,
+      messageText: input.messageText,
+      selectedProperty: catalog.selectedProperty,
+    }),
+    input.rentalContext
+      ? `El contacto coincide con un inquilino: contrato ${input.rentalContext.contractId}, propiedad ${input.rentalContext.propertyTitle}, alquiler actual ${formatArs(input.rentalContext.currentRent)}.`
+      : "No se encontro contrato de alquiler asociado por telefono.",
+  ].join("\n");
+
+  if (input.rentalContext && isRentAmountQuestion(input.messageText)) {
+    return contextualFallback;
+  }
 
   if (!openAI.configured) {
     return contextualFallback;
@@ -337,6 +416,18 @@ export async function POST(request: Request) {
     );
   }
 
+  const rentalContext = await findTenantRentalContext({
+    agencyId: agency.id,
+    phone: remoteJid,
+  }).catch((error) => {
+    console.error("[whatsapp-inbound] tenant rental context failed", {
+      agencyId: agency.id,
+      remoteJid,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  });
+
   if (waMessageId) {
     const admin = createAdminClient();
     const { data: existingMessage } = await admin
@@ -366,17 +457,35 @@ export async function POST(request: Request) {
       messagingInstance: agency.messagingInstance ?? null,
     },
     property: null,
-    fullName: senderName,
+    fullName: rentalContext?.tenantName ?? senderName,
     email: null,
     phone: remoteJid,
     source: "whatsapp_inbound",
     message: messageText,
   });
 
+  if (rentalContext) {
+    await createAdminClient()
+      .from("crm_leads")
+      .update({
+        property_id: rentalContext.propertyId,
+        full_name: rentalContext.tenantName,
+        stage: "Seguimiento",
+        priority: "Media",
+        qualification_summary: `Inquilino con contrato activo en ${rentalContext.propertyTitle}.`,
+        intent: "Gestion de alquiler",
+        desired_operation: "Alquiler",
+        desired_location: rentalContext.propertyLocation,
+        needs_response: false,
+        last_activity_at: new Date().toISOString(),
+      })
+      .eq("id", signal.lead.id);
+  }
+
   await recordCrmLeadMessage({
     leadId: signal.lead.id,
     agencyId: signal.lead.agency_id,
-    propertyId: signal.lead.property_id,
+    propertyId: rentalContext?.propertyId ?? signal.lead.property_id,
     content: messageText,
     direction: "incoming",
     senderRole: "customer",
@@ -386,7 +495,51 @@ export async function POST(request: Request) {
       instanceName,
       remoteJid,
       source: "evolution_webhook",
+      rentalContractId: rentalContext?.contractId ?? null,
     },
+  });
+
+  await rememberClientInteraction({
+    agencyId: agency.id,
+    displayName: rentalContext?.tenantName ?? senderName,
+    phone: remoteJid,
+    leadId: signal.lead.id,
+    propertyId: rentalContext?.propertyId ?? signal.lead.property_id,
+    propertyTitle: rentalContext?.propertyTitle ?? null,
+    contractId: rentalContext?.contractId ?? null,
+    sourceType: "whatsapp_inbound",
+    sourceId: waMessageId,
+    rentalContext,
+    messages: [
+      {
+        direction: "incoming",
+        role: "customer",
+        content: messageText,
+        metadata: {
+          messageType,
+          instanceName,
+          remoteJid,
+        },
+      },
+    ],
+  }).catch((error) => {
+    console.error("[whatsapp-inbound] memory write failed", {
+      leadId: signal.lead.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
+
+  const memoryContext = await buildClientMemoryContext({
+    agencyId: agency.id,
+    phone: remoteJid,
+    leadId: signal.lead.id,
+    rentalContext,
+  }).catch((error) => {
+    console.error("[whatsapp-inbound] memory context failed", {
+      leadId: signal.lead.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { profile: null, contextText: null };
   });
 
   const latestLead = await getCrmLeadById(signal.lead.id);
@@ -399,6 +552,8 @@ export async function POST(request: Request) {
       leadId: signal.lead.id,
       messageText,
       fallback: signal.insight.replyDraft,
+      rentalContext,
+      memoryContextText: memoryContext.contextText,
     });
 
     await sendEvolutionTextMessage({
@@ -410,7 +565,7 @@ export async function POST(request: Request) {
     await recordCrmLeadMessage({
       leadId: signal.lead.id,
       agencyId: signal.lead.agency_id,
-      propertyId: signal.lead.property_id,
+      propertyId: rentalContext?.propertyId ?? signal.lead.property_id,
       content: aiReply,
       direction: "outgoing",
       senderRole: "assistant",
@@ -419,7 +574,37 @@ export async function POST(request: Request) {
         instanceName,
         remoteJid,
         source: "whatsapp_inbound_auto_reply",
+        rentalContractId: rentalContext?.contractId ?? null,
       },
+    });
+
+    await rememberClientInteraction({
+      agencyId: agency.id,
+      displayName: rentalContext?.tenantName ?? latestLead?.fullName ?? senderName,
+      phone: remoteJid,
+      leadId: signal.lead.id,
+      propertyId: rentalContext?.propertyId ?? latestLead?.propertyId ?? signal.lead.property_id,
+      propertyTitle: rentalContext?.propertyTitle ?? latestLead?.propertyTitle ?? null,
+      contractId: rentalContext?.contractId ?? null,
+      sourceType: "whatsapp_inbound_auto_reply",
+      sourceId: waMessageId,
+      rentalContext,
+      messages: [
+        {
+          direction: "outgoing",
+          role: "assistant",
+          content: aiReply,
+          metadata: {
+            instanceName,
+            remoteJid,
+          },
+        },
+      ],
+    }).catch((error) => {
+      console.error("[whatsapp-inbound] memory reply write failed", {
+        leadId: signal.lead.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
 
     await createAdminClient()

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { rememberClientInteraction } from "@/lib/client-memory";
 import { ensureLeadTask, recordCrmLeadMessage, upsertLeadFromSignal } from "@/lib/crm-automation";
 import { getOpenAIEnv } from "@/lib/openai-env";
 import { listProperties } from "@/lib/props-data";
@@ -345,6 +346,46 @@ export async function POST(request: Request) {
       conversationId,
       inquiryId: inquiry?.id ?? null,
     },
+  });
+
+  await rememberClientInteraction({
+    agencyId: agency.id,
+    displayName: visitState.customerName ?? current.profile.full_name ?? current.user.email ?? "Cliente Props",
+    phone: extractedPhone ?? lead.phone,
+    email: current.user.email ?? null,
+    leadId: lead.id,
+    propertyId: property.id,
+    propertyTitle: property.title,
+    conversationId,
+    sourceType: "marketplace_chat",
+    sourceId: conversationId,
+    messages: [
+      {
+        direction: "incoming",
+        role: "customer",
+        content: message,
+        metadata: {
+          propertyId: property.id,
+          tenantSlug,
+          inquiryId: inquiry?.id ?? null,
+        },
+      },
+      {
+        direction: "outgoing",
+        role: "assistant",
+        content: reply,
+        metadata: {
+          propertyId: property.id,
+          tenantSlug,
+          inquiryId: inquiry?.id ?? null,
+        },
+      },
+    ],
+  }).catch((error) => {
+    console.error("[public-conversations] memory write failed", {
+      leadId: lead.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
   });
 
   return NextResponse.json({
