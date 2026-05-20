@@ -8,12 +8,13 @@
       :root {
         --ink: #07111f;
         --muted: #516174;
-        --soft: #edf4ff;
+        --soft: #eef5ff;
         --line: #d7e2f1;
         --blue: #2563eb;
         --blue-dark: #0a1b4f;
         --green: #0f9f6e;
         --amber: #f4a62a;
+        --red: #dc2626;
         --paper: #ffffff;
       }
 
@@ -35,14 +36,14 @@
       }
 
       .page {
+        position: relative;
         width: 210mm;
         min-height: 297mm;
         margin: 0 auto;
-        padding: 18mm;
+        padding: 17mm;
+        overflow: hidden;
         background: var(--paper);
         page-break-after: always;
-        position: relative;
-        overflow: hidden;
       }
 
       .page:last-child {
@@ -52,24 +53,35 @@
       .cover {
         color: #fff;
         background:
-          radial-gradient(circle at 82% 18%, rgba(80, 130, 255, 0.58), transparent 32%),
+          radial-gradient(circle at 84% 16%, rgba(80, 130, 255, 0.58), transparent 32%),
+          radial-gradient(circle at 15% 85%, rgba(15, 159, 110, 0.28), transparent 30%),
           linear-gradient(135deg, #051025 0%, #0a1b4f 48%, #2563eb 100%);
       }
 
       .cover::after {
         content: "";
         position: absolute;
-        inset: auto -18mm -42mm auto;
-        width: 140mm;
-        height: 140mm;
+        right: -28mm;
+        bottom: -46mm;
+        width: 145mm;
+        height: 145mm;
         border-radius: 999px;
         background: rgba(255, 255, 255, 0.08);
       }
 
       .brand {
-        letter-spacing: -0.05em;
-        font-size: 32px;
-        font-weight: 900;
+        letter-spacing: -0.055em;
+        font-size: 34px;
+        font-weight: 950;
+      }
+
+      .subtitle {
+        margin-top: 1mm;
+        color: #aecaed;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
       }
 
       .eyebrow {
@@ -82,13 +94,13 @@
         color: var(--blue);
         background: #f7fbff;
         font-size: 11px;
-        font-weight: 800;
+        font-weight: 850;
         letter-spacing: 0.22em;
         text-transform: uppercase;
       }
 
       .cover .eyebrow {
-        color: #bcd1ff;
+        color: #d9e5ff;
         background: rgba(255, 255, 255, 0.1);
         border-color: rgba(255, 255, 255, 0.16);
       }
@@ -101,30 +113,30 @@
       }
 
       h1 {
-        max-width: 140mm;
-        margin: 32mm 0 8mm;
-        font-size: 54px;
+        max-width: 150mm;
+        margin: 30mm 0 8mm;
+        font-size: 53px;
         line-height: 0.96;
         letter-spacing: -0.055em;
       }
 
       h2 {
-        margin: 8mm 0 5mm;
-        font-size: 30px;
-        line-height: 1.05;
+        margin: 7mm 0 5mm;
+        font-size: 29px;
+        line-height: 1.07;
         letter-spacing: -0.035em;
       }
 
       h3 {
         margin-bottom: 2mm;
-        font-size: 16px;
+        font-size: 15.5px;
         letter-spacing: -0.015em;
       }
 
       .lead {
-        max-width: 150mm;
+        max-width: 154mm;
         color: var(--muted);
-        font-size: 17px;
+        font-size: 16.5px;
       }
 
       .cover .lead {
@@ -134,17 +146,17 @@
 
       .cover-grid {
         position: absolute;
-        left: 18mm;
-        right: 18mm;
-        bottom: 22mm;
+        left: 17mm;
+        right: 17mm;
+        bottom: 20mm;
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 6mm;
+        gap: 5mm;
       }
 
       .cover-card {
-        min-height: 31mm;
-        padding: 6mm;
+        min-height: 35mm;
+        padding: 5.5mm;
         border: 1px solid rgba(255, 255, 255, 0.16);
         border-radius: 18px;
         background: rgba(255, 255, 255, 0.1);
@@ -165,7 +177,7 @@
 
       .grid {
         display: grid;
-        gap: 5mm;
+        gap: 4.5mm;
       }
 
       .grid.compact {
@@ -180,23 +192,24 @@
         grid-template-columns: repeat(3, 1fr);
       }
 
+      .grid.four {
+        grid-template-columns: repeat(4, 1fr);
+      }
+
       .card {
-        padding: 6mm;
+        padding: 5.5mm;
         border: 1px solid var(--line);
         border-radius: 20px;
         background: linear-gradient(180deg, #fff, #f8fbff);
       }
 
       .card.compact {
-        padding: 4mm 5mm;
+        padding: 4mm 4.5mm;
       }
 
-      .card.compact h3 {
-        margin-bottom: 1mm;
-      }
-
+      .card.compact h3,
       .card.compact p {
-        margin-bottom: 0;
+        margin-bottom: 1mm;
       }
 
       .card.blue {
@@ -205,21 +218,41 @@
         background: linear-gradient(135deg, #0b1d4d, #2563eb);
       }
 
+      .card.green {
+        color: #fff;
+        border-color: transparent;
+        background: linear-gradient(135deg, #064e3b, #0f9f6e);
+      }
+
       .card.soft {
         background: var(--soft);
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 1.5mm 3mm;
+        background: #eaf1ff;
+        color: var(--blue);
+        font-size: 10px;
+        font-weight: 850;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
       }
 
       .number {
         display: inline-flex;
         width: 28px;
         height: 28px;
+        margin-right: 2mm;
         align-items: center;
         justify-content: center;
         border-radius: 999px;
         background: var(--blue);
         color: #fff;
         font-size: 13px;
-        font-weight: 800;
+        font-weight: 850;
       }
 
       ul {
@@ -228,7 +261,7 @@
       }
 
       li {
-        margin: 0 0 2.4mm;
+        margin: 0 0 2.2mm;
       }
 
       .pill-row {
@@ -245,17 +278,17 @@
         background: #fff;
         color: var(--muted);
         font-size: 12px;
-        font-weight: 700;
+        font-weight: 750;
       }
 
       .quote {
-        margin: 6mm 0;
-        padding: 6mm;
+        margin: 5mm 0;
+        padding: 5.5mm;
         border-left: 5px solid var(--blue);
         border-radius: 18px;
         background: #f7fbff;
-        font-size: 18px;
-        font-weight: 800;
+        font-size: 17px;
+        font-weight: 850;
         letter-spacing: -0.02em;
       }
 
@@ -280,17 +313,17 @@
 
       .table th,
       .table td {
-        padding: 4mm;
+        padding: 3.6mm;
         border-bottom: 1px solid var(--line);
         text-align: left;
         vertical-align: top;
-        font-size: 13px;
+        font-size: 12.5px;
       }
 
       .table th {
         background: #eef5ff;
         color: var(--blue-dark);
-        font-size: 12px;
+        font-size: 11px;
         letter-spacing: 0.12em;
         text-transform: uppercase;
       }
@@ -299,27 +332,30 @@
         border-bottom: 0;
       }
 
+      .mini {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .check {
+        color: var(--green);
+        font-weight: 850;
+      }
+
+      .warning {
+        color: var(--amber);
+        font-weight: 850;
+      }
+
       .footer {
         position: absolute;
-        right: 18mm;
-        bottom: 8mm;
-        left: 18mm;
+        right: 17mm;
+        bottom: 7mm;
+        left: 17mm;
         display: flex;
         justify-content: space-between;
         color: #8b9ab0;
         font-size: 10px;
-      }
-
-      .accent {
-        color: var(--blue);
-      }
-
-      .green {
-        color: var(--green);
-      }
-
-      .amber {
-        color: var(--amber);
       }
 
       @page {
@@ -342,24 +378,25 @@
   <body>
     <section class="page cover">
       <div class="brand">PROPS</div>
+      <div class="subtitle">Control inmobiliario</div>
       <div class="eyebrow">Guía de ventas</div>
       <h1>Cómo vender Props a inmobiliarias</h1>
       <p class="lead">
-        Una guía práctica para explicar qué resuelve Props, cómo demostrar valor rápido y cómo
-        convertir una reunión en una oportunidad comercial concreta.
+        Material práctico para que la vendedora entienda qué hace Props, qué dolores resuelve y
+        cómo presentarlo como una herramienta irresistible para inmobiliarias.
       </p>
       <div class="cover-grid">
         <div class="cover-card">
-          <strong>Automatiza mensajes</strong>
-          <span>Atención 24/7, WhatsApp, seguimiento de leads y respuestas rápidas con IA.</span>
+          <strong>Automatiza lo repetitivo</strong>
+          <span>Mensajes, seguimientos, aumentos, avisos de mora, recordatorios y tareas.</span>
         </div>
         <div class="cover-card">
-          <strong>Ordena alquileres</strong>
-          <span>Aumentos, avisos a inquilinos, cobranzas, morosos y liquidaciones.</span>
+          <strong>Ordena la operación</strong>
+          <span>Propiedades, leads, inquilinos, propietarios, contratos, cobranzas y liquidaciones.</span>
         </div>
         <div class="cover-card">
-          <strong>Da más visibilidad</strong>
-          <span>Portafolio online propio y publicación en props.com.ar.</span>
+          <strong>Genera más oportunidades</strong>
+          <span>Portafolio online propio, fichas compartibles y publicación en props.com.ar.</span>
         </div>
       </div>
     </section>
@@ -368,111 +405,184 @@
       <div class="eyebrow">Resumen ejecutivo</div>
       <h2>Qué es Props</h2>
       <p class="lead">
-        Props es un sistema de control inmobiliario con IA que centraliza la operación diaria de una
-        inmobiliaria: propiedades, mensajes, leads, visitas, contratos, alquileres, cobranzas,
-        liquidaciones y tareas.
+        Props es una plataforma de gestión inmobiliaria con IA. Ayuda a una inmobiliaria a vender,
+        alquilar, administrar contratos y atender clientes desde un solo lugar.
       </p>
       <div class="quote">
-        Props no se vende como “otro CRM”. Se vende como un asistente operativo que le ahorra horas
-        al equipo y evita que se pierdan consultas, aumentos, pagos o seguimientos.
+        Props no se vende como “otro CRM”. Se vende como un asistente operativo que trabaja todos
+        los días: responde, avisa, calcula, ordena y evita que el equipo pierda oportunidades.
       </div>
       <div class="grid three">
         <div class="card">
-          <span class="number">1</span>
-          <h3>Más velocidad comercial</h3>
-          <p>Responde consultas, ordena leads y ayuda a coordinar visitas sin depender de planillas o WhatsApps sueltos.</p>
+          <span class="tag">Comercial</span>
+          <h3>Más consultas respondidas</h3>
+          <p>IA por WhatsApp y web, bandeja única, historial completo, seguimiento de leads y visitas.</p>
         </div>
         <div class="card">
-          <span class="number">2</span>
-          <h3>Más control administrativo</h3>
-          <p>Gestiona alquileres, aumentos, cobranzas, morosos, propietarios y liquidaciones desde un solo panel.</p>
+          <span class="tag">Administración</span>
+          <h3>Menos trabajo manual</h3>
+          <p>Aumentos, morosos, cobranzas, comprobantes, liquidaciones y tareas operativas.</p>
         </div>
         <div class="card">
-          <span class="number">3</span>
-          <h3>Más visibilidad online</h3>
-          <p>Cada inmobiliaria tiene su portafolio y puede publicar propiedades en Props para recibir más oportunidades.</p>
+          <span class="tag">Visibilidad</span>
+          <h3>Más presencia online</h3>
+          <p>Portafolio de la inmobiliaria, fichas de propiedades y publicación opcional en Props.</p>
         </div>
       </div>
-      <div class="footer"><span>PROPS · Control inmobiliario</span><span>01</span></div>
+      <div class="footer"><span>PROPS · Guía de ventas</span><span>01</span></div>
     </section>
 
     <section class="page">
-      <div class="eyebrow">Dolores que vende Props</div>
-      <h2>Problemas reales de una inmobiliaria</h2>
+      <div class="eyebrow">Dolores que abre la venta</div>
+      <h2>Problemas reales que Props resuelve</h2>
       <table class="table">
         <thead>
           <tr>
             <th>Dolor</th>
-            <th>Cómo se ve en el día a día</th>
+            <th>Cómo se vive hoy</th>
             <th>Cómo lo resuelve Props</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>Mensajes desordenados</td>
-            <td>Consultas por WhatsApp, web e Instagram mezcladas, sin historial claro.</td>
-            <td>Bandeja unificada con contexto de propiedad, historial, estado y respuesta asistida.</td>
+            <td>WhatsApps desordenados</td>
+            <td>Consultas mezcladas, empleados respondiendo desde celulares y poca trazabilidad.</td>
+            <td>Bandeja de mensajes con Web, WhatsApp e historial por cliente, propiedad y conversación.</td>
           </tr>
           <tr>
             <td>Consultas fuera de horario</td>
-            <td>El interesado pregunta de noche y nadie responde hasta el día siguiente.</td>
-            <td>IA 24/7 que responde sobre precios, requisitos, ubicación, fotos, visitas y disponibilidad.</td>
+            <td>El interesado pregunta de noche y se enfría antes de que alguien responda.</td>
+            <td>IA 24/7 que responde igual, incluso si la inmobiliaria está cerrada, usando horarios cargados en Ajustes.</td>
           </tr>
           <tr>
             <td>Aumentos manuales</td>
-            <td>Hay que revisar contratos, calcular IPC/ICL y avisar uno por uno.</td>
-            <td>Props calcula aumentos, registra el cambio y avisa automáticamente al inquilino por WhatsApp.</td>
+            <td>Hay que revisar contratos, fechas, IPC/ICL y avisar uno por uno.</td>
+            <td>Props calcula aumentos, actualiza el alquiler y avisa automáticamente al inquilino por WhatsApp.</td>
+          </tr>
+          <tr>
+            <td>Morosos difíciles de seguir</td>
+            <td>No queda claro quién debe, cuántos días, punitorios ni cuándo avisar.</td>
+            <td>Reporte de morosos con riesgo, punitorios, mensaje sugerido por IA y aviso por WhatsApp.</td>
           </tr>
           <tr>
             <td>Liquidaciones lentas</td>
-            <td>El equipo arma números a mano para cada propietario.</td>
-            <td>Liquidaciones automáticas con alquiler cobrado, punitorios, descuentos, honorarios y transferencia.</td>
+            <td>Se arman a mano con alquiler, descuentos, honorarios y pagos a propietarios.</td>
+            <td>Liquidación automática al propietario, cuenta corriente, comprobantes y transferencias.</td>
           </tr>
           <tr>
-            <td>Seguimientos perdidos</td>
-            <td>Leads interesados quedan sin respuesta o sin próxima acción.</td>
-            <td>Panel de tareas, lead scoring, recordatorios y recontacto automático.</td>
-          </tr>
-          <tr>
-            <td>Poca presencia digital</td>
-            <td>La inmobiliaria depende solo de portales o publicaciones aisladas.</td>
-            <td>Portafolio online propio y publicación en props.com.ar para ganar visibilidad.</td>
+            <td>Leads sin seguimiento</td>
+            <td>La consulta entra, se responde una vez y después nadie sabe qué hacer.</td>
+            <td>Lead scoring, tareas del día, próximos pasos, recordatorios y seguimiento automático.</td>
           </tr>
         </tbody>
       </table>
-      <div class="footer"><span>PROPS · Control inmobiliario</span><span>02</span></div>
+      <div class="footer"><span>PROPS · Guía de ventas</span><span>02</span></div>
     </section>
 
     <section class="page">
-      <div class="eyebrow">Lo que más vende</div>
-      <h2>Funciones clave para destacar</h2>
+      <div class="eyebrow">Funciones que más venden</div>
+      <h2>Lo que la vendedora tiene que destacar</h2>
       <div class="grid two">
         <div class="card blue">
-          <h3>Automatización de mensajes</h3>
-          <p>Props atiende consultas de propiedades, sugiere respuestas y mantiene conversaciones ordenadas. La inmobiliaria deja de perder interesados por demora o falta de seguimiento.</p>
+          <h3>1. WhatsApp inteligente 24/7</h3>
+          <p>
+            Responde consultas sobre propiedades, precios, requisitos, mascotas, ubicación, fotos,
+            visitas y disponibilidad. Si detecta que necesita un humano, crea una tarea interna.
+          </p>
+        </div>
+        <div class="card green">
+          <h3>2. Avisos automáticos de aumentos</h3>
+          <p>
+            Lee contratos, detecta fechas, índice y frecuencia. Cuando corresponde, calcula el nuevo
+            alquiler por IPC/ICL y avisa al inquilino por WhatsApp.
+          </p>
         </div>
         <div class="card">
-          <h3>Avisos automáticos de aumentos</h3>
-          <p>El sistema interpreta contratos, calcula aumentos por IPC o ICL y envía el aviso al inquilino por WhatsApp cuando corresponde.</p>
+          <h3>3. Aviso automático a morosos</h3>
+          <p>
+            Muestra quién debe alquiler, días de atraso, punitorios y total. Permite avisar por
+            WhatsApp con un mensaje claro, amable o firme según el riesgo.
+          </p>
         </div>
         <div class="card">
-          <h3>Liquidaciones a propietarios</h3>
-          <p>Centraliza cobros, punitorios, conceptos, honorarios y transferencias para que el propietario reciba una liquidación clara.</p>
+          <h3>4. Liquidaciones a propietarios</h3>
+          <p>
+            Genera la liquidación con alquiler cobrado, punitorios, gastos, honorarios, saldo final
+            y transferencia. Reduce errores y tiempo administrativo.
+          </p>
         </div>
         <div class="card soft">
-          <h3>IA interna para el equipo</h3>
-          <p>El empleado puede preguntar qué hacer, pedir resumen de conversaciones, revisar contratos o consultar tareas pendientes.</p>
+          <h3>5. IA interna para empleados</h3>
+          <p>
+            El equipo puede preguntar “qué tengo pendiente hoy”, “resumime este contrato”,
+            “qué le contesto a este lead” o “registrá este pago”.
+          </p>
         </div>
         <div class="card">
-          <h3>Portafolio online</h3>
-          <p>Cada inmobiliaria tiene una página propia con sus propiedades, datos, ubicación, redes y fichas públicas compartibles.</p>
-        </div>
-        <div class="card">
-          <h3>Visibilidad en props.com.ar</h3>
-          <p>Las propiedades cargadas pueden mostrarse en Props, aumentando la exposición y generando más oportunidades comerciales.</p>
+          <h3>6. Portafolio online + Props marketplace</h3>
+          <p>
+            Cada inmobiliaria tiene una página propia con sus propiedades. Además puede publicar en
+            props.com.ar para sumar visibilidad.
+          </p>
         </div>
       </div>
-      <div class="footer"><span>PROPS · Control inmobiliario</span><span>03</span></div>
+      <div class="footer"><span>PROPS · Guía de ventas</span><span>03</span></div>
+    </section>
+
+    <section class="page">
+      <div class="eyebrow">Mapa de funcionalidades</div>
+      <h2>Todo lo que hoy incluye Props</h2>
+      <div class="grid three compact">
+        <div class="card compact">
+          <h3>Propiedades</h3>
+          <p>Alta, edición, fotos, contratos, mapa, requisitos, moneda ARS/USD y publicación opcional.</p>
+        </div>
+        <div class="card compact">
+          <h3>Mensajes</h3>
+          <p>Bandeja única, historial completo, respuesta manual, IA, badges por canal y ficha del cliente.</p>
+        </div>
+        <div class="card compact">
+          <h3>Leads</h3>
+          <p>Calificación automática, estado, probabilidad de cierre, objeciones y próxima acción.</p>
+        </div>
+        <div class="card compact">
+          <h3>Alquileres</h3>
+          <p>Contratos, aumentos, índice, frecuencia, aviso automático y lectura de documentos.</p>
+        </div>
+        <div class="card compact">
+          <h3>Inquilinos</h3>
+          <p>Datos editables, propiedad asociada, contrato, teléfono, historial y cuenta corriente.</p>
+        </div>
+        <div class="card compact">
+          <h3>Propietarios</h3>
+          <p>Participación, datos de contacto, liquidaciones, transferencias y propiedades vinculadas.</p>
+        </div>
+        <div class="card compact">
+          <h3>Cobranzas</h3>
+          <p>Registro de pagos, comprobantes para inquilinos, envío por WhatsApp o email.</p>
+        </div>
+        <div class="card compact">
+          <h3>Morosos</h3>
+          <p>Ranking por riesgo, punitorios por contrato, aviso individual o masivo y recomendación IA.</p>
+        </div>
+        <div class="card compact">
+          <h3>Caja y proveedores</h3>
+          <p>Gastos, movimientos, proveedores, facturación y control operativo básico.</p>
+        </div>
+        <div class="card compact">
+          <h3>Agenda</h3>
+          <p>Visitas, recordatorios, tareas, seguimiento post-visita y próximos pasos.</p>
+        </div>
+        <div class="card compact">
+          <h3>Mapa</h3>
+          <p>Vista de propiedades publicadas con filtros por venta/alquiler y ubicación.</p>
+        </div>
+        <div class="card compact">
+          <h3>Ajustes</h3>
+          <p>WhatsApp, IA activada/desactivada, horarios de atención, redes y datos de la inmobiliaria.</p>
+        </div>
+      </div>
+      <div class="footer"><span>PROPS · Guía de ventas</span><span>04</span></div>
     </section>
 
     <section class="page">
@@ -481,35 +591,72 @@
       <div class="script">
         <h3>Pitch recomendado</h3>
         <p>
-          “Props es una plataforma para que la inmobiliaria tenga todo bajo control: propiedades,
-          mensajes, leads, visitas, alquileres, aumentos, cobranzas y liquidaciones. Lo fuerte es
-          que no solo ordena información: automatiza trabajo repetitivo. Atiende consultas 24/7,
-          avisa aumentos por WhatsApp, ayuda con contratos, hace seguimiento de leads y crea un
-          portafolio online para mostrar propiedades con más visibilidad.”
+          “Props es una plataforma para que la inmobiliaria tenga toda su operación bajo control:
+          propiedades, mensajes, leads, visitas, alquileres, aumentos, morosos, cobranzas y
+          liquidaciones. Lo más fuerte es que automatiza trabajo repetitivo: responde consultas por
+          WhatsApp 24/7, avisa aumentos, avisa a inquilinos morosos, genera comprobantes, ayuda a
+          liquidar propietarios y crea un portafolio online para mostrar propiedades con más
+          visibilidad.”
         </p>
       </div>
-      <h2>Preguntas para descubrir necesidad</h2>
+      <h2>Frase simple para abrir una reunión</h2>
+      <div class="quote">
+        “La idea de Props es que la inmobiliaria deje de depender de planillas, mensajes sueltos y
+        memoria del empleado. Todo queda ordenado, automatizado y listo para accionar.”
+      </div>
       <div class="grid two">
         <div class="card">
-          <h3>Comercial</h3>
+          <h3>Si hablás con el dueño</h3>
           <ul>
-            <li>¿Cuántas consultas reciben por día por WhatsApp?</li>
-            <li>¿Quién responde cuando llegan fuera de horario?</li>
-            <li>¿Cómo saben qué leads quedaron sin responder?</li>
-            <li>¿Tienen una forma rápida de mostrar todas sus propiedades?</li>
+            <li>Menos errores administrativos.</li>
+            <li>Más control sobre empleados y conversaciones.</li>
+            <li>Más visibilidad para las propiedades.</li>
+            <li>Más velocidad para responder y cerrar oportunidades.</li>
           </ul>
         </div>
         <div class="card">
-          <h3>Administración</h3>
+          <h3>Si hablás con un empleado</h3>
           <ul>
-            <li>¿Cómo calculan hoy los aumentos de alquiler?</li>
-            <li>¿Cómo avisan a los inquilinos?</li>
-            <li>¿Cómo hacen liquidaciones a propietarios?</li>
-            <li>¿Cómo controlan morosos, punitorios y pagos pendientes?</li>
+            <li>Menos tareas repetitivas.</li>
+            <li>Más claridad sobre qué hacer hoy.</li>
+            <li>Respuestas sugeridas por IA.</li>
+            <li>Historial completo para no arrancar de cero.</li>
           </ul>
         </div>
       </div>
-      <div class="footer"><span>PROPS · Control inmobiliario</span><span>04</span></div>
+      <div class="footer"><span>PROPS · Guía de ventas</span><span>05</span></div>
+    </section>
+
+    <section class="page">
+      <div class="eyebrow">Preguntas de descubrimiento</div>
+      <h2>Cómo detectar dolor en la reunión</h2>
+      <div class="grid two">
+        <div class="card">
+          <h3>Comercial y atención</h3>
+          <ul>
+            <li>¿Cuántas consultas reciben por WhatsApp por día?</li>
+            <li>¿Quién responde cuando llegan de noche o fin de semana?</li>
+            <li>¿Cómo saben qué lead pidió visita y no fue contactado?</li>
+            <li>¿Tienen historial de lo que habló cada cliente?</li>
+            <li>¿Pueden mandar rápido fotos, link o ficha de una propiedad?</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Administración de alquileres</h3>
+          <ul>
+            <li>¿Cómo calculan hoy los aumentos por IPC o ICL?</li>
+            <li>¿Cómo avisan a cada inquilino el nuevo valor?</li>
+            <li>¿Cómo controlan morosos, punitorios y comprobantes?</li>
+            <li>¿Cuánto tardan en liquidar a propietarios?</li>
+            <li>¿Dónde guardan contratos, garantías y documentos?</li>
+          </ul>
+        </div>
+      </div>
+      <div class="quote">
+        Si la inmobiliaria responde “lo hacemos por Excel y WhatsApp”, ese es el punto de venta:
+        Props convierte esas tareas sueltas en un sistema con seguimiento, avisos e IA.
+      </div>
+      <div class="footer"><span>PROPS · Guía de ventas</span><span>06</span></div>
     </section>
 
     <section class="page">
@@ -517,27 +664,73 @@
       <h2>Orden ideal para mostrar Props</h2>
       <div class="grid compact">
         <div class="card compact">
-          <h3><span class="number">1</span> Dashboard diario</h3>
-          <p>Mostrar “qué tengo que hacer hoy”: consultas pendientes, leads urgentes, visitas, contratos y tareas.</p>
+          <h3><span class="number">1</span>Dashboard: qué tengo que hacer hoy</h3>
+          <p>Mostrar tareas urgentes, consultas, visitas, morosos, aumentos y acciones concretas.</p>
         </div>
         <div class="card compact">
-          <h3><span class="number">2</span> Propiedades y portafolio</h3>
-          <p>Cargar o editar una propiedad, mostrar fotos, mapa, precio, requisitos y la ficha pública compartible.</p>
+          <h3><span class="number">2</span>Mensajes con IA</h3>
+          <p>Mostrar historial, ficha del cliente, canal Web/WhatsApp, respuesta manual y respuesta sugerida.</p>
         </div>
         <div class="card compact">
-          <h3><span class="number">3</span> Mensajes con IA</h3>
-          <p>Mostrar cómo una consulta queda registrada, cómo la IA responde y cómo el empleado puede continuar con contexto.</p>
+          <h3><span class="number">3</span>Propiedades y portafolio</h3>
+          <p>Cargar una propiedad, subir fotos, ver mapa, link público y opción de publicar en marketplace.</p>
         </div>
         <div class="card compact">
-          <h3><span class="number">4</span> Alquileres y aumentos</h3>
-          <p>Adjuntar contrato, detectar datos importantes, calcular aumento y preparar aviso por WhatsApp.</p>
+          <h3><span class="number">4</span>Alquiler: contrato y aumento</h3>
+          <p>Adjuntar contrato, completar datos, ver fecha de ajuste y explicar el aviso automático por WhatsApp.</p>
         </div>
         <div class="card compact">
-          <h3><span class="number">5</span> Cobranzas y propietarios</h3>
-          <p>Mostrar cobranza, morosos, punitorios, liquidación al propietario y transferencia.</p>
+          <h3><span class="number">5</span>Morosos y cobranzas</h3>
+          <p>Mostrar deuda, punitorios, mensaje sugerido, envío por WhatsApp y comprobante de alquiler.</p>
+        </div>
+        <div class="card compact">
+          <h3><span class="number">6</span>Liquidación al propietario</h3>
+          <p>Registrar cobro, generar liquidación, descontar honorarios/gastos y dejar lista la transferencia.</p>
         </div>
       </div>
-      <div class="footer"><span>PROPS · Control inmobiliario</span><span>05</span></div>
+      <div class="footer"><span>PROPS · Guía de ventas</span><span>07</span></div>
+    </section>
+
+    <section class="page">
+      <div class="eyebrow">Casos de uso concretos</div>
+      <h2>Ejemplos que ayudan a vender</h2>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Situación</th>
+            <th>Antes</th>
+            <th>Con Props</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Inquilino moroso</td>
+            <td>Buscar contrato, calcular días, escribir mensaje y acordarse de insistir.</td>
+            <td>Props muestra deuda, punitorios y riesgo. La IA prepara el mensaje y se puede avisar por WhatsApp.</td>
+          </tr>
+          <tr>
+            <td>Aumento de alquiler</td>
+            <td>Revisar contrato, calcular índice, actualizar precio y escribir al inquilino.</td>
+            <td>Props detecta fecha e índice, calcula y deja listo el aviso automático.</td>
+          </tr>
+          <tr>
+            <td>Consulta por propiedad</td>
+            <td>Responder a mano precio, requisitos, fotos y ubicación.</td>
+            <td>La IA responde con datos reales de la propiedad y deja el historial en Mensajes.</td>
+          </tr>
+          <tr>
+            <td>Pago de alquiler</td>
+            <td>Anotar en planilla, enviar recibo manual y luego liquidar aparte.</td>
+            <td>Se registra la cobranza, genera comprobante y queda lista la liquidación al propietario.</td>
+          </tr>
+          <tr>
+            <td>Empleado nuevo</td>
+            <td>No sabe qué se habló con cada cliente ni qué está pendiente.</td>
+            <td>Ve ficha del cliente, historial, próximas acciones y resumen de IA.</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="footer"><span>PROPS · Guía de ventas</span><span>08</span></div>
     </section>
 
     <section class="page">
@@ -553,66 +746,93 @@
         <tbody>
           <tr>
             <td>“Ya usamos WhatsApp.”</td>
-            <td>“Perfecto. Props no reemplaza WhatsApp: lo ordena. Les permite responder más rápido, no perder historial y automatizar seguimientos.”</td>
+            <td>“Perfecto. Props no reemplaza WhatsApp: lo ordena, lo automatiza y deja historial para que ningún lead se pierda.”</td>
           </tr>
           <tr>
             <td>“Nos manejamos con Excel.”</td>
-            <td>“Excel sirve para anotar, pero no avisa aumentos, no responde consultas, no calcula tareas ni centraliza conversaciones.”</td>
+            <td>“Excel sirve para anotar, pero no responde consultas, no avisa aumentos, no detecta morosos ni crea tareas.”</td>
           </tr>
           <tr>
             <td>“La IA me da miedo.”</td>
-            <td>“La IA trabaja con datos de sus propiedades y contratos. Además, el equipo puede revisar y tomar control cuando haga falta.”</td>
+            <td>“La IA trabaja con datos cargados por la inmobiliaria. Además se puede apagar, revisar o derivar al equipo cuando haga falta.”</td>
           </tr>
           <tr>
             <td>“No tenemos tiempo para implementar.”</td>
-            <td>“La idea es empezar por lo que más duele: mensajes, propiedades y alquileres. No necesitan cambiar todo de golpe.”</td>
+            <td>“Se puede empezar por lo más urgente: WhatsApp, propiedades y alquileres. No necesitan cambiar todo el primer día.”</td>
           </tr>
           <tr>
-            <td>“Ya publicamos en otros portales.”</td>
-            <td>“Props suma un portafolio propio y más visibilidad. No compite con lo que ya usan: les da otro canal y más control.”</td>
+            <td>“Ya publicamos en portales.”</td>
+            <td>“Props suma un portafolio propio y otro canal de visibilidad. No compite: complementa y ordena.”</td>
+          </tr>
+          <tr>
+            <td>“Eso lo hace mi empleado.”</td>
+            <td>“Justamente: Props ayuda al empleado a hacer menos tareas repetitivas y deja todo trazable para el dueño.”</td>
           </tr>
         </tbody>
       </table>
-      <div class="footer"><span>PROPS · Control inmobiliario</span><span>06</span></div>
+      <div class="footer"><span>PROPS · Guía de ventas</span><span>09</span></div>
     </section>
 
     <section class="page">
-      <div class="eyebrow">Cierre comercial</div>
-      <h2>Beneficios que tiene que recordar el vendedor</h2>
+      <div class="eyebrow">Guión de cierre</div>
+      <h2>Cómo cerrar la reunión</h2>
+      <div class="grid two">
+        <div class="card blue">
+          <h3>Cierre orientado a dolor</h3>
+          <p>
+            “Por lo que me contás, hoy el mayor problema está en mensajes, aumentos y morosos.
+            Podemos arrancar por ahí: conectar WhatsApp, cargar propiedades principales y dejar los
+            alquileres listos para avisos automáticos.”
+          </p>
+        </div>
+        <div class="card green">
+          <h3>Cierre orientado a crecimiento</h3>
+          <p>
+            “Además de ordenar la administración, Props les da una vidriera online: portafolio propio
+            y publicación en props.com.ar para que sus propiedades tengan más exposición.”
+          </p>
+        </div>
+      </div>
+      <h2>Beneficios que tiene que recordar la vendedora</h2>
       <div class="grid two">
         <div class="card">
-          <h3>Para el dueño</h3>
+          <h3>Para la inmobiliaria</h3>
           <ul>
-            <li>Más control sobre la operación diaria.</li>
-            <li>Menos dependencia de empleados específicos.</li>
-            <li>Más visibilidad para sus propiedades.</li>
+            <li>Más control de la operación diaria.</li>
             <li>Menos errores en alquileres, aumentos y liquidaciones.</li>
+            <li>Más velocidad para responder consultas.</li>
+            <li>Más visibilidad para propiedades.</li>
+            <li>Menos dependencia de una sola persona.</li>
           </ul>
         </div>
         <div class="card">
-          <h3>Para el empleado</h3>
+          <h3>Para el equipo</h3>
           <ul>
             <li>Menos mensajes repetitivos.</li>
-            <li>Más claridad sobre qué responder y qué hacer hoy.</li>
-            <li>Historial completo de cada cliente.</li>
-            <li>IA como apoyo para responder, resumir y ordenar.</li>
+            <li>Menos planillas y tareas manuales.</li>
+            <li>Más claridad sobre qué hacer hoy.</li>
+            <li>IA para responder, resumir y ordenar.</li>
+            <li>Historial completo de clientes e inquilinos.</li>
           </ul>
         </div>
       </div>
       <div class="quote">
-        Frase de cierre: “Props hace que la inmobiliaria responda más rápido, administre mejor y venda con más presencia online.”
+        Frase de cierre: “Props hace que la inmobiliaria responda más rápido, administre mejor y
+        tenga más presencia online, sin sumar trabajo al equipo.”
       </div>
       <div class="pill-row">
-        <span class="pill">Mensajes 24/7</span>
+        <span class="pill">WhatsApp 24/7</span>
+        <span class="pill">Aviso a morosos</span>
         <span class="pill">Aumentos automáticos</span>
         <span class="pill">Liquidaciones</span>
+        <span class="pill">Cobranzas</span>
+        <span class="pill">Comprobantes</span>
         <span class="pill">Portafolio online</span>
-        <span class="pill">Leads y visitas</span>
-        <span class="pill">Morosos</span>
-        <span class="pill">IA interna</span>
         <span class="pill">props.com.ar</span>
+        <span class="pill">Leads y visitas</span>
+        <span class="pill">IA interna</span>
       </div>
-      <div class="footer"><span>PROPS · Control inmobiliario</span><span>07</span></div>
+      <div class="footer"><span>PROPS · Guía de ventas</span><span>10</span></div>
     </section>
   </body>
 </html>
