@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { syncRentalContractMemory } from "@/lib/client-memory";
 import {
   analyzeRentalContractText,
   buildFallbackContractSchedule,
@@ -418,10 +419,21 @@ export async function POST(request: Request) {
         agencyId: property.agency_id,
         owners: sanitizedOwners,
       });
+      await syncRentalContractMemory({
+        agencyId: property.agency_id,
+        contractId: savedContract.id,
+        propertyId: property.id,
+        tenantName: resolvedTenantName,
+        tenantPhone: resolvedTenantPhone,
+        tenantEmail: resolvedTenantEmail,
+        ownerName: primaryOwner?.full_name ?? resolvedOwnerName,
+        ownerPhone: primaryOwner?.phone ?? resolvedOwnerPhone,
+        ownerEmail: primaryOwner?.email ?? resolvedOwnerEmail,
+      });
     } catch (ownersError) {
       console.error("[rental-contract] owners sync failed", ownersError);
       return NextResponse.json(
-        { error: "Guardamos el contrato, pero no se pudieron actualizar los propietarios." },
+        { error: "Guardamos el contrato, pero no se pudo actualizar la memoria de inquilino/propietario." },
         { status: 400 }
       );
     }
@@ -608,10 +620,21 @@ export async function PATCH(request: Request) {
       agencyId: contract.agency_id,
       owners: sanitizedOwners,
     });
+    await syncRentalContractMemory({
+      agencyId: contract.agency_id,
+      contractId,
+      propertyId: contract.property_id,
+      tenantName,
+      tenantPhone,
+      tenantEmail,
+      ownerName: primaryOwner?.full_name ?? ownerName,
+      ownerPhone: primaryOwner?.phone ?? ownerPhone,
+      ownerEmail: primaryOwner?.email ?? ownerEmail,
+    });
   } catch (ownersError) {
     console.error("[rental-contract] owners sync failed on patch", ownersError);
     return NextResponse.json(
-      { error: "Se confirmo el contrato, pero no se pudieron actualizar los propietarios." },
+      { error: "Se confirmo el contrato, pero no se pudo actualizar la memoria de inquilino/propietario." },
       { status: 400 }
     );
   }

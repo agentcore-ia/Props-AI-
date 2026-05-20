@@ -62,6 +62,7 @@ export async function POST(request: Request) {
     findTenantRentalContext({
       agencyId: lead.agencyId,
       phone: contactPhone,
+      messageText,
     }).catch((error) => {
       console.error("[whatsapp-context] tenant memory lookup failed", {
         leadId: lead.id,

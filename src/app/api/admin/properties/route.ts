@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth/current-user";
+import { syncRentalContractMemory } from "@/lib/client-memory";
 import { uploadPropertyImages } from "@/lib/property-images";
 import {
   analyzeRentalContractText,
@@ -409,13 +410,13 @@ async function handleUpsertProperty(request: Request, mode: "create" | "update")
     };
 
     const contractQuery = existingContract?.id
-      ? admin.from("rental_contracts").update(contractPayload).eq("id", existingContract.id)
+      ? admin.from("rental_contracts").update(contractPayload).eq("id", existingContract.id).select("id").single()
       : admin.from("rental_contracts").insert({
           ...contractPayload,
           created_by: current.user.id,
-        });
+        }).select("id").single();
 
-    const { error: contractError } = await contractQuery;
+    const { data: savedContract, error: contractError } = await contractQuery;
 
     if (contractError) {
       if (!isUpdate) {
@@ -426,6 +427,23 @@ async function handleUpsertProperty(request: Request, mode: "create" | "update")
         { error: isUpdate ? "La propiedad se actualizo, pero fallo el contrato de alquiler." : "La propiedad se creo, pero fallo el contrato de alquiler." },
         { status: 400 }
       );
+    }
+
+    if (savedContract?.id) {
+      await syncRentalContractMemory({
+        agencyId: agency.id,
+        contractId: savedContract.id,
+        propertyId: property.id,
+        tenantName: rentalContract.tenantName.trim(),
+        tenantPhone: rentalContract.tenantPhone.trim(),
+        tenantEmail: rentalContract.tenantEmail.trim() || null,
+      }).catch((memoryError) => {
+        console.error("[properties] rental memory sync failed", {
+          propertyId: property.id,
+          contractId: savedContract.id,
+          error: memoryError instanceof Error ? memoryError.message : String(memoryError),
+        });
+      });
     }
   }
 

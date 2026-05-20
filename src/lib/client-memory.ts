@@ -101,6 +101,86 @@ export function normalizeMemoryPhone(phone: string | null | undefined) {
   return digits.startsWith("54") ? digits : `54${digits}`;
 }
 
+function phoneVariants(phone: string | null | undefined) {
+  const normalized = normalizeMemoryPhone(phone);
+  const digits = normalized.replace(/[^\d]/g, "");
+  const withoutCountry = digits.startsWith("54") ? digits.slice(2) : digits;
+  const withoutMobileNine = digits.startsWith("549") ? `54${digits.slice(3)}` : "";
+  const withMobileNine =
+    digits.startsWith("54") && !digits.startsWith("549") ? `549${digits.slice(2)}` : "";
+  const withoutLocal15 = withoutCountry.startsWith("15") ? withoutCountry.slice(2) : "";
+  const withLocal15 = withoutCountry && !withoutCountry.startsWith("15") ? `15${withoutCountry}` : "";
+
+  return Array.from(
+    new Set(
+      [
+        digits,
+        normalized,
+        withoutCountry,
+        withoutMobileNine,
+        withMobileNine,
+        withoutLocal15,
+        withLocal15,
+        withoutCountry.slice(-10),
+        withoutCountry.slice(-8),
+      ].filter((item) => item && item.length >= 8)
+    )
+  );
+}
+
+function scorePhoneMatch(a: string | null | undefined, b: string | null | undefined) {
+  const aNormalized = normalizeMemoryPhone(a);
+  const bNormalized = normalizeMemoryPhone(b);
+  const aVariants = phoneVariants(a);
+  const bVariants = phoneVariants(b);
+
+  if (!aNormalized || !bNormalized) return 0;
+  if (aNormalized === bNormalized) return 120;
+  if (aVariants.some((left) => bVariants.includes(left))) return 90;
+  if (
+    aVariants.some((left) =>
+      bVariants.some((right) => left.endsWith(right) || right.endsWith(left))
+    )
+  ) {
+    return 55;
+  }
+
+  return 0;
+}
+
+function normalizeSearchText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function scorePropertyTextMatch(contractText: string, messageText: string) {
+  const normalizedMessage = normalizeSearchText(messageText);
+  if (!normalizedMessage) return 0;
+
+  const haystack = normalizeSearchText(contractText);
+  const tokens = normalizedMessage
+    .split(/[^a-z0-9]+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 4 || /^\d{3,}$/.test(token));
+
+  let score = 0;
+  for (const token of tokens) {
+    if (haystack.includes(token)) {
+      score += /^\d+$/.test(token) ? 35 : 18;
+    }
+  }
+
+  if (normalizedMessage && haystack.includes(normalizedMessage)) {
+    score += 60;
+  }
+
+  return score;
+}
+
 function normalizeEmail(email: string | null | undefined) {
   return String(email ?? "").trim().toLowerCase();
 }
@@ -342,13 +422,15 @@ async function findProfile(input: {
   const admin = createAdminClient();
 
   if (input.normalizedPhone) {
+    const variants = phoneVariants(input.normalizedPhone);
     const { data } = await admin
       .from("client_memory_profiles")
       .select("*")
       .eq("agency_id", input.agencyId)
-      .eq("normalized_phone", input.normalizedPhone)
-      .maybeSingle();
-    if (data) return data as MemoryProfileRow;
+      .in("normalized_phone", variants.length ? variants : [input.normalizedPhone])
+      .order("last_interaction_at", { ascending: false })
+      .limit(1);
+    if (data?.[0]) return data[0] as MemoryProfileRow;
   }
 
   if (input.email) {
@@ -608,6 +690,148 @@ export async function rememberClientInteraction(input: {
   return updatedProfile as MemoryProfileRow;
 }
 
+export async function syncRentalContractMemory(input: {
+  agencyId: string;
+  contractId: string;
+  propertyId: string;
+  tenantName: string;
+  tenantPhone?: string | null;
+  tenantEmail?: string | null;
+  ownerName?: string | null;
+  ownerPhone?: string | null;
+  ownerEmail?: string | null;
+}) {
+  const admin = createAdminClient();
+  const { data: property } = await admin
+    .from("properties")
+    .select("title, location, exact_address")
+    .eq("id", input.propertyId)
+    .maybeSingle();
+  const propertyLabel = property
+    ? [property.title, property.location].filter(Boolean).join(" - ")
+    : "Contrato de alquiler";
+
+  const upsertProfileWithLinks = async (profileInput: {
+    displayName: string;
+    phone?: string | null;
+    email?: string | null;
+    entityType: MemoryEntityType;
+    entityId: string;
+    entityLabel: string;
+    metadata?: Record<string, unknown>;
+  }) => {
+    const normalizedPhone = normalizeMemoryPhone(profileInput.phone);
+    const email = normalizeEmail(profileInput.email);
+    if (!normalizedPhone && !email) return;
+
+    const existingProfile = await findProfile({
+      agencyId: input.agencyId,
+      normalizedPhone,
+      email,
+    });
+
+    const baseProfile = {
+      agency_id: input.agencyId,
+      display_name: profileInput.displayName || existingProfile?.display_name || "Cliente",
+      normalized_phone: normalizedPhone || existingProfile?.normalized_phone || null,
+      email: email || existingProfile?.email || null,
+      last_interaction_at: new Date().toISOString(),
+    };
+
+    const { data: profile, error } = existingProfile
+      ? await admin
+          .from("client_memory_profiles")
+          .update(baseProfile)
+          .eq("id", existingProfile.id)
+          .select("*")
+          .single()
+      : await admin
+          .from("client_memory_profiles")
+          .insert(baseProfile)
+          .select("*")
+          .single();
+
+    if (error || !profile) throw error ?? new Error("No se pudo sincronizar memoria.");
+
+    await Promise.all([
+      upsertMemoryLink({
+        memoryId: profile.id,
+        agencyId: input.agencyId,
+        entityType: profileInput.entityType,
+        entityId: profileInput.entityId,
+        label: profileInput.entityLabel,
+        metadata: profileInput.metadata,
+      }),
+      upsertMemoryLink({
+        memoryId: profile.id,
+        agencyId: input.agencyId,
+        entityType: "contract",
+        entityId: input.contractId,
+        label: propertyLabel,
+        metadata: {
+          propertyId: input.propertyId,
+          tenantName: input.tenantName,
+        },
+      }),
+      upsertMemoryLink({
+        memoryId: profile.id,
+        agencyId: input.agencyId,
+        entityType: "property",
+        entityId: input.propertyId,
+        label: propertyLabel,
+        metadata: {
+          contractId: input.contractId,
+        },
+      }),
+    ]);
+
+    await admin.from("client_memory_events").insert({
+      memory_id: profile.id,
+      agency_id: input.agencyId,
+      property_id: input.propertyId,
+      contract_id: input.contractId,
+      source_type: "rental_contract_sync",
+      source_id: input.contractId,
+      direction: "internal",
+      role: "system",
+      content: `Contrato vinculado a ${propertyLabel}.`,
+      metadata: profileInput.metadata ?? {},
+    });
+  };
+
+  await upsertProfileWithLinks({
+    displayName: input.tenantName,
+    phone: input.tenantPhone,
+    email: input.tenantEmail,
+    entityType: "tenant",
+    entityId: `tenant:${input.contractId}`,
+    entityLabel: input.tenantName,
+    metadata: {
+      contractId: input.contractId,
+      propertyId: input.propertyId,
+      propertyTitle: property?.title ?? null,
+      role: "tenant",
+    },
+  });
+
+  if (input.ownerName || input.ownerPhone || input.ownerEmail) {
+    await upsertProfileWithLinks({
+      displayName: input.ownerName || "Propietario",
+      phone: input.ownerPhone,
+      email: input.ownerEmail,
+      entityType: "owner",
+      entityId: `owner:${input.contractId}`,
+      entityLabel: input.ownerName || "Propietario",
+      metadata: {
+        contractId: input.contractId,
+        propertyId: input.propertyId,
+        propertyTitle: property?.title ?? null,
+        role: "owner",
+      },
+    });
+  }
+}
+
 export async function buildClientMemoryContext(input: {
   agencyId: string;
   phone?: string | null;
@@ -696,10 +920,8 @@ export async function buildClientMemoryContext(input: {
 export async function findTenantRentalContext(input: {
   agencyId: string;
   phone?: string | null;
+  messageText?: string | null;
 }): Promise<TenantRentalMemoryContext | null> {
-  const normalizedPhone = normalizeMemoryPhone(input.phone);
-  if (!normalizedPhone) return null;
-
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("rental_contracts")
@@ -739,30 +961,120 @@ export async function findTenantRentalContext(input: {
       | { title: string; location: string; exact_address: string | null }[];
   }>;
 
-  const match = rows.find((contract) => normalizeMemoryPhone(contract.tenant_phone) === normalizedPhone);
+  const toContext = (match: (typeof rows)[number]): TenantRentalMemoryContext => {
+    const property = Array.isArray(match.properties) ? match.properties[0] : match.properties;
+
+    return {
+      contractId: match.id,
+      propertyId: match.property_id,
+      tenantName: match.tenant_name,
+      tenantPhone: match.tenant_phone,
+      currentRent: Number(match.current_rent ?? 0),
+      currency: match.currency,
+      indexType: match.index_type,
+      adjustmentFrequencyMonths: Number(match.adjustment_frequency_months ?? 0),
+      contractStartDate: match.contract_start_date,
+      nextAdjustmentDate: match.next_adjustment_date,
+      lastAdjustmentDate: match.last_adjustment_date,
+      lateFeeDailyAmount: Number(match.late_fee_daily_amount ?? 0),
+      lateFeeGraceDays: Number(match.late_fee_grace_days ?? 0),
+      status: match.status,
+      propertyTitle: property?.title ?? "la propiedad alquilada",
+      propertyLocation: property?.location ?? "",
+      exactAddress: property?.exact_address ?? "",
+    };
+  };
+
+  const profile = await findProfile({
+    agencyId: input.agencyId,
+    normalizedPhone: normalizeMemoryPhone(input.phone),
+    email: "",
+  });
+
+  if (profile) {
+    const { data: linkRows } = await admin
+      .from("client_memory_links")
+      .select("entity_type, entity_id")
+      .eq("agency_id", input.agencyId)
+      .eq("memory_id", profile.id)
+      .in("entity_type", ["contract", "tenant"]);
+
+    const linkedContractIds = new Set(
+      (linkRows ?? []).flatMap((link: { entity_type: string; entity_id: string }) => {
+        if (link.entity_type === "contract") return [link.entity_id];
+        if (link.entity_type === "tenant" && link.entity_id.startsWith("tenant:")) {
+          return [link.entity_id.replace(/^tenant:/, "")];
+        }
+        return [];
+      })
+    );
+    const linkedMatches = rows.filter((contract) => linkedContractIds.has(contract.id));
+
+    if (linkedMatches.length === 1) {
+      return toContext(linkedMatches[0]);
+    }
+
+    if (linkedMatches.length > 1) {
+      const rankedLinkedMatches = linkedMatches
+        .map((contract) => {
+          const property = Array.isArray(contract.properties) ? contract.properties[0] : contract.properties;
+          return {
+            contract,
+            propertyScore: scorePropertyTextMatch(
+              [contract.tenant_name, property?.title, property?.location, property?.exact_address]
+                .filter(Boolean)
+                .join(" "),
+              input.messageText ?? ""
+            ),
+          };
+        })
+        .sort((a, b) => b.propertyScore - a.propertyScore);
+
+      if (rankedLinkedMatches[0]?.propertyScore > 0) {
+        return toContext(rankedLinkedMatches[0].contract);
+      }
+    }
+  }
+
+  const scored = rows
+    .map((contract) => {
+      const property = Array.isArray(contract.properties) ? contract.properties[0] : contract.properties;
+      const propertyScore = scorePropertyTextMatch(
+        [contract.tenant_name, property?.title, property?.location, property?.exact_address]
+          .filter(Boolean)
+          .join(" "),
+        input.messageText ?? ""
+      );
+      const phoneScore = scorePhoneMatch(contract.tenant_phone, input.phone);
+
+      return {
+        contract,
+        score: phoneScore + propertyScore,
+        phoneScore,
+        propertyScore,
+      };
+    })
+    .filter((item) => item.score >= 55 || item.propertyScore >= 35)
+    .sort((a, b) => b.score - a.score);
+
+  const best = scored[0];
+  const second = scored[1];
+
+  if (!best) return null;
+
+  if (
+    second &&
+    best.propertyScore === 0 &&
+    best.phoneScore < 120 &&
+    best.score - second.score < 20
+  ) {
+    return null;
+  }
+
+  const match = best.contract;
   if (!match) return null;
 
-  const property = Array.isArray(match.properties) ? match.properties[0] : match.properties;
-
-  return {
-    contractId: match.id,
-    propertyId: match.property_id,
-    tenantName: match.tenant_name,
-    tenantPhone: match.tenant_phone,
-    currentRent: Number(match.current_rent ?? 0),
-    currency: match.currency,
-    indexType: match.index_type,
-    adjustmentFrequencyMonths: Number(match.adjustment_frequency_months ?? 0),
-    contractStartDate: match.contract_start_date,
-    nextAdjustmentDate: match.next_adjustment_date,
-    lastAdjustmentDate: match.last_adjustment_date,
-    lateFeeDailyAmount: Number(match.late_fee_daily_amount ?? 0),
-    lateFeeGraceDays: Number(match.late_fee_grace_days ?? 0),
-    status: match.status,
-    propertyTitle: property?.title ?? "la propiedad alquilada",
-    propertyLocation: property?.location ?? "",
-    exactAddress: property?.exact_address ?? "",
-  };
+  return toContext(match);
 }
 
 async function findLatestOwnerFinancials(input: {

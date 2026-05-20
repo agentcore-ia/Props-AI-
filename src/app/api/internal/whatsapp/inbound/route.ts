@@ -487,6 +487,7 @@ export async function POST(request: Request) {
   const rentalContext = await findTenantRentalContext({
     agencyId: agency.id,
     phone: remoteJid,
+    messageText,
   }).catch((error) => {
     console.error("[whatsapp-inbound] tenant rental context failed", {
       agencyId: agency.id,
