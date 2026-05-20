@@ -10,6 +10,7 @@ import {
   CheckCheck,
   Loader2,
   MessageCircle,
+  RotateCcw,
   SendHorizonal,
   Sparkles,
 } from "lucide-react";
@@ -83,6 +84,7 @@ export function InboxWorkspace({
   templates,
   initialMode = "completo",
   initialLeadId,
+  canResetMemory = false,
 }: {
   leads: CrmLeadSummary[];
   messages: CrmLeadMessageSummary[];
@@ -91,6 +93,7 @@ export function InboxWorkspace({
   templates: AgencyMessageTemplateSummary[];
   initialMode?: "completo" | "recepcion";
   initialLeadId?: string;
+  canResetMemory?: boolean;
 }) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState(
@@ -291,6 +294,33 @@ export function InboxWorkspace({
     router.refresh();
   }
 
+  async function resetConversationMemory() {
+    if (!selectedLead || !canResetMemory || selectedLead.agencySlug !== "ceballos") return;
+
+    const confirmed = window.confirm(
+      "Esto borra el historial y los datos de calificacion de este contacto para probar desde cero. No borra el WhatsApp del cliente. ¿Continuar?"
+    );
+
+    if (!confirmed) return;
+
+    setBusy(true);
+    setFeedback(null);
+
+    const response = await fetch(`/api/admin/leads/${selectedLead.id}/memory`, {
+      method: "POST",
+    });
+    const payload = await response.json().catch(() => null);
+    setBusy(false);
+
+    if (!response.ok) {
+      setFeedback(payload?.error ?? "No pudimos reiniciar la conversacion.");
+      return;
+    }
+
+    setFeedback("Memoria reiniciada. El proximo mensaje de este WhatsApp empieza desde cero.");
+    router.refresh();
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -392,9 +422,28 @@ export function InboxWorkspace({
                 </p>
               </div>
             </div>
-            <Badge className={`border-0 ${conversationStatusTone[deriveConversationStatus(selectedLead)]}`}>
-              {deriveConversationStatus(selectedLead)}
-            </Badge>
+            <div className="flex shrink-0 items-center gap-2">
+              {canResetMemory && selectedLead.agencySlug === "ceballos" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  disabled={busy}
+                  onClick={() => void resetConversationMemory()}
+                >
+                  {busy ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <RotateCcw className="size-4" />
+                  )}
+                  Reiniciar memoria
+                </Button>
+              ) : null}
+              <Badge className={`border-0 ${conversationStatusTone[deriveConversationStatus(selectedLead)]}`}>
+                {deriveConversationStatus(selectedLead)}
+              </Badge>
+            </div>
           </div>
 
           <div ref={messageScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">

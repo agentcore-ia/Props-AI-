@@ -45,6 +45,7 @@ export default async function MessagesPage({
       templates={templates}
       initialMode={searchParams?.modo === "recepcion" ? "recepcion" : "completo"}
       initialLeadId={searchParams?.lead}
+      canResetMemory={scope?.agencySlug === "ceballos"}
     />
   );
 }
