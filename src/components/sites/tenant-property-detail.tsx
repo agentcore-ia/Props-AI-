@@ -60,7 +60,7 @@ export function TenantPropertyDetail({
   ].filter(Boolean) as Array<{ label: string; href: string; icon: ReactNode }>;
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,rgba(241,245,249,0.95)_0%,rgba(255,255,255,1)_28%,rgba(255,255,255,1)_100%)]">
+    <div className="public-light min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,rgba(241,245,249,0.95)_0%,rgba(255,255,255,1)_28%,rgba(255,255,255,1)_100%)]">
       <header className="border-b border-slate-200 bg-white/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1440px] min-w-0 flex-col gap-4 px-4 py-5 sm:px-6 xl:px-8">
           <Link

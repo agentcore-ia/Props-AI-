@@ -111,7 +111,7 @@ export function MarketplacePropertyDetail({
   ].filter((item) => item.show);
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,rgba(237,242,255,0.88)_0%,rgba(247,249,252,1)_24%,rgba(255,255,255,1)_100%)]">
+    <div className="public-light min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,rgba(237,242,255,0.88)_0%,rgba(247,249,252,1)_24%,rgba(255,255,255,1)_100%)]">
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/88 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1480px] flex-col gap-2 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6 xl:px-8">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">

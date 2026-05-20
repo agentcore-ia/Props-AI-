@@ -207,7 +207,7 @@ export function PublicMarketplace({
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,rgba(237,242,255,0.9)_0%,rgba(246,248,252,1)_24%,rgba(255,255,255,1)_100%)]">
+    <div className="public-light min-h-screen bg-[linear-gradient(180deg,rgba(237,242,255,0.9)_0%,rgba(246,248,252,1)_24%,rgba(255,255,255,1)_100%)]">
       <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1480px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 xl:px-8">
           <div className="flex min-w-0 items-center gap-4 sm:gap-8">
@@ -282,7 +282,7 @@ export function PublicMarketplace({
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder="Buscar por ciudad, barrio, inmobiliaria, direccion o requisito"
-                      className="h-12 rounded-2xl border-0 bg-white pl-11 shadow-none ring-1 ring-slate-200"
+                      className="h-12 rounded-2xl border-0 bg-white pl-11 text-slate-950 shadow-none ring-1 ring-slate-200 placeholder:text-slate-400 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400"
                     />
                   </div>
                   <Button className="h-12 rounded-2xl px-5 sm:px-6" onClick={() => setSection("explorar")}>
@@ -1134,7 +1134,7 @@ function pillClass(active: boolean) {
     "inline-flex h-11 items-center rounded-full border px-4 text-sm font-medium transition-colors",
     active
       ? "border-slate-950 bg-slate-950 text-white"
-      : "border-slate-200 bg-white text-slate-600 hover:text-slate-950"
+      : "border-slate-200 bg-white text-slate-600 hover:text-slate-950 dark:border-slate-200 dark:bg-white dark:text-slate-600 dark:hover:bg-slate-50 dark:hover:text-slate-950"
   );
 }
 
@@ -1143,6 +1143,6 @@ function iconToggleClass(active: boolean) {
     "inline-flex size-11 items-center justify-center rounded-2xl border transition-colors",
     active
       ? "border-slate-950 bg-slate-950 text-white"
-      : "border-slate-200 bg-white text-slate-600 hover:text-slate-950"
+      : "border-slate-200 bg-white text-slate-600 hover:text-slate-950 dark:border-slate-200 dark:bg-white dark:text-slate-600 dark:hover:bg-slate-50 dark:hover:text-slate-950"
   );
 }

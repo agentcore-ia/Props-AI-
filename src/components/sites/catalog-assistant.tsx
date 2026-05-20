@@ -479,7 +479,7 @@ function AssistantComposer({
         onKeyDown={handleKeyDown}
         placeholder="Ej: busco alquiler de 2 ambientes en Palermo con balcon."
         className={cn(
-          "rounded-[24px] border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 placeholder:text-slate-400",
+          "rounded-[24px] border-slate-200 bg-white px-4 py-3 text-slate-950 shadow-none ring-1 ring-slate-200 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-blue-100 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400",
           compact ? "min-h-20" : "min-h-24"
         )}
       />

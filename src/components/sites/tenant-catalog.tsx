@@ -90,7 +90,7 @@ export function TenantCatalog({
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,rgba(239,246,255,0.95)_0%,rgba(248,250,252,1)_24%,rgba(255,255,255,1)_100%)]">
+    <div className="public-light min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,rgba(239,246,255,0.95)_0%,rgba(248,250,252,1)_24%,rgba(255,255,255,1)_100%)]">
       <header className="border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-4 sm:px-6 sm:py-5 xl:px-8">
           <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_20px_60px_-44px_rgba(15,23,42,0.28)] sm:rounded-[30px]">
@@ -163,7 +163,7 @@ export function TenantCatalog({
                       value={searchValue}
                       onChange={(event) => setSearchValue(event.target.value)}
                       placeholder="Buscar por barrio, tipologia, amenities o nombre..."
-                      className="h-11 rounded-2xl border-0 bg-white pl-11 text-sm shadow-none ring-1 ring-slate-200 sm:h-12"
+                      className="h-11 rounded-2xl border-0 bg-white pl-11 text-sm text-slate-950 shadow-none ring-1 ring-slate-200 placeholder:text-slate-400 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400 sm:h-12"
                     />
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -250,7 +250,11 @@ export function TenantCatalog({
                 <Button
                   key={option.value}
                   variant={operationFilter === option.value ? "default" : "outline"}
-                  className="h-10 rounded-full px-4 text-xs sm:h-11 sm:px-5 sm:text-sm"
+                  className={`h-10 rounded-full px-4 text-xs sm:h-11 sm:px-5 sm:text-sm ${
+                    operationFilter === option.value
+                      ? "dark:border-blue-600 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-700"
+                      : "dark:border-slate-200 dark:bg-white dark:text-slate-700 dark:hover:bg-slate-50"
+                  }`}
                   onClick={() =>
                     setOperationFilter(option.value as "all" | Property["operation"])
                   }

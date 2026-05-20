@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
+const publicFieldClass =
+  "border-slate-200 bg-white text-slate-950 shadow-none ring-1 ring-slate-200 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-blue-100 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400";
+
 export function CatalogInquiryForm({
   tenantSlug,
   propertyId,
@@ -106,20 +109,20 @@ export function CatalogInquiryForm({
                 placeholder="Nombre"
                 value={form.name}
                 onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                className="h-11 rounded-2xl border-slate-200 bg-slate-50 px-4"
+                className={`h-11 rounded-2xl px-4 ${publicFieldClass}`}
               />
               <Input
                 type="email"
                 placeholder="Email"
                 value={form.email}
                 onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                className="h-11 rounded-2xl border-slate-200 bg-slate-50 px-4"
+                className={`h-11 rounded-2xl px-4 ${publicFieldClass}`}
               />
               <Input
                 placeholder="Telefono"
                 value={form.phone}
                 onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-                className="h-11 rounded-2xl border-slate-200 bg-slate-50 px-4"
+                className={`h-11 rounded-2xl px-4 ${publicFieldClass}`}
               />
             </>
           ) : null}
@@ -127,7 +130,7 @@ export function CatalogInquiryForm({
             placeholder="Presupuesto estimado"
             value={form.budget}
             onChange={(event) => setForm((current) => ({ ...current, budget: event.target.value }))}
-            className="h-11 rounded-2xl border-slate-200 bg-slate-50 px-4"
+            className={`h-11 rounded-2xl px-4 ${publicFieldClass}`}
           />
         </div>
 
@@ -135,7 +138,7 @@ export function CatalogInquiryForm({
           placeholder="Contanos que necesitas, zona deseada, cantidad de ambientes o cualquier detalle clave."
           value={form.message}
           onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))}
-          className="min-h-32 rounded-[24px] border-slate-200 bg-slate-50 px-4 py-3"
+          className={`min-h-32 rounded-[24px] px-4 py-3 ${publicFieldClass}`}
         />
 
         {error ? (
@@ -150,7 +153,11 @@ export function CatalogInquiryForm({
           </div>
         ) : null}
 
-        <Button type="submit" className="h-11 w-full rounded-2xl" disabled={submitting}>
+        <Button
+          type="submit"
+          className="h-11 w-full rounded-2xl bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-700"
+          disabled={submitting}
+        >
           {submitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
           Enviar consulta
         </Button>
