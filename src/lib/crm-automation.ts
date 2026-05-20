@@ -100,12 +100,31 @@ function addHoursIso(hours: number) {
 
 function inferLeadFallback(input: LeadAutomationInput): LeadInsight {
   const message = input.message.toLowerCase();
+  const firstName = input.fullName.split(" ")[0] || "";
+  const isPaymentNotice = /pago|pagar|pague|pag[óo]|transfer|comprobante|demora|deuda/.test(message);
   const operation =
     message.includes("alquiler") || input.property?.operation === "Alquiler"
       ? "Alquiler"
       : message.includes("compra") || message.includes("venta")
         ? "Venta"
         : input.property?.operation ?? null;
+
+  if (isPaymentNotice) {
+    return {
+      stage: "Seguimiento",
+      priority: "Media",
+      score: 62,
+      summary: "Mensaje operativo de alquiler: el contacto avisa o consulta por un pago.",
+      replyDraft: `Gracias ${firstName}. Dejo asentado el aviso de pago. Cuando tengas el comprobante, mandalo por aca para que administracion lo registre.`,
+      intent: "Gestion de pago",
+      desiredOperation: "Alquiler",
+      desiredLocation: input.property?.location ?? null,
+      desiredTimeline: null,
+      budget: null,
+      requirementsSummary: null,
+      nextFollowUpHours: 24,
+    };
+  }
 
   const urgent =
     /hoy|urgente|ya|esta semana|mañana|manana|visita/i.test(input.message) ||
@@ -119,8 +138,8 @@ function inferLeadFallback(input: LeadAutomationInput): LeadInsight {
       ? "Lead con intención clara y pedido de respuesta rápida."
       : "Lead nuevo a calificar con presupuesto, zona y tiempos.",
     replyDraft: urgent
-      ? `Hola ${input.fullName.split(" ")[0] || ""}, gracias por escribirnos por ${input.property?.title ?? "esta propiedad"}. Te confirmo que ya estamos revisando la disponibilidad y te propongo coordinar una visita o llamada para avanzar.`
-      : `Hola ${input.fullName.split(" ")[0] || ""}, gracias por tu consulta. Para ayudarte mejor, ¿me compartís presupuesto estimado, zona buscada y para cuándo querés resolverlo?`,
+      ? `Hola ${firstName}, gracias por escribirnos${input.property?.title ? ` por ${input.property.title}` : ""}. Te confirmo que ya estamos revisando la disponibilidad y te propongo coordinar una visita o llamada para avanzar.`
+      : `Hola ${firstName}, gracias por tu consulta. Decime si queres consultar por una propiedad, coordinar una visita o resolver algo de alquiler y te ayudo.`,
     intent: urgent ? "Coordinar visita" : "Consulta general",
     desiredOperation: operation,
     desiredLocation: input.property?.location ?? null,
@@ -242,6 +261,28 @@ async function findExistingLead(params: {
       .limit(1)
       .maybeSingle();
     if (data) return data as LeadRow;
+
+    const normalizedPhone = normalizeWhatsAppJid(params.phone);
+
+    if (normalizedPhone) {
+      let normalizedQuery = admin
+        .from("crm_leads")
+        .select("*")
+        .eq("agency_id", params.agencyId)
+        .order("last_activity_at", { ascending: false })
+        .limit(80);
+
+      if (params.propertyId) {
+        normalizedQuery = normalizedQuery.eq("property_id", params.propertyId);
+      }
+
+      const { data: recentLeads } = await normalizedQuery;
+      const normalizedMatch = ((recentLeads ?? []) as LeadRow[]).find(
+        (lead) => normalizeWhatsAppJid(lead.phone) === normalizedPhone
+      );
+
+      if (normalizedMatch) return normalizedMatch;
+    }
   }
 
   if (params.email) {

@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { isAutomationRequest } from "@/lib/automation-auth";
+import type { CrmLeadMessageSummary, CrmLeadSummary } from "@/lib/crm-types";
 import { recordCrmLeadMessage, upsertLeadFromSignal } from "@/lib/crm-automation";
 import { sendEvolutionTextMessage } from "@/lib/evolution";
 import { getOpenAIEnv } from "@/lib/openai-env";
+import { buildShortPropertyUrl } from "@/lib/property-links";
 import { getCrmLeadById, listCrmLeadMessages } from "@/lib/props-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -15,12 +17,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function readPath(value: unknown, path: string[]) {
-  let current = value as Record<string, unknown> | null | undefined;
+function readPath(value: unknown, path: string[]): unknown {
+  let current = value;
 
   for (const key of path) {
     if (!current || typeof current !== "object") return undefined;
-    current = current[key] as Record<string, unknown> | null | undefined;
+    current = (current as Record<string, unknown>)[key];
   }
 
   return current;
@@ -103,6 +105,117 @@ function looksLikeEvolutionWebhook(body: unknown) {
   return Boolean(payload.instanceName && payload.remoteJid && (payload.waMessageId || payload.messageText));
 }
 
+function normalizeTextForIntent(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function firstName(value: string) {
+  return value.trim().split(/\s+/)[0] || "ahi";
+}
+
+function threadContains(messages: CrmLeadMessageSummary[], pattern: RegExp) {
+  return messages.some((message) => pattern.test(normalizeTextForIntent(message.content)));
+}
+
+function formatKnownContext(input: {
+  lead: CrmLeadSummary;
+  agencyName: string;
+  recentMessages: CrmLeadMessageSummary[];
+}) {
+  const propertyLine = input.lead.propertyTitle
+    ? `Estamos hablando de ${input.lead.propertyTitle}${input.lead.propertyLocation ? ` en ${input.lead.propertyLocation}` : ""}.`
+    : "No tengo una propiedad puntual asociada con certeza en este chat.";
+  const customerMessages = input.recentMessages
+    .filter((message) => message.senderRole === "customer")
+    .slice(-4)
+    .map((message) => message.content.trim())
+    .filter(Boolean);
+  const historyLine = customerMessages.length
+    ? `Lo ultimo que tengo registrado es: ${customerMessages.join(" / ")}.`
+    : "Todavia no tengo muchos mensajes previos tuyos en este hilo.";
+
+  return `${propertyLine} Estas hablando con ${input.agencyName}. ${historyLine}`;
+}
+
+function buildContextualFallbackReply(input: {
+  agencyName: string;
+  lead: CrmLeadSummary;
+  messageText: string;
+  recentMessages: CrmLeadMessageSummary[];
+}) {
+  const normalized = normalizeTextForIntent(input.messageText);
+  const name = firstName(input.lead.fullName);
+  const context = formatKnownContext(input);
+  const hasPaymentContext =
+    /pago|pagar|pag[oe]|transfer|comprobante|alquiler|demora|deuda/.test(normalized) ||
+    threadContains(input.recentMessages.slice(-6), /pago|pagar|pag[oe]|transfer|comprobante|alquiler|demora|deuda/);
+  const hasVisitContext =
+    /visita|visitar|ver la propiedad|horario|viernes|sabado|domingo|lunes|martes|miercoles|jueves|tarde|manana/.test(
+      normalized
+    ) || threadContains(input.recentMessages.slice(-6), /visita|visitar|ver la propiedad|horario/);
+
+  if (/contexto|que sabes|que tenes|que tienes|de que propiedad|cual propiedad|propiedad hablas|link/.test(normalized)) {
+    if (/link/.test(normalized) && input.lead.propertyId && input.lead.agencySlug) {
+      return `${context} Link de la ficha: ${buildShortPropertyUrl(input.lead.agencySlug, input.lead.propertyId)}`;
+    }
+
+    return context;
+  }
+
+  if (hasPaymentContext) {
+    if (/comprobante|transfer/.test(normalized)) {
+      return `Gracias, ${name}. Cuando tengas el comprobante, mandalo por aca y ${input.agencyName} lo registra en tu cuenta.`;
+    }
+
+    return `Gracias, ${name}. Dejo asentado que vas a pagar el alquiler. Cuando hagas la transferencia, mandanos el comprobante por aca para registrarlo.`;
+  }
+
+  if (hasVisitContext) {
+    if (/nombre|telefono|celular|numero|datos/.test(normalized)) {
+      return `Gracias, ${name}. Ya queda registrado para que ${input.agencyName} te contacte y cierre la visita.`;
+    }
+
+    return `Perfecto, ${name}. Te tomo esa disponibilidad para coordinar la visita. Si todavia no lo pasaste, enviame nombre y celular para dejarlo registrado.`;
+  }
+
+  if (/^hola|buenas|buen dia|buenas tardes|buenas noches/.test(normalized)) {
+    return `Hola ${name}, te leo. Decime si es por una propiedad, una visita o un tema de alquiler y te ayudo con eso.`;
+  }
+
+  return `${name}, te leo. Para no mezclar temas: queres consultar por una propiedad, coordinar una visita o avisar algo de un alquiler?`;
+}
+
+function extractOpenAIResponseText(payload: unknown) {
+  const outputText = readPath(payload, ["output_text"]);
+  if (typeof outputText === "string" && outputText.trim()) {
+    return outputText.trim();
+  }
+
+  const output = readPath(payload, ["output"]);
+  if (!Array.isArray(output)) {
+    return "";
+  }
+
+  return output
+    .flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const content = (item as { content?: unknown }).content;
+      return Array.isArray(content) ? content : [];
+    })
+    .map((content) => {
+      if (!content || typeof content !== "object") return "";
+      const text = (content as { text?: unknown }).text;
+      return typeof text === "string" ? text : "";
+    })
+    .join("\n")
+    .trim();
+}
+
 async function generateWhatsappReply(input: {
   agency: Awaited<ReturnType<typeof resolveAgencyByMessagingInstance>>;
   leadId: string;
@@ -120,6 +233,12 @@ async function generateWhatsappReply(input: {
     messageText: input.messageText,
   });
   const recentMessages = await listCrmLeadMessages({ leadIds: [lead.id] });
+  const contextualFallback = buildContextualFallbackReply({
+    agencyName: input.agency?.name ?? lead.agencyName,
+    lead,
+    messageText: input.messageText,
+    recentMessages,
+  });
   const systemPrompt = buildWhatsappSystemPrompt({
     agency: input.agency ?? {
       id: lead.agencyId,
@@ -143,7 +262,7 @@ async function generateWhatsappReply(input: {
   });
 
   if (!openAI.configured) {
-    return input.fallback;
+    return contextualFallback;
   }
 
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -167,10 +286,18 @@ async function generateWhatsappReply(input: {
     }),
   });
 
-  if (!response.ok) return input.fallback;
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    console.error("[whatsapp-inbound] openai reply failed", {
+      leadId: lead.id,
+      status: response.status,
+      error: errorText.slice(0, 500),
+    });
+    return contextualFallback;
+  }
 
-  const payload = (await response.json()) as { output_text?: string };
-  return payload.output_text?.trim() || input.fallback;
+  const payload = await response.json();
+  return extractOpenAIResponseText(payload) || contextualFallback;
 }
 
 export async function POST(request: Request) {
