@@ -159,6 +159,37 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
           </div>
         ) : null}
 
+        {snapshot.myDay.automaticFollowUps.length > 0 ? (
+          <section className="rounded-[24px] border bg-background p-3.5">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <MessageCircleMore className="size-4 text-primary" />
+                  <h3 className="font-semibold">A quién va a recontactar</h3>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Si apretás el botón, Props envía estos WhatsApp reales ahora.
+                </p>
+              </div>
+              <span className="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                {snapshot.myDay.automaticFollowUps.length} contacto{snapshot.myDay.automaticFollowUps.length === 1 ? "" : "s"}
+              </span>
+            </div>
+
+            <div className="mt-3 grid gap-2 xl:grid-cols-2">
+              {snapshot.myDay.automaticFollowUps.slice(0, 4).map((lead) => (
+                <FollowUpPreviewCard key={lead.id} lead={lead} />
+              ))}
+            </div>
+
+            {snapshot.myDay.automaticFollowUps.length > 4 ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Hay {snapshot.myDay.automaticFollowUps.length - 4} recontactos más listos. Abrí Mensajes para revisar el resto antes de enviar.
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+
         {followUpResults.length > 0 ? (
           <TodayList
             title="Resultado del ultimo envio"
@@ -282,6 +313,49 @@ function deriveFollowUpReason(lead: CrmLeadSummary) {
     return "Consulto por compra y ya corresponde retomarlo.";
   }
   return "Es un lead pendiente que ya esta listo para recontactar.";
+}
+
+function FollowUpPreviewCard({ lead }: { lead: CrmLeadSummary }) {
+  const message = buildAutomaticFollowUpMessage({ lead, property: null });
+
+  return (
+    <article className="rounded-2xl border bg-card p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold">{lead.fullName}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {lead.phone ? `WhatsApp: ${formatPhoneForPreview(lead.phone)}` : "Sin WhatsApp cargado"}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
+          {lead.stage}
+        </span>
+      </div>
+      <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+        {deriveFollowUpReason(lead)}
+        {lead.propertyTitle ? ` · ${lead.propertyTitle}` : ""}
+      </p>
+      <div className="mt-3 rounded-xl border border-dashed bg-background px-3 py-2 text-sm text-muted-foreground">
+        <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/80">
+          Mensaje que se enviará
+        </span>
+        <span className="line-clamp-3">{message}</span>
+      </div>
+      <Link
+        href={`/mensajes?lead=${lead.id}`}
+        className="mt-2 inline-flex h-8 items-center gap-1 rounded-xl px-2 text-sm font-medium text-primary transition hover:bg-primary/5"
+      >
+        Revisar conversación
+        <ArrowRight className="size-4" />
+      </Link>
+    </article>
+  );
+}
+
+function formatPhoneForPreview(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length <= 4) return phone;
+  return `${digits.slice(0, -4)} ${digits.slice(-4)}`;
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
