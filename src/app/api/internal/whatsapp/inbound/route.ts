@@ -135,6 +135,28 @@ function formatDate(value: string | null | undefined) {
   return `${day}/${month}/${year}`;
 }
 
+function isRentalAdministrationMessage(messageText: string) {
+  const normalized = normalizeTextForIntent(messageText);
+
+  return /mi alquiler|alquiler de este mes|cuanto tengo que pagar|cuanto debo|pagar el alquiler|pago el alquiler|pague el alquiler|voy a pagar|comprobante|transferencia|deuda|mora|moroso|punitorio|aumento|ajuste|ipc|icl|contrato|rescision|finalizacion|fin del contrato|expensas de mi|liquidacion/.test(
+    normalized
+  );
+}
+
+function isCommercialPropertySearch(messageText: string) {
+  const normalized = normalizeTextForIntent(messageText);
+  const hasSearchIntent =
+    /busco|buscando|buscar|queria|quisiera|necesito|tenes|tienes|hay algo|opcion|opciones|depto|departamento|casa|monoambiente|ambientes|alquilar|comprar|venta|alquiler/.test(
+      normalized
+    );
+  const hasSearchTarget =
+    /para mi hijo|para mi hija|para mi viejo|para mi vieja|para mi mama|para mi papa|para mi pareja|zona|belgrano|nunez|palermo|caballito|balvanera|barrio|cerca|hasta|presupuesto|dormitorio|ambiente/.test(
+      normalized
+    );
+
+  return hasSearchIntent && hasSearchTarget && !isRentalAdministrationMessage(messageText);
+}
+
 function extractOpenAIResponseText(payload: unknown) {
   const outputText = readPath(payload, ["output_text"]);
   if (typeof outputText === "string" && outputText.trim()) {
@@ -209,9 +231,22 @@ async function generateWhatsappReply(input: {
 
   if (!lead) return null;
 
+  const isNewPropertySearch = isCommercialPropertySearch(input.messageText);
+  const leadForPrompt = isNewPropertySearch
+    ? {
+        ...lead,
+        propertyId: null,
+        propertyTitle: null,
+        propertyLocation: null,
+        stage: "Nuevo" as const,
+        intent: "Busqueda comercial de propiedades",
+        qualificationSummary:
+          "El contacto tiene historial previo, pero el ultimo mensaje es una busqueda comercial nueva. No limitar la respuesta al contrato o propiedad asociada anteriormente.",
+      }
+    : lead;
   const catalog = await buildAgencyCatalogContext({
     agencySlug: lead.agencySlug,
-    selectedPropertyId: lead.propertyId,
+    selectedPropertyId: isNewPropertySearch ? null : lead.propertyId,
     messageText: input.messageText,
   });
   const recentMessages = await listCrmLeadMessages({ leadIds: [lead.id] });
@@ -228,7 +263,7 @@ async function generateWhatsappReply(input: {
         messagingInstance: "",
         whatsappAiEnabled: true,
       },
-      lead,
+      lead: leadForPrompt,
       selectedProperty: catalog.selectedProperty,
       catalogSummary: catalog.catalogSummary,
       recentMessages,
@@ -236,8 +271,11 @@ async function generateWhatsappReply(input: {
     "Memoria persistente Props:",
     input.memoryContextText ?? "Sin memoria persistente previa.",
     "No uses respuestas de plantilla ni textos fijos. Redacta cada respuesta segun el ultimo mensaje, el historial y los datos reales disponibles.",
+    isNewPropertySearch
+      ? "El ultimo mensaje es una busqueda comercial nueva de propiedades. Aunque el telefono pertenezca a un inquilino o propietario, no uses su contrato actual como propiedad consultada, no propongas visitar esa propiedad y no respondas como administracion."
+      : "El ultimo mensaje no fue clasificado como busqueda comercial nueva.",
     "Si prometes derivar a administracion, pedir que lo revise una persona, confirmar monto exacto o tomar nota para seguimiento humano, dilo solo cuando sea realmente necesario y redactalo como una tarea concreta para administracion.",
-    input.rentalContext
+    input.rentalContext && !isNewPropertySearch
       ? [
           "Contrato operativo detectado por telefono:",
           `Inquilino: ${input.rentalContext.tenantName}.`,
@@ -246,10 +284,12 @@ async function generateWhatsappReply(input: {
           `Indice: ${input.rentalContext.indexType}. Frecuencia: cada ${input.rentalContext.adjustmentFrequencyMonths} meses.`,
           `Inicio: ${formatDate(input.rentalContext.contractStartDate)}. Ultimo ajuste: ${formatDate(input.rentalContext.lastAdjustmentDate)}. Proximo ajuste: ${formatDate(input.rentalContext.nextAdjustmentDate)}.`,
           `Punitorios: ${formatArs(input.rentalContext.lateFeeDailyAmount)} por dia despues de ${input.rentalContext.lateFeeGraceDays} dias de gracia.`,
-          "Si pregunta por su alquiler, pago, deuda, comprobante, proximo mes o ajuste, responde como administracion con estos datos duros. No preguntes presupuesto ni zona.",
+          "Usa este contrato solo si el ultimo mensaje trata sobre su alquiler, pago, deuda, comprobante, aumento, ajuste o contrato. Si el ultimo mensaje es una busqueda nueva de propiedad, por ejemplo para un familiar o por otra zona, ignora este contrato para responder y atiende como consulta comercial.",
         ].join("\n")
-      : "No hay contrato operativo detectado por telefono.",
-    input.ownerContext
+      : input.rentalContext
+        ? "Hay un contrato detectado por telefono, pero se ignora en esta respuesta porque el ultimo mensaje es una busqueda comercial nueva."
+        : "No hay contrato operativo detectado por telefono.",
+    input.ownerContext && !isNewPropertySearch
       ? [
           "Contexto operativo del propietario detectado por telefono:",
           `Propietario: ${input.ownerContext.ownerName}.`,
@@ -263,20 +303,26 @@ async function generateWhatsappReply(input: {
             : "No hay transferencia reciente detectada.",
           "Si pregunta por liquidacion, transferencia, pago al propietario o cuanto le corresponde, responde como administracion con estos datos duros. No lo trates como lead comprador/inquilino ni preguntes presupuesto o zona.",
         ].join("\n")
-      : "No hay propietario operativo detectado por telefono.",
+      : input.ownerContext
+        ? "Hay un propietario detectado por telefono, pero se ignora en esta respuesta porque el ultimo mensaje es una busqueda comercial nueva."
+        : "No hay propietario operativo detectado por telefono.",
   ].join("\n\n");
   const agentInput = [
     buildWhatsappAgentInput({
-      lead,
+      lead: leadForPrompt,
       messageText: input.messageText,
       selectedProperty: catalog.selectedProperty,
     }),
-    input.rentalContext
+    input.rentalContext && !isNewPropertySearch
       ? `El contacto coincide con un inquilino: contrato ${input.rentalContext.contractId}, propiedad ${input.rentalContext.propertyTitle}, alquiler actual ${formatArs(input.rentalContext.currentRent)}.`
-      : "No se encontro contrato de alquiler asociado por telefono.",
-    input.ownerContext
+      : input.rentalContext
+        ? "El telefono coincide con un inquilino, pero el mensaje actual es busqueda comercial nueva: no usar el contrato como propiedad consultada."
+        : "No se encontro contrato de alquiler asociado por telefono.",
+    input.ownerContext && !isNewPropertySearch
       ? `El contacto coincide con un propietario: contrato ${input.ownerContext.contractId}, propiedad ${input.ownerContext.propertyTitle}, participacion ${input.ownerContext.participationPercent}%, ultima liquidacion ${input.ownerContext.latestSettlement ? `${input.ownerContext.latestSettlement.settlementMonth} por ${formatArs(input.ownerContext.latestSettlement.ownerPayoutAmount)}` : "sin liquidacion reciente"}.`
-      : "No se encontro propietario asociado por telefono.",
+      : input.ownerContext
+        ? "El telefono coincide con un propietario, pero el mensaje actual es busqueda comercial nueva: no usar su propiedad administrada como propiedad consultada."
+        : "No se encontro propietario asociado por telefono.",
   ].join("\n");
 
   if (!openAI.configured) {
@@ -381,6 +427,10 @@ export async function POST(request: Request) {
     });
     return null;
   });
+  const isNewPropertySearch = isCommercialPropertySearch(messageText);
+  const isAdministrationMessage = isRentalAdministrationMessage(messageText);
+  const activeRentalContext = isNewPropertySearch ? null : rentalContext;
+  const activeOwnerContext = isNewPropertySearch || activeRentalContext ? null : ownerContext;
 
   if (waMessageId) {
     const admin = createAdminClient();
@@ -417,38 +467,53 @@ export async function POST(request: Request) {
     source: "whatsapp_inbound",
     message: messageText,
   });
+  const fallbackPropertyId = isNewPropertySearch ? null : signal.lead.property_id;
 
-  if (rentalContext) {
+  if (isNewPropertySearch) {
     await createAdminClient()
       .from("crm_leads")
       .update({
-        property_id: rentalContext.propertyId,
-        full_name: rentalContext.tenantName,
+        property_id: null,
+        stage: "Nuevo",
+        priority: "Media",
+        qualification_summary:
+          "Busqueda comercial nueva desde WhatsApp. El telefono puede tener historial administrativo, pero esta consulta no debe quedar asociada al contrato anterior.",
+        intent: "Busqueda comercial de propiedades",
+        needs_response: false,
+        last_activity_at: new Date().toISOString(),
+      })
+      .eq("id", signal.lead.id);
+  } else if (activeRentalContext) {
+    await createAdminClient()
+      .from("crm_leads")
+      .update({
+        property_id: activeRentalContext.propertyId,
+        full_name: activeRentalContext.tenantName,
         stage: "Seguimiento",
         priority: "Media",
-        qualification_summary: `Inquilino con contrato activo en ${rentalContext.propertyTitle}.`,
+        qualification_summary: `Inquilino con contrato activo en ${activeRentalContext.propertyTitle}.`,
         intent: "Gestion de alquiler",
         desired_operation: "Alquiler",
-        desired_location: rentalContext.propertyLocation,
+        desired_location: activeRentalContext.propertyLocation,
         needs_response: false,
         last_activity_at: new Date().toISOString(),
       })
       .eq("id", signal.lead.id);
   }
 
-  if (!rentalContext && ownerContext) {
+  if (!activeRentalContext && activeOwnerContext) {
     await createAdminClient()
       .from("crm_leads")
       .update({
-        property_id: ownerContext.propertyId,
-        full_name: ownerContext.ownerName,
-        email: ownerContext.ownerEmail,
+        property_id: activeOwnerContext.propertyId,
+        full_name: activeOwnerContext.ownerName,
+        email: activeOwnerContext.ownerEmail,
         stage: "Seguimiento",
         priority: "Media",
-        qualification_summary: `Propietario vinculado a ${ownerContext.propertyTitle}.`,
+        qualification_summary: `Propietario vinculado a ${activeOwnerContext.propertyTitle}.`,
         intent: "Gestion de propietario",
         desired_operation: "Administracion",
-        desired_location: ownerContext.propertyLocation,
+        desired_location: activeOwnerContext.propertyLocation,
         needs_response: false,
         last_activity_at: new Date().toISOString(),
       })
@@ -458,7 +523,7 @@ export async function POST(request: Request) {
   await recordCrmLeadMessage({
     leadId: signal.lead.id,
     agencyId: signal.lead.agency_id,
-    propertyId: rentalContext?.propertyId ?? ownerContext?.propertyId ?? signal.lead.property_id,
+    propertyId: activeRentalContext?.propertyId ?? activeOwnerContext?.propertyId ?? fallbackPropertyId,
     content: messageText,
     direction: "incoming",
     senderRole: "customer",
@@ -468,9 +533,11 @@ export async function POST(request: Request) {
       instanceName,
       remoteJid,
       source: "evolution_webhook",
-      rentalContractId: rentalContext?.contractId ?? null,
-      ownerContractId: ownerContext?.contractId ?? null,
-      contractOwnerId: ownerContext?.contractOwnerId ?? null,
+      ignoredOperationalContext: isNewPropertySearch && Boolean(rentalContext || ownerContext),
+      intentMode: isNewPropertySearch ? "commercial_search" : isAdministrationMessage ? "administration" : "general",
+      rentalContractId: activeRentalContext?.contractId ?? null,
+      ownerContractId: activeOwnerContext?.contractId ?? null,
+      contractOwnerId: activeOwnerContext?.contractOwnerId ?? null,
     },
   });
 
@@ -478,15 +545,15 @@ export async function POST(request: Request) {
     agencyId: agency.id,
     displayName: rentalContext?.tenantName ?? ownerContext?.ownerName ?? senderName,
     phone: remoteJid,
-    email: ownerContext?.ownerEmail ?? null,
+    email: activeOwnerContext?.ownerEmail ?? null,
     leadId: signal.lead.id,
-    propertyId: rentalContext?.propertyId ?? ownerContext?.propertyId ?? signal.lead.property_id,
-    propertyTitle: rentalContext?.propertyTitle ?? ownerContext?.propertyTitle ?? null,
-    contractId: rentalContext?.contractId ?? ownerContext?.contractId ?? null,
+    propertyId: activeRentalContext?.propertyId ?? activeOwnerContext?.propertyId ?? fallbackPropertyId,
+    propertyTitle: activeRentalContext?.propertyTitle ?? activeOwnerContext?.propertyTitle ?? null,
+    contractId: activeRentalContext?.contractId ?? activeOwnerContext?.contractId ?? null,
     sourceType: "whatsapp_inbound",
     sourceId: waMessageId,
-    rentalContext,
-    ownerContext,
+    rentalContext: activeRentalContext,
+    ownerContext: activeOwnerContext,
     messages: [
       {
         direction: "incoming",
@@ -496,6 +563,7 @@ export async function POST(request: Request) {
           messageType,
           instanceName,
           remoteJid,
+          intentMode: isNewPropertySearch ? "commercial_search" : isAdministrationMessage ? "administration" : "general",
         },
       },
     ],
@@ -510,8 +578,8 @@ export async function POST(request: Request) {
     agencyId: agency.id,
     phone: remoteJid,
     leadId: signal.lead.id,
-    rentalContext,
-    ownerContext,
+    rentalContext: activeRentalContext,
+    ownerContext: activeOwnerContext,
   }).catch((error) => {
     console.error("[whatsapp-inbound] memory context failed", {
       leadId: signal.lead.id,
@@ -554,8 +622,8 @@ export async function POST(request: Request) {
       agency,
       leadId: signal.lead.id,
       messageText,
-      rentalContext,
-      ownerContext,
+      rentalContext: activeRentalContext,
+      ownerContext: activeOwnerContext,
       memoryContextText: memoryContext.contextText,
     });
 
@@ -576,13 +644,13 @@ export async function POST(request: Request) {
       await ensureLeadTask({
         agencyId: signal.lead.agency_id,
         leadId: signal.lead.id,
-        propertyId: rentalContext?.propertyId ?? ownerContext?.propertyId ?? signal.lead.property_id,
-        title: `Responder manualmente a ${rentalContext?.tenantName ?? ownerContext?.ownerName ?? senderName}`,
+        propertyId: activeRentalContext?.propertyId ?? activeOwnerContext?.propertyId ?? fallbackPropertyId,
+        title: `Responder manualmente a ${activeRentalContext?.tenantName ?? activeOwnerContext?.ownerName ?? senderName}`,
         details: buildAdministrationTaskDetails({
           messageText,
           replyText: manualReason,
-          rentalContext,
-          ownerContext,
+          rentalContext: activeRentalContext,
+          ownerContext: activeOwnerContext,
         }),
         dueAt: new Date().toISOString(),
         taskType: "Responder",
@@ -614,7 +682,7 @@ export async function POST(request: Request) {
     await recordCrmLeadMessage({
       leadId: signal.lead.id,
       agencyId: signal.lead.agency_id,
-      propertyId: rentalContext?.propertyId ?? ownerContext?.propertyId ?? signal.lead.property_id,
+      propertyId: activeRentalContext?.propertyId ?? activeOwnerContext?.propertyId ?? fallbackPropertyId,
       content: aiReply,
       direction: "outgoing",
       senderRole: "assistant",
@@ -623,9 +691,10 @@ export async function POST(request: Request) {
         instanceName,
         remoteJid,
         source: "whatsapp_inbound_auto_reply",
-        rentalContractId: rentalContext?.contractId ?? null,
-        ownerContractId: ownerContext?.contractId ?? null,
-        contractOwnerId: ownerContext?.contractOwnerId ?? null,
+        intentMode: isNewPropertySearch ? "commercial_search" : isAdministrationMessage ? "administration" : "general",
+        rentalContractId: activeRentalContext?.contractId ?? null,
+        ownerContractId: activeOwnerContext?.contractId ?? null,
+        contractOwnerId: activeOwnerContext?.contractOwnerId ?? null,
       },
     });
 
@@ -633,15 +702,15 @@ export async function POST(request: Request) {
       agencyId: agency.id,
       displayName: rentalContext?.tenantName ?? ownerContext?.ownerName ?? latestLead?.fullName ?? senderName,
       phone: remoteJid,
-      email: ownerContext?.ownerEmail ?? null,
+      email: activeOwnerContext?.ownerEmail ?? null,
       leadId: signal.lead.id,
-      propertyId: rentalContext?.propertyId ?? ownerContext?.propertyId ?? latestLead?.propertyId ?? signal.lead.property_id,
-      propertyTitle: rentalContext?.propertyTitle ?? ownerContext?.propertyTitle ?? latestLead?.propertyTitle ?? null,
-      contractId: rentalContext?.contractId ?? ownerContext?.contractId ?? null,
+      propertyId: activeRentalContext?.propertyId ?? activeOwnerContext?.propertyId ?? latestLead?.propertyId ?? fallbackPropertyId,
+      propertyTitle: activeRentalContext?.propertyTitle ?? activeOwnerContext?.propertyTitle ?? latestLead?.propertyTitle ?? null,
+      contractId: activeRentalContext?.contractId ?? activeOwnerContext?.contractId ?? null,
       sourceType: "whatsapp_inbound_auto_reply",
       sourceId: waMessageId,
-      rentalContext,
-      ownerContext,
+      rentalContext: activeRentalContext,
+      ownerContext: activeOwnerContext,
       messages: [
         {
           direction: "outgoing",
@@ -650,6 +719,7 @@ export async function POST(request: Request) {
           metadata: {
             instanceName,
             remoteJid,
+            intentMode: isNewPropertySearch ? "commercial_search" : isAdministrationMessage ? "administration" : "general",
           },
         },
       ],
@@ -685,13 +755,13 @@ export async function POST(request: Request) {
       await ensureLeadTask({
         agencyId: signal.lead.agency_id,
         leadId: signal.lead.id,
-        propertyId: rentalContext?.propertyId ?? ownerContext?.propertyId ?? signal.lead.property_id,
-        title: `Administracion: responder a ${rentalContext?.tenantName ?? ownerContext?.ownerName ?? senderName}`,
+        propertyId: activeRentalContext?.propertyId ?? activeOwnerContext?.propertyId ?? fallbackPropertyId,
+        title: `Administracion: responder a ${activeRentalContext?.tenantName ?? activeOwnerContext?.ownerName ?? senderName}`,
         details: buildAdministrationTaskDetails({
           messageText,
           replyText: aiReply,
-          rentalContext,
-          ownerContext,
+          rentalContext: activeRentalContext,
+          ownerContext: activeOwnerContext,
         }),
         dueAt: new Date().toISOString(),
         taskType: "Responder",
@@ -722,13 +792,13 @@ export async function POST(request: Request) {
     await ensureLeadTask({
       agencyId: signal.lead.agency_id,
       leadId: signal.lead.id,
-      propertyId: rentalContext?.propertyId ?? ownerContext?.propertyId ?? signal.lead.property_id,
-      title: `Responder manualmente a ${rentalContext?.tenantName ?? ownerContext?.ownerName ?? senderName}`,
+      propertyId: activeRentalContext?.propertyId ?? activeOwnerContext?.propertyId ?? fallbackPropertyId,
+      title: `Responder manualmente a ${activeRentalContext?.tenantName ?? activeOwnerContext?.ownerName ?? senderName}`,
       details: buildAdministrationTaskDetails({
         messageText,
         replyText: `Fallo la respuesta automatica: ${aiError}`,
-        rentalContext,
-        ownerContext,
+        rentalContext: activeRentalContext,
+        ownerContext: activeOwnerContext,
       }),
       dueAt: new Date().toISOString(),
       taskType: "Responder",

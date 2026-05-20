@@ -267,9 +267,11 @@ export function buildWhatsappSystemPrompt(input: {
     .filter(Boolean)
     .length;
   const businessHours = input.agency.businessHours?.trim();
-  const hasFixedProperty = Boolean(input.selectedProperty || input.lead.propertyId);
+  const isFreshCommercialSearch = input.lead.intent === "Busqueda comercial de propiedades";
+  const hasFixedProperty = !isFreshCommercialSearch && Boolean(input.selectedProperty || input.lead.propertyId);
   const isVisitFlow =
-    input.lead.stage === "Visita" ||
+    !isFreshCommercialSearch &&
+    (input.lead.stage === "Visita" ||
     /visita|coordinar|viernes|sabado|domingo|lunes|martes|miercoles|jueves|manana|mañana|tarde|horario/i.test(
       [
         input.lead.intent,
@@ -278,7 +280,7 @@ export function buildWhatsappSystemPrompt(input: {
       ]
         .filter(Boolean)
         .join(" ")
-    );
+    ));
 
   return [
     `Eres el asistente comercial de WhatsApp de ${input.agency.name}, una inmobiliaria de ${input.agency.city}.`,
@@ -290,6 +292,9 @@ export function buildWhatsappSystemPrompt(input: {
       : `La inmobiliaria no cargo horarios de atencion. Fecha y hora actual en Buenos Aires: ${formatBuenosAiresNow()}. Si preguntan si estan abiertos, deci que no tenes el horario exacto cargado, pero igual podes tomar la consulta para que el equipo responda.`,
     "Solo puedes afirmar datos que esten en el contexto. Si no aparece algo, dilo con honestidad y ofrece derivarlo al equipo.",
     "Si no sabes con certeza de que propiedad o contrato habla el cliente, dilo explicitamente. Nunca inventes una propiedad, nunca mezcles inmobiliarias y nunca pases links de propiedades fuera de esta inmobiliaria.",
+    isFreshCommercialSearch
+      ? "Esta consulta fue marcada como busqueda comercial nueva. No uses una visita, contrato o propiedad anterior del historial como si fuera la propiedad actual."
+      : "Usa el historial reciente solo cuando ayude a continuar el mismo tema; si el cliente cambio de tema, prioriza el ultimo mensaje.",
     "Cuando el cliente muestra interes concreto, invita a dejar horario, presupuesto o coordinar visita. Cuando haga falta, pide una sola aclaracion a la vez.",
     hasFixedProperty
       ? "Esta conversacion ya esta asociada a una propiedad puntual. Responde solo sobre esa propiedad y no abras una nueva busqueda ni sugieras otras opciones salvo que el cliente lo pida explicitamente."
