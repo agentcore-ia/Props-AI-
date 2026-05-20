@@ -132,10 +132,10 @@ function SidebarContent({ userRole = "agency_admin" }: { userRole?: AppRole | nu
           <Image
             src="/props-control-logo.svg"
             alt="Props Control Inmobiliario"
-            width={168}
-            height={76}
+            width={160}
+            height={100}
             priority
-            className="h-auto w-36"
+            className="h-auto w-32"
           />
         </Link>
       </div>
