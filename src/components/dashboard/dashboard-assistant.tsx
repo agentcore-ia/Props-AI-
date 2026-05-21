@@ -230,7 +230,7 @@ export function DashboardAssistant() {
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex justify-end md:inset-x-auto md:right-6">
+    <div className="pointer-events-none fixed inset-x-3 bottom-3 z-50 flex justify-end sm:inset-x-4 sm:bottom-4 md:inset-x-auto md:right-6">
       {!open ? (
         <Button
           type="button"
@@ -241,21 +241,21 @@ export function DashboardAssistant() {
           Asistente Props
         </Button>
       ) : (
-        <div className="pointer-events-auto flex w-full max-w-[440px] flex-col overflow-hidden rounded-[28px] border bg-card shadow-2xl md:w-[440px]">
-          <div className="border-b px-4 py-4">
+        <div className="pointer-events-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[min(440px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-[28px] border bg-card shadow-2xl md:w-[440px] md:max-h-[calc(100dvh-3rem)]">
+          <div className="shrink-0 border-b px-4 py-4">
             <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 items-start gap-3">
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
                   <Sparkles className="size-5" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-semibold">{sectionPreset.title}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {sectionPreset.description}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1">
                 <Button type="button" variant="ghost" size="icon-sm" className="rounded-full" onClick={resetConversation}>
                   <RefreshCcw className="size-4" />
                 </Button>
@@ -266,7 +266,7 @@ export function DashboardAssistant() {
             </div>
           </div>
 
-          <ScrollArea className="h-[52vh] min-h-[360px] max-h-[560px] px-4 py-4">
+          <ScrollArea className="min-h-[180px] flex-1 px-4 py-4">
             <div className="space-y-3 pr-3">
               {messages.map((message) => (
                 <div key={message.id} className={cn("flex", message.role === "assistant" ? "justify-start" : "justify-end")}>
@@ -312,8 +312,8 @@ export function DashboardAssistant() {
             </div>
           </ScrollArea>
 
-          <div className="border-t px-4 py-4">
-            <div className="mb-3 flex flex-wrap gap-2">
+          <div className="max-h-[42dvh] shrink-0 overflow-y-auto border-t px-4 py-4 props-scrollbar sm:max-h-none">
+            <div className="mb-3 flex max-h-24 flex-wrap gap-2 overflow-y-auto pr-1 props-scrollbar sm:max-h-none sm:overflow-visible">
               {sectionPreset.prompts.map((prompt) => (
                 <Button
                   key={prompt}
