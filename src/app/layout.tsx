@@ -17,6 +17,14 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: "Props AI",
   description: "Dashboard SaaS para inmobiliarias modernas",
+  icons: {
+    icon: [
+      { url: "/favicon.ico?v=props-20260524", sizes: "any" },
+      { url: "/icon.png?v=props-20260524", type: "image/png", sizes: "512x512" },
+    ],
+    shortcut: "/favicon.ico?v=props-20260524",
+    apple: "/apple-icon.png?v=props-20260524",
+  },
 };
 
 export default function RootLayout({
