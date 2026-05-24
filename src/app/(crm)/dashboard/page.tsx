@@ -11,6 +11,7 @@ import { AgencyList, CreateAgencyDialog } from "@/components/admin/agency-manage
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { OperationsOverview } from "@/components/dashboard/operations-overview";
 import { PipelineChart } from "@/components/dashboard/pipeline-chart";
+import { SmartAlertsPanel } from "@/components/dashboard/smart-alerts-panel";
 import { TodayPanel } from "@/components/dashboard/today-panel";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +20,7 @@ import { getAgencyScopeFromUser } from "@/lib/crm-automation";
 import {
   getAdminDashboardSnapshot,
   getDashboardSnapshot,
+  getSmartAlerts,
   getTodayWorkspaceSnapshot,
   listDelinquentTenants,
   listLeaseRoster,
@@ -161,6 +163,7 @@ export default async function DashboardPage() {
     collections,
     settlements,
     delinquencies,
+    smartAlerts,
   ] = await Promise.all([
     getDashboardSnapshot(scope),
     getTodayWorkspaceSnapshot(scope),
@@ -170,6 +173,7 @@ export default async function DashboardPage() {
     listRentalCollections({ agencySlug: scope?.agencySlug, limit: 80 }),
     listOwnerSettlements({ agencySlug: scope?.agencySlug, limit: 80 }),
     listDelinquentTenants({ agencySlug: scope?.agencySlug }),
+    getSmartAlerts({ agencySlug: scope?.agencySlug }),
   ]);
 
   return (
@@ -180,6 +184,8 @@ export default async function DashboardPage() {
       />
 
       <TodayPanel snapshot={todaySnapshot} />
+
+      <SmartAlertsPanel alerts={smartAlerts} />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {snapshot.metrics.map((metric) => (

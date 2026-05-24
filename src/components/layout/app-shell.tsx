@@ -12,6 +12,7 @@ import {
   Landmark,
   KeyRound,
   LayoutDashboard,
+  Wrench,
   Menu,
   MessageSquareText,
   Phone,
@@ -74,6 +75,7 @@ const defaultNavigation: NavigationGroup[] = [
       { href: "/propietarios", label: "Propietarios", icon: UserRound },
       { href: "/caja", label: "Caja", icon: Landmark },
       { href: "/transferencias", label: "Pagos propietarios", icon: Wallet },
+      { href: "/mantenimiento", label: "Mantenimiento", icon: Wrench },
     ],
   },
   {
@@ -108,6 +110,7 @@ const adminNavigation: NavigationGroup[] = [
       { href: "/morosos", label: "Morosos", icon: CircleAlert },
       { href: "/caja", label: "Caja", icon: Landmark },
       { href: "/transferencias", label: "Pagos propietarios", icon: Wallet },
+      { href: "/mantenimiento", label: "Mantenimiento", icon: Wrench },
     ],
   },
   {

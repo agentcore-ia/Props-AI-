@@ -4,6 +4,15 @@ export type SupplierStatus = "Activo" | "Inactivo";
 export type SupplierInvoiceStatus = "Borrador" | "Emitida" | "Pagada" | "Anulada";
 export type CashMovementKind = "Ingreso" | "Egreso" | "Transferencia";
 export type ContractRescissionStatus = "Borrador" | "En negociacion" | "Aprobada" | "Cerrada";
+export type MaintenanceTicketStatus =
+  | "Nuevo"
+  | "En revision"
+  | "Proveedor asignado"
+  | "Esperando aprobacion"
+  | "Resuelto"
+  | "Cancelado";
+export type MaintenanceTicketPriority = "Alta" | "Media" | "Baja";
+export type MaintenanceTicketPayer = "Inquilino" | "Propietario" | "Inmobiliaria" | "A definir";
 
 export type OwnerRosterSummary = {
   agencyId: string;
@@ -163,4 +172,50 @@ export type ContractRescissionSummary = {
   settlementTerms: string;
   status: ContractRescissionStatus;
   createdAt: string;
+};
+
+export type MaintenanceTicketSummary = {
+  id: string;
+  agencyId: string;
+  agencySlug: string;
+  propertyId: string | null;
+  contractId: string | null;
+  tenantName: string;
+  ownerName: string;
+  propertyTitle: string;
+  propertyLocation: string;
+  title: string;
+  description: string;
+  priority: MaintenanceTicketPriority;
+  status: MaintenanceTicketStatus;
+  supplierId: string | null;
+  supplierName: string;
+  estimatedCost: number;
+  payer: MaintenanceTicketPayer;
+  ownerApprovalRequired: boolean;
+  ownerApprovedAt: string | null;
+  nextStep: string;
+  photos: string[];
+  documents: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PersonTimelineEvent = {
+  id: string;
+  type: "Mensaje" | "Cobro" | "Liquidacion" | "Pago propietario" | "Visita" | "Contrato" | "Reclamo" | "Tarea";
+  title: string;
+  description: string;
+  at: string;
+  tone: "info" | "success" | "warning" | "danger";
+  href?: string;
+};
+
+export type SmartAlertSummary = {
+  id: string;
+  title: string;
+  description: string;
+  priority: "Alta" | "Media" | "Baja";
+  actionLabel: string;
+  actionHref: string;
 };

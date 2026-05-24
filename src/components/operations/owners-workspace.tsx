@@ -6,10 +6,11 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle2, Search, Send } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { PersonTimeline } from "@/components/operations/person-timeline";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import type { OwnerRosterSummary } from "@/lib/operations-types";
+import type { MaintenanceTicketSummary, OwnerRosterSummary, PersonTimelineEvent } from "@/lib/operations-types";
 import type { OwnerSettlementItemSummary, OwnerSettlementSummary } from "@/lib/rental-types";
 import { formatMoney } from "@/lib/utils";
 
@@ -17,10 +18,14 @@ export function OwnersWorkspace({
   owners,
   settlements,
   settlementItems,
+  maintenanceTickets,
+  timelinesByOwnerKey,
 }: {
   owners: OwnerRosterSummary[];
   settlements: OwnerSettlementSummary[];
   settlementItems: OwnerSettlementItemSummary[];
+  maintenanceTickets: MaintenanceTicketSummary[];
+  timelinesByOwnerKey: Record<string, PersonTimelineEvent[]>;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -119,10 +124,17 @@ export function OwnersWorkspace({
                 const preview = getOwnerPreview(owner);
                 const alreadySettled = owner.latestSettlementMonth === currentMonth;
                 const saving = savingContractId === owner.contractId;
+                const ownerKey = buildOwnerKey(owner);
+                const ownerSettlements = settlements.filter((settlement) => settlement.ownerName === owner.ownerName);
+                const ownerTickets = maintenanceTickets.filter(
+                  (ticket) =>
+                    ticket.contractId === owner.contractId ||
+                    ticket.ownerName.toLowerCase() === owner.ownerName.toLowerCase()
+                );
 
                 return (
                   <div
-                    key={`${owner.contractId}-${owner.contractOwnerId ?? owner.ownerName}`}
+                    key={ownerKey}
                     className="rounded-2xl border bg-background p-4"
                   >
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -168,6 +180,38 @@ export function OwnersWorkspace({
                       <Info label="Base" value={formatMoney(preview.gross, "ARS")} />
                       <Info label="Descuentos" value={formatMoney(preview.discounts, "ARS")} />
                       <Info label="Neto a pagar" value={formatMoney(preview.payout, "ARS")} strong />
+                    </div>
+
+                    <div className="mt-4 grid gap-3 xl:grid-cols-[0.95fr_1.05fr]">
+                      <div className="rounded-2xl border bg-muted/20 p-3 text-sm">
+                        <p className="font-semibold">Panel del propietario</p>
+                        <p className="mt-1 text-muted-foreground">
+                          Vista rápida para responderle sin buscar entre módulos.
+                        </p>
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                          <Info
+                            label="Última liquidación"
+                            value={
+                              ownerSettlements[0]
+                                ? `${ownerSettlements[0].settlementMonth} · ${formatMoney(ownerSettlements[0].ownerPayoutAmount, "ARS")}`
+                                : "Sin liquidar"
+                            }
+                          />
+                          <Info
+                            label="Reclamos abiertos"
+                            value={String(ownerTickets.filter((ticket) => !["Resuelto", "Cancelado"].includes(ticket.status)).length)}
+                          />
+                        </div>
+                        <div className="mt-3 rounded-xl border border-dashed bg-background p-3 text-muted-foreground">
+                          {buildOwnerPanelMessage(owner, ownerSettlements, ownerTickets)}
+                        </div>
+                      </div>
+                      <PersonTimeline
+                        compact
+                        title="Timeline del propietario"
+                        events={timelinesByOwnerKey[ownerKey] ?? []}
+                        empty="Todavía no hay actividad asociada a este propietario."
+                      />
                     </div>
                   </div>
                 );
@@ -245,6 +289,29 @@ export function OwnersWorkspace({
       </section>
     </div>
   );
+}
+
+function buildOwnerKey(owner: OwnerRosterSummary) {
+  return `${owner.contractOwnerId ?? owner.contractId}-${owner.ownerName}`;
+}
+
+function buildOwnerPanelMessage(
+  owner: OwnerRosterSummary,
+  settlements: OwnerSettlementSummary[],
+  tickets: MaintenanceTicketSummary[]
+) {
+  const latest = settlements[0];
+  const openTickets = tickets.filter((ticket) => !["Resuelto", "Cancelado"].includes(ticket.status));
+  const parts = [
+    `Hola ${owner.ownerName}, te compartimos el estado de ${owner.propertyTitle}.`,
+    latest
+      ? `Última liquidación: ${latest.settlementMonth}, neto ${formatMoney(latest.ownerPayoutAmount, "ARS")}.`
+      : "Todavía no hay liquidaciones emitidas para el período actual.",
+    openTickets.length
+      ? `Reclamos abiertos: ${openTickets.length}. Principal: ${openTickets[0].title}.`
+      : "No hay reclamos abiertos sobre la propiedad.",
+  ];
+  return parts.join(" ");
 }
 
 function getOwnerPreview(owner: OwnerRosterSummary) {

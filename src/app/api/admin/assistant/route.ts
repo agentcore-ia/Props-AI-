@@ -38,6 +38,7 @@ type AssistantAction =
   | "record_transfer"
   | "record_cash_movement"
   | "start_rescission"
+  | "create_maintenance_ticket"
   | "notify_delinquencies";
 
 type AssistantActionResult = {
@@ -135,6 +136,7 @@ function sanitizeAssistantAction(value: unknown): AssistantAction {
     "record_transfer",
     "record_cash_movement",
     "start_rescission",
+    "create_maintenance_ticket",
     "notify_delinquencies",
   ];
   return allowed.includes(value as AssistantAction) ? (value as AssistantAction) : "answer";
@@ -201,6 +203,10 @@ function inferAssistantAction(prompt: string): AssistantAction {
     return "start_rescission";
   }
 
+  if (/(reclamo|mantenimiento|reparacion|arreglo|proveedor|plomero|gasista|electricista|humedad|perdida|rotura)/.test(normalized)) {
+    return "create_maintenance_ticket";
+  }
+
   if (/(avisa|avisar|notifica|notificar|manda).*(moros|deud|atrasad)/.test(normalized)) {
     return "notify_delinquencies";
   }
@@ -215,6 +221,7 @@ function buildSectionGuide() {
     "Leads: perfil del cliente, score, objeciones, propiedades vistas y siguiente accion sugerida.",
     "Propiedades: alta y edicion de publicaciones, fotos, requisitos, direccion exacta y estado comercial.",
     "Alquileres: contratos, ajustes, liquidaciones, rescisiones y documentacion.",
+    "Mantenimiento: reclamos por propiedad, proveedor, costo, autorizacion del propietario, estado y seguimiento.",
     "Propietarios: relacion por propietario, participacion, liquidaciones emitidas y netos.",
     "Cobros: registrar pagos de inquilinos y controlar estado del periodo.",
     "Morosos: ver alquileres pendientes, deuda por inquilino, prioridad IA y avisos por WhatsApp.",
@@ -434,6 +441,7 @@ async function planWithOpenAI(input: {
                 "- record_transfer: registrar transferencia al propietario.",
                 "- record_cash_movement: registrar ingreso/egreso de caja.",
                 "- start_rescission: iniciar rescision de contrato.",
+                "- create_maintenance_ticket: crear un reclamo o mantenimiento con proveedor/costo/estado.",
                 "- notify_delinquencies: enviar avisos reales por WhatsApp a inquilinos morosos.",
                 "",
                 "Formato JSON exacto:",
@@ -811,6 +819,69 @@ export async function POST(request: Request) {
         status: failed.length > 0 ? "error" : "success",
         title: failed.length > 0 ? "Avisos enviados con errores" : "Avisos de mora enviados",
         details: `${sent} enviados - ${failed.length} fallidos`,
+      } satisfies AssistantActionResult,
+    });
+  }
+
+  if (current.profile.role !== "superadmin" && inferredAction === "create_maintenance_ticket") {
+    const { contract } = resolveContractFromPlan(
+      plan ?? sanitizeAssistantPlan(null, inferredAction),
+      prompt,
+      assistantContracts
+    );
+    const normalized = normalizeText(prompt);
+    const priority = /(urgente|grave|inundable|sin luz|sin agua|gas|peligro|alta)/.test(normalized)
+      ? "Alta"
+      : /(leve|baja|cuando puedan)/.test(normalized)
+        ? "Baja"
+        : "Media";
+    const payer = /(propietario|dueño|dueno)/.test(normalized)
+      ? "Propietario"
+      : /(inquilino)/.test(normalized)
+        ? "Inquilino"
+        : "A definir";
+
+    const result = await callInternalAction(
+      request,
+      "/api/admin/maintenance-tickets",
+      {
+        contractId: contract?.contractId ?? null,
+        title: clip(prompt, 90),
+        description: prompt,
+        priority,
+        payer,
+        nextStep: contract
+          ? `Contactar a ${contract.tenantName}, validar el problema y asignar proveedor.`
+          : "Identificar propiedad o contrato, validar el problema y asignar proveedor.",
+      },
+      "POST"
+    );
+
+    if (!result.ok) {
+      return NextResponse.json({
+        reply: result.payload?.error ?? "No pude crear el reclamo de mantenimiento.",
+        configured: openAI.configured,
+        actionResult: {
+          type: inferredAction,
+          status: "error",
+          title: "No se pudo crear el reclamo",
+          details: result.payload?.error ?? "Revisa la propiedad, contrato o permisos.",
+        } satisfies AssistantActionResult,
+      });
+    }
+
+    return NextResponse.json({
+      reply: contract
+        ? `Listo. Creé el reclamo de mantenimiento para ${contract.propertyTitle} y dejé una tarea para el equipo.`
+        : "Listo. Creé el reclamo de mantenimiento y dejé una tarea para identificar el contrato y avanzar.",
+      configured: openAI.configured,
+      actionResult: {
+        type: inferredAction,
+        status: "success",
+        title: "Reclamo creado",
+        details: contract
+          ? `${contract.propertyTitle} · ${contract.tenantName} · prioridad ${priority}`
+          : `Prioridad ${priority} · falta asociar contrato si corresponde`,
       } satisfies AssistantActionResult,
     });
   }

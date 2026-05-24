@@ -6,6 +6,7 @@ import {
   ArrowRight,
   CalendarClock,
   CheckCheck,
+  CheckCircle2,
   ListChecks,
   Loader2,
   MessageCircleMore,
@@ -26,9 +27,11 @@ type FollowUpResult = {
 
 type TodayItem = {
   id: string;
+  taskId?: string;
   title: string;
   description: string;
   meta: string;
+  taskType?: string;
   actionLabel?: string;
   actionHref?: string;
   preview?: string;
@@ -37,6 +40,7 @@ type TodayItem = {
 export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
   const router = useRouter();
   const [busyAction, setBusyAction] = useState<null | "followups" | "visits">(null);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [followUpResults, setFollowUpResults] = useState<FollowUpResult[]>([]);
 
@@ -53,10 +57,12 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
         })),
         ...snapshot.myDay.dueNow.map((task) => ({
           id: `task-${task.id}`,
+          taskId: task.id.startsWith("contract-review-") ? undefined : task.id,
           title: task.title,
           description: task.details,
           meta: task.priority,
-          actionLabel: task.leadId ? "Ver lead" : "Abrir agenda",
+          taskType: task.taskType,
+          actionLabel: getTaskActionLabel(task.taskType, task.details, Boolean(task.leadId)),
           actionHref: task.leadId ? `/mensajes?lead=${task.leadId}` : "/agenda",
         })),
       ].slice(0, 8),
@@ -97,6 +103,23 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
       setFeedback(`Se enviaron ${payload?.processed ?? 0} recordatorios de visita.`);
     }
 
+    router.refresh();
+  }
+
+  async function completeTask(taskId: string) {
+    setCompletingTaskId(taskId);
+    setFeedback(null);
+
+    const response = await fetch(`/api/admin/tasks/${taskId}/complete`, { method: "POST" });
+    const payload = await response.json().catch(() => null);
+    setCompletingTaskId(null);
+
+    if (!response.ok) {
+      setFeedback(payload?.error ?? "No se pudo marcar la tarea como hecha.");
+      return;
+    }
+
+    setFeedback("Tarea marcada como hecha.");
     router.refresh();
   }
 
@@ -218,6 +241,8 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
             icon={<ListChecks className="size-4 text-primary" />}
             items={actionItems}
             empty="No hay tareas urgentes ni conversaciones para responder ahora."
+            completingTaskId={completingTaskId}
+            onCompleteTask={completeTask}
           />
 
           <TodayList
@@ -315,6 +340,18 @@ function deriveFollowUpReason(lead: CrmLeadSummary) {
   return "Es un lead pendiente que ya esta listo para recontactar.";
 }
 
+function getTaskActionLabel(taskType: string, details: string, hasLead: boolean) {
+  const normalized = `${taskType} ${details}`.toLowerCase();
+  if (hasLead) return "Responder";
+  if (normalized.includes("pago") || normalized.includes("cobranza") || normalized.includes("cobro")) {
+    return "Registrar pago";
+  }
+  if (normalized.includes("liquid")) return "Liquidar";
+  if (normalized.includes("visita")) return "Agendar visita";
+  if (normalized.includes("contrato") || normalized.includes("revis")) return "Revisar";
+  return "Resolver";
+}
+
 function FollowUpPreviewCard({ lead }: { lead: CrmLeadSummary }) {
   const message = buildAutomaticFollowUpMessage({ lead, property: null });
 
@@ -372,11 +409,15 @@ function TodayList({
   icon,
   items,
   empty,
+  completingTaskId,
+  onCompleteTask,
 }: {
   title: string;
   icon: ReactNode;
   items: TodayItem[];
   empty: string;
+  completingTaskId?: string | null;
+  onCompleteTask?: (taskId: string) => void | Promise<void>;
 }) {
   return (
     <div className="rounded-[24px] border bg-background p-3.5">
@@ -400,15 +441,32 @@ function TodayList({
                       {item.preview}
                     </div>
                   ) : null}
-                  {item.actionHref && item.actionLabel ? (
-                    <Link
-                      href={item.actionHref}
-                      className="mt-2 inline-flex h-8 items-center gap-1 rounded-xl px-2 text-sm font-medium text-primary transition hover:bg-primary/5"
-                    >
-                      {item.actionLabel}
-                      <ArrowRight className="size-4" />
-                    </Link>
-                  ) : null}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {item.actionHref && item.actionLabel ? (
+                      <Link
+                        href={item.actionHref}
+                        className="inline-flex h-8 items-center gap-1 rounded-xl border bg-card px-2.5 text-sm font-medium text-primary transition hover:bg-primary/5"
+                      >
+                        {item.actionLabel}
+                        <ArrowRight className="size-4" />
+                      </Link>
+                    ) : null}
+                    {item.taskId && onCompleteTask ? (
+                      <button
+                        type="button"
+                        className="inline-flex h-8 items-center gap-1 rounded-xl border bg-card px-2.5 text-sm font-medium transition hover:bg-muted"
+                        disabled={completingTaskId === item.taskId}
+                        onClick={() => void onCompleteTask(item.taskId!)}
+                      >
+                        {completingTaskId === item.taskId ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="size-4 text-emerald-600" />
+                        )}
+                        Marcar hecho
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
                 <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
                   {item.meta}

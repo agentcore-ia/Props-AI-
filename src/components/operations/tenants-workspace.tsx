@@ -5,13 +5,20 @@ import { useMemo, useState } from "react";
 import { Edit3, Save, Search, X } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { PersonTimeline } from "@/components/operations/person-timeline";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import type { TenantRosterSummary } from "@/lib/operations-types";
+import type { PersonTimelineEvent, TenantRosterSummary } from "@/lib/operations-types";
 import { formatMoney, formatShortDate } from "@/lib/utils";
 
-export function TenantsWorkspace({ tenants }: { tenants: TenantRosterSummary[] }) {
+export function TenantsWorkspace({
+  tenants,
+  timelinesByContractId,
+}: {
+  tenants: TenantRosterSummary[];
+  timelinesByContractId: Record<string, PersonTimelineEvent[]>;
+}) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -238,8 +245,17 @@ export function TenantsWorkspace({ tenants }: { tenants: TenantRosterSummary[] }
                     Cobranza:{" "}
                     {tenant.latestCollectionStatus
                       ? `${tenant.latestCollectionStatus} - ${tenant.latestCollectionMonth ?? ""}`
-                      : "sin registrar"}
+                    : "sin registrar"}
                   </p>
+                </div>
+
+                <div className="mt-4">
+                  <PersonTimeline
+                    compact
+                    title="Timeline del inquilino"
+                    events={timelinesByContractId[tenant.contractId] ?? []}
+                    empty="Todavía no hay mensajes, pagos, reclamos o tareas asociadas."
+                  />
                 </div>
               </div>
             ))

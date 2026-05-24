@@ -33,6 +33,7 @@ import {
 } from "@/lib/crm-insights";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
+import { PersonTimeline } from "@/components/operations/person-timeline";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { cn, formatMoney, formatShortDate } from "@/lib/utils";
+import type { PersonTimelineEvent } from "@/lib/operations-types";
 
 const conversationStatusTone = {
   Nuevo: "bg-sky-500/10 text-sky-700",
@@ -203,6 +205,41 @@ export function InboxWorkspace({
       visits,
     });
   }, [relatedLeadsByPerson, selectedLead, selectedMessages, visits]);
+
+  const selectedTimeline = useMemo<PersonTimelineEvent[]>(() => {
+    if (!selectedLead) return [];
+
+    const messageEvents = selectedMessages.map((message) => ({
+      id: `message-${message.id}`,
+      type: "Mensaje" as const,
+      title:
+        message.senderRole === "customer"
+          ? "Mensaje del cliente"
+          : message.senderRole === "assistant"
+            ? "Respuesta de IA"
+            : "Respuesta del equipo",
+      description: message.content,
+      at: message.createdAt,
+      tone: message.senderRole === "customer" ? ("info" as const) : ("success" as const),
+      href: `/mensajes?lead=${selectedLead.id}`,
+    }));
+
+    const visitEvents = visits
+      .filter((visit) => visit.leadId === selectedLead.id)
+      .map((visit) => ({
+        id: `visit-${visit.id}`,
+        type: "Visita" as const,
+        title: `Visita ${visit.status}`,
+        description: `${visit.propertyTitle ?? selectedLead.propertyTitle ?? "Propiedad"} · ${visit.notes || "Sin notas"}`,
+        at: visit.scheduledFor,
+        tone: "warning" as const,
+        href: "/agenda",
+      }));
+
+    return [...messageEvents, ...visitEvents]
+      .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+      .slice(0, 8);
+  }, [selectedLead, selectedMessages, visits]);
 
   useEffect(() => {
     const container = messageScrollRef.current;
@@ -634,6 +671,12 @@ export function InboxWorkspace({
                   {selectedProfile?.nextAction}
                 </p>
               </div>
+              <PersonTimeline
+                compact
+                title="Timeline del contacto"
+                events={selectedTimeline}
+                empty="Todavía no hay movimientos suficientes para este contacto."
+              />
             </div>
           </section>
 

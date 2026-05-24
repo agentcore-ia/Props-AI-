@@ -15,6 +15,9 @@ import type {
   DelinquentTenantSummary,
   OwnerTransferSummary,
   RentalCollectionSummary,
+  MaintenanceTicketSummary,
+  PersonTimelineEvent,
+  SmartAlertSummary,
   SupplierInvoiceSummary,
   SupplierSummary,
   TenantRosterSummary,
@@ -29,6 +32,7 @@ import type {
   RentalDashboardSummary,
 } from "@/lib/rental-types";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { formatMoney } from "@/lib/utils";
 
 type AgencyRow = {
   id: string;
@@ -344,6 +348,41 @@ type SupplierInvoiceRow = {
   suppliers:
     | { name: string }
     | { name: string }[]
+    | null;
+};
+
+type MaintenanceTicketRow = {
+  id: string;
+  agency_id: string;
+  property_id: string | null;
+  contract_id: string | null;
+  tenant_name: string;
+  owner_name: string;
+  title: string;
+  description: string;
+  priority: "Alta" | "Media" | "Baja";
+  status:
+    | "Nuevo"
+    | "En revision"
+    | "Proveedor asignado"
+    | "Esperando aprobacion"
+    | "Resuelto"
+    | "Cancelado";
+  supplier_id: string | null;
+  supplier_name: string;
+  estimated_cost: number;
+  payer: "Inquilino" | "Propietario" | "Inmobiliaria" | "A definir";
+  owner_approval_required: boolean;
+  owner_approved_at: string | null;
+  next_step: string;
+  photos: string[] | null;
+  documents: string[] | null;
+  created_at: string;
+  updated_at: string;
+  agencies: { slug: string } | { slug: string }[] | null;
+  properties:
+    | { title: string; location: string }
+    | { title: string; location: string }[]
     | null;
 };
 
@@ -963,6 +1002,38 @@ function mapSupplierInvoice(row: SupplierInvoiceRow): SupplierInvoiceSummary {
     status: row.status,
     notes: row.notes,
     createdAt: row.created_at,
+  };
+}
+
+function mapMaintenanceTicket(row: MaintenanceTicketRow): MaintenanceTicketSummary {
+  const agency = Array.isArray(row.agencies) ? row.agencies[0] : row.agencies;
+  const property = Array.isArray(row.properties) ? row.properties[0] : row.properties;
+
+  return {
+    id: row.id,
+    agencyId: row.agency_id,
+    agencySlug: agency?.slug ?? "",
+    propertyId: row.property_id,
+    contractId: row.contract_id,
+    tenantName: row.tenant_name,
+    ownerName: row.owner_name,
+    propertyTitle: property?.title ?? "",
+    propertyLocation: property?.location ?? "",
+    title: row.title,
+    description: row.description,
+    priority: row.priority,
+    status: row.status,
+    supplierId: row.supplier_id,
+    supplierName: row.supplier_name,
+    estimatedCost: Number(row.estimated_cost ?? 0),
+    payer: row.payer,
+    ownerApprovalRequired: Boolean(row.owner_approval_required),
+    ownerApprovedAt: row.owner_approved_at,
+    nextStep: row.next_step,
+    photos: Array.isArray(row.photos) ? row.photos : [],
+    documents: Array.isArray(row.documents) ? row.documents : [],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -1874,6 +1945,49 @@ export async function listSupplierInvoices(options?: { agencySlug?: string; limi
   }>).map(mapSupplierInvoice);
 }
 
+export async function listMaintenanceTickets(options?: {
+  agencySlug?: string;
+  contractId?: string;
+  propertyId?: string;
+  status?: string;
+  limit?: number;
+}) {
+  const admin = createAdminClient();
+  let query = admin
+    .from("maintenance_tickets")
+    .select(
+      "id, agency_id, property_id, contract_id, tenant_name, owner_name, title, description, priority, status, supplier_id, supplier_name, estimated_cost, payer, owner_approval_required, owner_approved_at, next_step, photos, documents, created_at, updated_at, agencies!inner(slug), properties(title, location)"
+    )
+    .order("created_at", { ascending: false })
+    .limit(options?.limit ?? 40);
+
+  if (options?.agencySlug) {
+    query = query.eq("agencies.slug", options.agencySlug);
+  }
+
+  if (options?.contractId) {
+    query = query.eq("contract_id", options.contractId);
+  }
+
+  if (options?.propertyId) {
+    query = query.eq("property_id", options.propertyId);
+  }
+
+  if (options?.status) {
+    query = query.eq("status", options.status);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    if (/maintenance_tickets/i.test(error.message ?? "")) {
+      return [] as MaintenanceTicketSummary[];
+    }
+    throw error;
+  }
+
+  return ((data ?? []) as unknown as MaintenanceTicketRow[]).map(mapMaintenanceTicket);
+}
+
 export async function listContractRescissions(options?: { agencySlug?: string; limit?: number }) {
   const admin = createAdminClient();
   let query = admin
@@ -2720,4 +2834,245 @@ export async function getTodayWorkspaceSnapshot(options?: { agencySlug?: string 
       aiResolved: aiResolved.length,
     },
   };
+}
+
+function timelineTone(type: PersonTimelineEvent["type"], status?: string): PersonTimelineEvent["tone"] {
+  if (status && /mora|fallido|pendiente|alta|cancelado/i.test(status)) return "warning";
+  if (status && /cobrada|pagada|resuelto|confirmada|realizada|enviado/i.test(status)) return "success";
+  if (type === "Reclamo") return "warning";
+  return "info";
+}
+
+export async function getPersonTimeline(options: {
+  agencySlug?: string;
+  contractId?: string;
+  leadId?: string;
+  phone?: string | null;
+  ownerName?: string | null;
+  tenantName?: string | null;
+  limit?: number;
+}): Promise<PersonTimelineEvent[]> {
+  const [collections, settlements, transfers, visits, tasks, messages, tickets, rescissions] = await Promise.all([
+    options.contractId
+      ? listRentalCollections({ agencySlug: options.agencySlug, limit: 120 })
+      : Promise.resolve([] as RentalCollectionSummary[]),
+    options.contractId
+      ? listOwnerSettlements({ agencySlug: options.agencySlug, limit: 120 })
+      : Promise.resolve([] as OwnerSettlementSummary[]),
+    options.contractId
+      ? listOwnerTransfers({ agencySlug: options.agencySlug, limit: 120 })
+      : Promise.resolve([] as OwnerTransferSummary[]),
+    listVisitAppointments({ agencySlug: options.agencySlug }),
+    listEmployeeTasks({ agencySlug: options.agencySlug, includeDone: true }),
+    options.leadId ? listCrmLeadMessages({ agencySlug: options.agencySlug, leadIds: [options.leadId] }) : Promise.resolve([]),
+    listMaintenanceTickets({
+      agencySlug: options.agencySlug,
+      contractId: options.contractId,
+      limit: 80,
+    }),
+    options.contractId
+      ? listContractRescissions({ agencySlug: options.agencySlug, limit: 80 })
+      : Promise.resolve([] as ContractRescissionSummary[]),
+  ]);
+
+  const normalizedPhone = String(options.phone ?? "").replace(/\D/g, "");
+  const matchesContract = (contractId: string | null) => !options.contractId || contractId === options.contractId;
+  const matchesName = (value: string | null | undefined, expected: string | null | undefined) =>
+    Boolean(value && expected && value.toLowerCase().includes(expected.toLowerCase()));
+
+  const events: PersonTimelineEvent[] = [
+    ...collections
+      .filter((item) => matchesContract(item.contractId))
+      .map((item) => ({
+        id: `collection-${item.id}`,
+        type: "Cobro" as const,
+        title: `Cobranza ${item.status} de ${item.collectionMonth}`,
+        description: `${item.tenantName}: ${formatMoney(item.collectedAmount, "ARS")} cobrado de ${formatMoney(item.expectedRent, "ARS")}.`,
+        at: item.paymentDate ? `${item.paymentDate}T12:00:00.000Z` : item.createdAt,
+        tone: timelineTone("Cobro", item.status),
+        href: "/cobranzas",
+      })),
+    ...settlements
+      .filter((item) => matchesContract(item.contractId) && (!options.ownerName || matchesName(item.ownerName, options.ownerName)))
+      .map((item) => ({
+        id: `settlement-${item.id}`,
+        type: "Liquidacion" as const,
+        title: `Liquidacion ${item.status} de ${item.settlementMonth}`,
+        description: `${item.ownerName}: neto ${formatMoney(item.ownerPayoutAmount, "ARS")} por ${item.propertyTitle}.`,
+        at: item.paidAt ?? item.sentAt ?? item.createdAt,
+        tone: timelineTone("Liquidacion", item.status),
+        href: "/propietarios",
+      })),
+    ...transfers
+      .filter((item) => matchesContract(item.contractId) && (!options.ownerName || matchesName(item.ownerName, options.ownerName)))
+      .map((item) => ({
+        id: `transfer-${item.id}`,
+        type: "Pago propietario" as const,
+        title: `Pago a propietario ${item.status}`,
+        description: `${item.ownerName}: ${formatMoney(item.amount, "ARS")} por ${item.propertyTitle}.`,
+        at: item.transferDate ? `${item.transferDate}T12:00:00.000Z` : item.createdAt,
+        tone: timelineTone("Pago propietario", item.status),
+        href: "/transferencias",
+      })),
+    ...visits
+      .filter((item) => !options.leadId || item.leadId === options.leadId)
+      .map((item) => ({
+        id: `visit-${item.id}`,
+        type: "Visita" as const,
+        title: `Visita ${item.status}`,
+        description: `${item.leadName} - ${item.propertyTitle ?? "Propiedad"}${item.notes ? `: ${item.notes}` : ""}`,
+        at: item.scheduledFor,
+        tone: timelineTone("Visita", item.status),
+        href: "/agenda",
+      })),
+    ...tasks
+      .filter((item) => (options.leadId ? item.leadId === options.leadId : true))
+      .filter((item) => !options.contractId || item.details.toLowerCase().includes(String(options.tenantName ?? "").toLowerCase()))
+      .slice(0, 20)
+      .map((item) => ({
+        id: `task-${item.id}`,
+        type: "Tarea" as const,
+        title: `${item.status === "Hecha" ? "Hecha" : "Pendiente"}: ${item.title}`,
+        description: item.details,
+        at: item.completedAt ?? item.dueAt,
+        tone: timelineTone("Tarea", item.status),
+        href: item.leadId ? `/mensajes?lead=${item.leadId}` : "/agenda",
+      })),
+    ...messages
+      .filter((item) => {
+        if (!normalizedPhone) return true;
+        const metaPhone = String(item.metadata?.phone ?? item.metadata?.from ?? "").replace(/\D/g, "");
+        return !metaPhone || metaPhone.endsWith(normalizedPhone.slice(-8));
+      })
+      .map((item) => ({
+        id: `message-${item.id}`,
+        type: "Mensaje" as const,
+        title: item.direction === "incoming" ? "Mensaje recibido" : `Respuesta de ${item.senderRole === "assistant" ? "IA" : "equipo"}`,
+        description: item.content,
+        at: item.createdAt,
+        tone: "info" as const,
+        href: item.leadId ? `/mensajes?lead=${item.leadId}` : "/mensajes",
+      })),
+    ...tickets.map((item) => ({
+      id: `ticket-${item.id}`,
+      type: "Reclamo" as const,
+      title: `${item.title} (${item.status})`,
+      description: `${item.propertyTitle || "Propiedad"} - ${item.nextStep || item.description}`,
+      at: item.updatedAt,
+      tone: timelineTone("Reclamo", item.status),
+      href: "/mantenimiento",
+    })),
+    ...rescissions
+      .filter((item) => matchesContract(item.contractId))
+      .map((item) => ({
+        id: `rescission-${item.id}`,
+        type: "Contrato" as const,
+        title: `Rescision ${item.status}`,
+        description: `${item.tenantName}: ${item.reason || item.settlementTerms}`,
+        at: item.createdAt,
+        tone: timelineTone("Contrato", item.status),
+        href: "/alquileres",
+      })),
+  ];
+
+  return events
+    .sort((left, right) => new Date(right.at).getTime() - new Date(left.at).getTime())
+    .slice(0, options.limit ?? 12);
+}
+
+export async function getSmartAlerts(options?: { agencySlug?: string }): Promise<SmartAlertSummary[]> {
+  const [leases, delinquencies, settlements, leads, tickets, collections] = await Promise.all([
+    listLeaseRoster(options),
+    listDelinquentTenants(options),
+    listOwnerSettlements({ agencySlug: options?.agencySlug, limit: 120 }),
+    listCrmLeads(options),
+    listMaintenanceTickets({ agencySlug: options?.agencySlug, limit: 80 }),
+    listRentalCollections({ agencySlug: options?.agencySlug, limit: 120 }),
+  ]);
+
+  const today = new Date();
+  const currentMonth = today.toISOString().slice(0, 7);
+  const alerts: SmartAlertSummary[] = [];
+
+  for (const lease of leases.filter((item) => item.status === "Activo")) {
+    const daysToAdjustment = Math.ceil((new Date(`${lease.nextAdjustmentDate}T00:00:00`).getTime() - today.getTime()) / 86_400_000);
+    if (daysToAdjustment >= 0 && daysToAdjustment <= 7) {
+      alerts.push({
+        id: `adjustment-${lease.contractId}`,
+        title: `${lease.propertyTitle} ajusta en ${daysToAdjustment} dia${daysToAdjustment === 1 ? "" : "s"}`,
+        description: `Contrato de ${lease.tenantName}: validar ${lease.indexType}, monto actual ${formatMoney(lease.currentRent, "ARS")} y WhatsApp antes del aviso.`,
+        priority: daysToAdjustment <= 2 ? "Alta" : "Media",
+        actionLabel: "Revisar alquiler",
+        actionHref: "/alquileres",
+      });
+    }
+  }
+
+  for (const item of delinquencies.slice(0, 4)) {
+    alerts.push({
+      id: `delinquency-${item.contractId}`,
+      title: `${item.tenantName} acumula ${item.daysLate} dias de atraso`,
+      description: `Saldo ${formatMoney(item.totalDebtAmount, item.currency)} en ${item.propertyTitle}. ${item.suggestedAction}`,
+      priority: item.risk,
+      actionLabel: "Abrir morosos",
+      actionHref: "/morosos",
+    });
+  }
+
+  const pendingSettlements = settlements.filter((item) => item.settlementMonth !== currentMonth || item.status !== "Pagada");
+  for (const settlement of pendingSettlements.slice(0, 3)) {
+    alerts.push({
+      id: `settlement-${settlement.id}`,
+      title: `Liquidacion pendiente para ${settlement.ownerName}`,
+      description: `${settlement.propertyTitle}: ${formatMoney(settlement.ownerPayoutAmount, "ARS")} del periodo ${settlement.settlementMonth}.`,
+      priority: settlement.status === "Borrador" ? "Alta" : "Media",
+      actionLabel: "Liquidar o pagar",
+      actionHref: "/propietarios",
+    });
+  }
+
+  const activeTickets = tickets.filter((item) => !["Resuelto", "Cancelado"].includes(item.status));
+  for (const ticket of activeTickets.slice(0, 4)) {
+    alerts.push({
+      id: `ticket-${ticket.id}`,
+      title: `Reclamo abierto: ${ticket.title}`,
+      description: `${ticket.propertyTitle || "Propiedad"} - ${ticket.nextStep || "definir proveedor, costo y responsable de pago"}.`,
+      priority: ticket.priority,
+      actionLabel: "Ver reclamo",
+      actionHref: "/mantenimiento",
+    });
+  }
+
+  const staleLeads = leads.filter((lead) => {
+    if (lead.stage === "Cerrado" || lead.stage === "Descartado") return false;
+    const last = new Date(lead.lastActivityAt).getTime();
+    return Date.now() - last > 48 * 60 * 60 * 1000 && lead.needsResponse;
+  });
+  for (const lead of staleLeads.slice(0, 3)) {
+    alerts.push({
+      id: `lead-${lead.id}`,
+      title: `${lead.fullName} espera respuesta`,
+      description: `${lead.propertyTitle ?? "Consulta general"}: ${lead.lastCustomerMessage}`,
+      priority: lead.priority,
+      actionLabel: "Responder",
+      actionHref: `/mensajes?lead=${lead.id}`,
+    });
+  }
+
+  const unpaidCollections = collections.filter((item) => item.collectionMonth === currentMonth && item.status !== "Cobrada");
+  if (unpaidCollections.length > 0) {
+    alerts.push({
+      id: "collections-current-month",
+      title: `${unpaidCollections.length} cobranza${unpaidCollections.length === 1 ? "" : "s"} del mes sin cerrar`,
+      description: "Revisar pagos parciales, comprobantes y saldos antes de liquidar propietarios.",
+      priority: "Media",
+      actionLabel: "Abrir cobros",
+      actionHref: "/cobranzas",
+    });
+  }
+
+  const weight = { Alta: 3, Media: 2, Baja: 1 };
+  return alerts
+    .sort((left, right) => weight[right.priority] - weight[left.priority])
+    .slice(0, 10);
 }
