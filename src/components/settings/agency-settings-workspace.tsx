@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Clock3,
+  CreditCard,
+  ExternalLink,
   Loader2,
   MessageCircle,
   QrCode,
@@ -40,6 +42,8 @@ type ManagedAgency = {
   tagline: string;
   owner_name: string;
   owner_email: string;
+  plan?: "Starter" | "Growth" | "Scale";
+  status?: "Activa" | "En onboarding";
   messaging_instance: string;
   whatsapp_ai_enabled?: boolean;
   business_hours?: string | null;
@@ -117,6 +121,8 @@ export function AgencySettingsWorkspace({
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [templates, setTemplates] = useState<AgencyMessageTemplateSummary[]>([]);
   const [templatesBusy, setTemplatesBusy] = useState(false);
+  const [subscriptionBusy, setSubscriptionBusy] = useState(false);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
   const selectedAgency = useMemo(
     () => agencies.find((agency) => agency.slug === selectedSlug) ?? null,
     [agencies, selectedSlug]
@@ -351,6 +357,31 @@ export function AgencySettingsWorkspace({
 
     setTemplates(payload?.templates ?? templates);
     setSaveSuccess("Plantillas guardadas.");
+  }
+
+  async function handleSubscribe() {
+    if (!selectedAgency) return;
+    setSubscriptionBusy(true);
+    setSubscriptionError(null);
+
+    const response = await fetch("/api/admin/subscriptions/mercadopago", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ agencySlug: selectedAgency.slug }),
+    });
+
+    const payload = await response.json().catch(() => null);
+    setSubscriptionBusy(false);
+
+    if (!response.ok || !payload?.checkoutUrl) {
+      setSubscriptionError(
+        [payload?.error, payload?.detail].filter(Boolean).join(" ") ||
+          "No se pudo iniciar la suscripcion."
+      );
+      return;
+    }
+
+    window.location.href = payload.checkoutUrl;
   }
 
   const statusCopy = getStatusCopy(connectionState);
@@ -589,6 +620,53 @@ export function AgencySettingsWorkspace({
                 {connectionState === "open" ? "Ver WhatsApp conectado" : "Vincular WhatsApp"}
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[32px] border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="size-5 text-primary" />
+              Suscripcion
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="rounded-[28px] border bg-[linear-gradient(135deg,hsl(var(--primary)/0.12),hsl(var(--card))_48%,hsl(var(--muted)/0.35))] p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Plan mensual</p>
+                  <p className="mt-2 text-3xl font-semibold">$ 50.000</p>
+                  <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                    Incluye panel operativo, portafolio publico, automatizaciones de WhatsApp, aumentos, morosos, liquidaciones y asistente IA.
+                  </p>
+                </div>
+                <Badge className="w-fit rounded-full border-0 bg-primary/10 px-3 py-1 text-primary">
+                  {selectedAgency?.plan ?? "Starter"}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="grid gap-3 text-sm text-muted-foreground">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" />
+                Se abre Mercado Pago para completar el alta con tarjeta o medio disponible.
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" />
+                La suscripcion queda asociada a {selectedAgency?.name ?? "esta inmobiliaria"}.
+              </div>
+            </div>
+
+            {subscriptionError ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {subscriptionError}
+              </div>
+            ) : null}
+
+            <Button className="w-full rounded-2xl" onClick={handleSubscribe} disabled={subscriptionBusy || !selectedAgency}>
+              {subscriptionBusy ? <Loader2 className="size-4 animate-spin" /> : <ExternalLink className="size-4" />}
+              Suscribirme con Mercado Pago
+            </Button>
           </CardContent>
         </Card>
       </div>
