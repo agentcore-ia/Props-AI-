@@ -539,6 +539,8 @@ create unique index if not exists crm_lead_messages_wa_message_id_idx
 
 alter table public.crm_lead_messages replica identity full;
 
+grant select on public.crm_lead_messages to authenticated;
+
 do $$
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
