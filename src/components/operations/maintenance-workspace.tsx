@@ -430,6 +430,11 @@ function TicketCard({
   const ownerMessage = buildOwnerMessage(ticket);
   const tenantMessage = buildTenantMessage(ticket);
   const supplierMessage = buildSupplierMessage(ticket);
+  const [costDraft, setCostDraft] = useState(ticket.estimatedCost > 0 ? String(ticket.estimatedCost) : "");
+
+  useEffect(() => {
+    setCostDraft(ticket.estimatedCost > 0 ? String(ticket.estimatedCost) : "");
+  }, [ticket.estimatedCost]);
 
   return (
     <article className="rounded-[24px] border bg-background p-4">
@@ -483,6 +488,37 @@ function TicketCard({
               Esta lista viene de Proveedores. Si falta alguien, cargalo primero ahí.
             </span>
           </label>
+
+          <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+            <label className="grid gap-1.5 text-sm">
+              <span className="font-medium">Costo real o presupuesto actualizado</span>
+              <Input
+                inputMode="numeric"
+                value={costDraft}
+                disabled={updating}
+                onChange={(event) => setCostDraft(event.target.value)}
+                placeholder="Ej. 45000"
+                className="h-10 rounded-2xl"
+              />
+              <span className="text-xs text-muted-foreground">
+                Actualizalo cuando el proveedor pase el importe exacto.
+              </span>
+            </label>
+            <Button
+              variant="outline"
+              className="rounded-2xl"
+              disabled={updating || Number(costDraft || 0) === ticket.estimatedCost}
+              onClick={() =>
+                onUpdate(
+                  ticket.id,
+                  { estimatedCost: Number(costDraft || 0) },
+                  costDraft ? "Costo del reclamo actualizado." : "Costo del reclamo quitado."
+                )
+              }
+            >
+              Guardar costo
+            </Button>
+          </div>
 
           <div className="mt-3 rounded-2xl border bg-muted/20 p-3 text-sm">
             <p className="font-medium">Qué hay que resolver</p>
