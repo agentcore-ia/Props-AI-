@@ -388,6 +388,24 @@ export function InboxWorkspace({
     }
   }, [initialLeadId, leads]);
 
+  useEffect(() => {
+    const refreshMessages = () => {
+      if (document.visibilityState === "visible" && !busy) {
+        router.refresh();
+      }
+    };
+
+    const interval = window.setInterval(refreshMessages, 4000);
+    window.addEventListener("focus", refreshMessages);
+    document.addEventListener("visibilitychange", refreshMessages);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshMessages);
+      document.removeEventListener("visibilitychange", refreshMessages);
+    };
+  }, [busy, router]);
+
   const filteredLeads = useMemo(() => {
     if (mode === "recepcion") {
       return leads.filter((lead) => deriveConversationStatus(lead) !== "Cerrado");
