@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { ensureAgencyMessagingInstance, getManagedAgency } from "@/lib/agency-access";
 import { getCurrentUserContext } from "@/lib/auth/current-user";
-import { ensureEvolutionInstance, getEvolutionQr } from "@/lib/evolution";
+import { ensureEvolutionInstance, getEvolutionQrWithRetry } from "@/lib/evolution";
 
 export async function GET(request: Request) {
   const current = await getCurrentUserContext();
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   try {
     const managedAgency = await ensureAgencyMessagingInstance(current, agency);
     await ensureEvolutionInstance(managedAgency.messaging_instance);
-    const qr = await getEvolutionQr(managedAgency.messaging_instance);
+    const qr = await getEvolutionQrWithRetry(managedAgency.messaging_instance);
 
     return NextResponse.json({
       ok: true,

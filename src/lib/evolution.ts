@@ -223,6 +223,14 @@ function extractQrPayload(payload: Record<string, unknown> | null) {
   > | null) as EvolutionQrPayload;
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function hasQrContent(qr: EvolutionQrPayload | null | undefined) {
+  return Boolean(qr?.base64 || qr?.code || qr?.pairingCode || qr?.instance?.state === "open" || qr?.status === "open");
+}
+
 function findInstanceByName(instances: EvolutionInstanceRecord[], instanceName: string) {
   return instances.find(
     (item) => item.name === instanceName || item.instance?.instanceName === instanceName
@@ -360,6 +368,36 @@ export async function getEvolutionQr(instanceName: string) {
   throw new Error(errors.at(-1) ?? "No se pudo obtener el QR de Evolution.");
 }
 
+export async function getEvolutionQrWithRetry(instanceName: string, attempts = 5, delayMs = 800) {
+  let lastQr: EvolutionQrPayload | null = null;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const qr = await getEvolutionQr(instanceName);
+      lastQr = qr;
+
+      if (hasQrContent(qr)) {
+        return qr;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (attempt < attempts - 1) {
+      await sleep(delayMs);
+    }
+  }
+
+  if (lastQr) {
+    return lastQr;
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("No se pudo obtener el QR de Evolution.");
+}
+
 export async function restartEvolutionInstance(instanceName: string) {
   await evolutionAdminFetch<Record<string, unknown>>(`/instance/restart/${encodeURIComponent(instanceName)}`, {
     method: "PUT",
@@ -421,7 +459,7 @@ export async function recreateEvolutionInstance(instanceName: string) {
   }
 
   const qr = extractQrPayload(created);
-  return qr.base64 || qr.code || qr.pairingCode ? qr : getEvolutionQr(instanceName);
+  return hasQrContent(qr) ? qr : getEvolutionQrWithRetry(instanceName);
 }
 
 export type EvolutionQrPayload = {

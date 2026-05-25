@@ -272,7 +272,7 @@ export function AgencySettingsWorkspace({
 
     if (!qrSessionStartedRef.current) {
       qrSessionStartedRef.current = true;
-      void loadQr(connectionState !== "open");
+      void loadQr(false);
     }
 
     const interval = setInterval(() => {

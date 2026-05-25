@@ -7,10 +7,6 @@ import {
   recreateEvolutionInstance,
 } from "@/lib/evolution";
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export async function POST(request: Request) {
   const current = await getCurrentUserContext();
 
@@ -34,7 +30,6 @@ export async function POST(request: Request) {
     const managedAgency = await ensureAgencyMessagingInstance(current, agency);
     await ensureEvolutionInstance(managedAgency.messaging_instance);
     const qr = await recreateEvolutionInstance(managedAgency.messaging_instance);
-    await sleep(1000);
 
     return NextResponse.json({
       ok: true,
