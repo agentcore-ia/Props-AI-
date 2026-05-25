@@ -24,6 +24,16 @@ export async function POST(
     return NextResponse.json({ error: "No tienes acceso a este lead." }, { status: 403 });
   }
 
+  if (lead.aiEnabled) {
+    return NextResponse.json(
+      {
+        error:
+          "La IA esta activa en este chat. Desactivala antes de enviar un mensaje manual para evitar respuestas duplicadas.",
+      },
+      { status: 409 }
+    );
+  }
+
   const admin = createAdminClient();
   const { data: agency, error: agencyError } = await admin
     .from("agencies")

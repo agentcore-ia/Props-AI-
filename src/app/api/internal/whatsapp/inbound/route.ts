@@ -592,6 +592,32 @@ export async function POST(request: Request) {
   let aiReply: string | null = null;
   let aiError: string | null = null;
 
+  if (latestLead?.aiEnabled === false) {
+    await createAdminClient()
+      .from("crm_leads")
+      .update({
+        needs_response: true,
+        ai_reply_draft: "IA pausada en este chat: responder manualmente desde Mensajes.",
+        last_activity_at: new Date().toISOString(),
+      })
+      .eq("id", signal.lead.id);
+
+    return NextResponse.json({
+      ok: true,
+      ai_active: false,
+      ai_sent: false,
+      ai_disabled: true,
+      ai_disabled_scope: "lead",
+      leadId: signal.lead.id,
+      agencySlug: agency.slug,
+      agencyName: agency.name,
+      propertyId: latestLead?.propertyId ?? null,
+      propertyTitle: latestLead?.propertyTitle ?? null,
+      customerName: latestLead?.fullName ?? signal.lead.full_name,
+      normalizedPhone: remoteJid.split("@")[0],
+    });
+  }
+
   if (agency.whatsappAiEnabled === false) {
     await createAdminClient()
       .from("crm_leads")

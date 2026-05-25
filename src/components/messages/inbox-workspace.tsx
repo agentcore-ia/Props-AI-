@@ -734,6 +734,11 @@ export function InboxWorkspace({
   }
 
   async function sendMessage(input?: { directText?: string; customPrompt?: string; resetDraft?: boolean }) {
+    if (selectedLead.aiEnabled) {
+      setFeedback("La IA esta activa en este chat. Desactivala para responder manualmente y evitar mensajes duplicados.");
+      return;
+    }
+
     setBusy(true);
     setFeedback(null);
 
@@ -759,6 +764,47 @@ export function InboxWorkspace({
       setDraft("");
     }
     router.refresh();
+  }
+
+  async function toggleLeadAi(enabled: boolean) {
+    setBusy(true);
+    setFeedback(null);
+
+    const response = await fetch(`/api/admin/leads/${selectedLead.id}/ai`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    });
+
+    const payload = await response.json().catch(() => null);
+    setBusy(false);
+
+    if (!response.ok) {
+      setFeedback(payload?.error ?? "No pudimos actualizar la IA de este chat.");
+      return;
+    }
+
+    setLiveLeads((current) =>
+      current.map((lead) =>
+        lead.id === selectedLead.id
+          ? {
+              ...lead,
+              aiEnabled: enabled,
+              needsResponse: enabled ? false : true,
+              aiReplyDraft: enabled
+                ? "IA activada para responder automaticamente este chat."
+                : "IA pausada en este chat: el equipo responde manualmente.",
+              lastActivityAt: new Date().toISOString(),
+            }
+          : lead
+      )
+    );
+    setFeedback(
+      enabled
+        ? "IA activada: Props volvera a responder automaticamente este chat."
+        : "IA pausada: ahora podes responder manualmente sin que Props conteste solo."
+    );
+    void syncInboxSnapshot();
   }
 
   async function sendComparison() {
@@ -889,13 +935,24 @@ export function InboxWorkspace({
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate font-medium">{lead.fullName}</p>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          <Badge variant="outline" className="rounded-full">
-                            {channel}
-                          </Badge>
-                          <Badge className={`border-0 ${conversationStatusTone[status]}`}>
-                            {status}
-                          </Badge>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <Badge variant="outline" className="rounded-full">
+                        {channel}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "rounded-full",
+                          lead.aiEnabled
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-slate-200 bg-slate-50 text-slate-600"
+                        )}
+                      >
+                        {lead.aiEnabled ? "IA activa" : "IA pausada"}
+                      </Badge>
+                      <Badge className={`border-0 ${conversationStatusTone[status]}`}>
+                        {status}
+                      </Badge>
                         </div>
                       </div>
                       {lead.needsResponse ? (
@@ -932,6 +989,20 @@ export function InboxWorkspace({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                variant={selectedLead.aiEnabled ? "default" : "outline"}
+                size="sm"
+                className={cn(
+                  "rounded-full",
+                  selectedLead.aiEnabled ? "bg-emerald-600 hover:bg-emerald-700" : ""
+                )}
+                disabled={busy}
+                onClick={() => void toggleLeadAi(!selectedLead.aiEnabled)}
+              >
+                {busy ? <Loader2 className="size-4 animate-spin" /> : <Bot className="size-4" />}
+                {selectedLead.aiEnabled ? "IA activa" : "IA pausada"}
+              </Button>
               {canResetMemory && selectedLead.agencySlug === "ceballos" ? (
                 <Button
                   type="button"
@@ -983,6 +1054,16 @@ export function InboxWorkspace({
           </div>
 
           <div className="border-t bg-card/95 px-4 py-3">
+            {selectedLead.aiEnabled ? (
+              <div className="mb-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                La IA esta respondiendo este chat. Para intervenir vos, primero pausala desde el boton
+                <span className="font-semibold"> IA activa</span>.
+              </div>
+            ) : (
+              <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                IA pausada en este chat. Las respuestas salen solo cuando el equipo las envia manualmente.
+              </div>
+            )}
             <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
               {quickReplies.map((reply) => (
                 <Button
@@ -990,7 +1071,7 @@ export function InboxWorkspace({
                   variant={reply.tone ?? "outline"}
                   size="sm"
                   className="shrink-0 rounded-full"
-                  disabled={busy}
+                  disabled={busy || selectedLead.aiEnabled}
                   onClick={() => void sendMessage({ directText: reply.message })}
                 >
                   {reply.label}
@@ -1001,6 +1082,7 @@ export function InboxWorkspace({
                   variant="outline"
                   size="sm"
                   className="shrink-0 rounded-full"
+                  disabled={busy || selectedLead.aiEnabled}
                   onClick={() => setCompareOpen(true)}
                 >
                   Comparar propiedades
@@ -1017,7 +1099,12 @@ export function InboxWorkspace({
                 <Input
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
-                  placeholder="Escribi el mensaje exacto que queres enviar por WhatsApp..."
+                  placeholder={
+                    selectedLead.aiEnabled
+                      ? "Pausa la IA para responder manualmente..."
+                      : "Escribi el mensaje exacto que queres enviar por WhatsApp..."
+                  }
+                  disabled={selectedLead.aiEnabled}
                   className="border-0 shadow-none focus-visible:ring-0"
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && !event.shiftKey) {
@@ -1029,12 +1116,16 @@ export function InboxWorkspace({
                 <Button
                   variant="outline"
                   className="rounded-2xl"
-                  disabled={busy || !draft.trim()}
+                  disabled={busy || selectedLead.aiEnabled || !draft.trim()}
                   onClick={() => void sendMessage({ customPrompt: draft.trim(), resetDraft: false })}
                 >
                   IA
                 </Button>
-                <Button className="rounded-2xl" disabled={busy || !draft.trim()} onClick={() => void sendMessage()}>
+                <Button
+                  className="rounded-2xl"
+                  disabled={busy || selectedLead.aiEnabled || !draft.trim()}
+                  onClick={() => void sendMessage()}
+                >
                   {busy ? <Loader2 className="size-4 animate-spin" /> : <SendHorizonal className="size-4" />}
                   Enviar
                 </Button>

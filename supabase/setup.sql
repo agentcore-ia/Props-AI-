@@ -415,6 +415,7 @@ create table if not exists public.crm_leads (
   requirements_summary text,
   last_customer_message text not null default '',
   needs_response boolean not null default true,
+  ai_enabled boolean not null default true,
   next_follow_up_at timestamptz,
   last_contacted_at timestamptz,
   last_activity_at timestamptz not null default timezone('utc'::text, now()),

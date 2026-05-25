@@ -503,6 +503,7 @@ type CrmLeadRow = {
   requirements_summary: string | null;
   last_customer_message: string;
   needs_response: boolean;
+  ai_enabled?: boolean | null;
   next_follow_up_at: string | null;
   last_contacted_at: string | null;
   last_activity_at: string;
@@ -685,6 +686,7 @@ function mapCrmLead(row: CrmLeadRow): CrmLeadSummary {
     requirementsSummary: row.requirements_summary,
     lastCustomerMessage: row.last_customer_message,
     needsResponse: row.needs_response,
+    aiEnabled: row.ai_enabled !== false,
     nextFollowUpAt: row.next_follow_up_at,
     lastContactedAt: row.last_contacted_at,
     lastActivityAt: row.last_activity_at,

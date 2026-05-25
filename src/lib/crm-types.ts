@@ -57,6 +57,7 @@ export type CrmLeadSummary = {
   requirementsSummary: string | null;
   lastCustomerMessage: string;
   needsResponse: boolean;
+  aiEnabled: boolean;
   nextFollowUpAt: string | null;
   lastContactedAt: string | null;
   lastActivityAt: string;
