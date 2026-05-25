@@ -221,7 +221,7 @@ function buildSectionGuide() {
     "Leads: perfil del cliente, score, objeciones, propiedades vistas y siguiente accion sugerida.",
     "Propiedades: alta y edicion de publicaciones, fotos, requisitos, direccion exacta y estado comercial.",
     "Alquileres: contratos, ajustes, liquidaciones, rescisiones y documentacion.",
-    "Mantenimiento: reclamos por propiedad, proveedor, costo, autorizacion del propietario, estado y seguimiento.",
+    "Reclamos: problemas de mantenimiento por propiedad, proveedor, costo, autorizacion del propietario, estado y seguimiento.",
     "Propietarios: relacion por propietario, participacion, liquidaciones emitidas y netos.",
     "Cobros: registrar pagos de inquilinos y controlar estado del periodo.",
     "Morosos: ver alquileres pendientes, deuda por inquilino, prioridad IA y avisos por WhatsApp.",

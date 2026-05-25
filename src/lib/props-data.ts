@@ -2960,7 +2960,7 @@ export async function getPersonTimeline(options: {
       description: `${item.propertyTitle || "Propiedad"} - ${item.nextStep || item.description}`,
       at: item.updatedAt,
       tone: timelineTone("Reclamo", item.status),
-      href: "/mantenimiento",
+      href: "/reclamos",
     })),
     ...rescissions
       .filter((item) => matchesContract(item.contractId))
@@ -3039,7 +3039,7 @@ export async function getSmartAlerts(options?: { agencySlug?: string }): Promise
       description: `${ticket.propertyTitle || "Propiedad"} - ${ticket.nextStep || "definir proveedor, costo y responsable de pago"}.`,
       priority: ticket.priority,
       actionLabel: "Ver reclamo",
-      actionHref: "/mantenimiento",
+      actionHref: "/reclamos",
     });
   }
 
