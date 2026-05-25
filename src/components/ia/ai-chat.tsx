@@ -112,7 +112,7 @@ export function AIChat() {
               )}
             >
               <p className="mb-2 text-xs uppercase tracking-[0.24em] opacity-70">
-                {message.role === "assistant" ? "Props AI" : "Equipo"}
+                {message.role === "assistant" ? "Asistente Props" : "Equipo"}
               </p>
               <p className="text-sm whitespace-pre-wrap">{message.content}</p>
             </div>

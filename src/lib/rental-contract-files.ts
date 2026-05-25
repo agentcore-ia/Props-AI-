@@ -326,7 +326,7 @@ async function extractPdfTextWithOpenAI(buffer: Buffer, fileName: string) {
   });
 
   if (!response.ok) {
-    throw new Error("No se pudo hacer OCR del PDF con OpenAI.");
+    throw new Error("No se pudo leer el texto del PDF con IA.");
   }
 
   const payload = await response.json();

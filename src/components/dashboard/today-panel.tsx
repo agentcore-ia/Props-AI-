@@ -173,7 +173,7 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
           <MiniStat label="Visitas hoy" value={String(snapshot.counters.visitsToday)} />
           <MiniStat label="Leads urgentes" value={String(snapshot.counters.urgentLeads)} />
           <MiniStat label="Recontactos" value={String(snapshot.counters.automaticFollowUps)} />
-          <MiniStat label="IA atendio" value={String(snapshot.counters.aiResolved)} />
+          <MiniStat label="IA atendió" value={String(snapshot.counters.aiResolved)} />
         </section>
 
         {feedback ? (
@@ -231,7 +231,7 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
                 actionHref: lead ? `/mensajes?lead=${lead.id}` : undefined,
               };
             })}
-            empty="Todavia no se ejecuto ningun seguimiento."
+            empty="Todavía no se ejecutó ningún seguimiento."
           />
         ) : null}
 
@@ -287,7 +287,7 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
                     }))
                   : []
               }
-              empty="No hay leads con seguimiento automatico listo para salir."
+              empty="No hay leads con seguimiento automático listo para salir."
             />
 
             <TodayList
@@ -326,7 +326,7 @@ function deriveChannelLabel(source: string) {
 
 function deriveFollowUpReason(lead: CrmLeadSummary) {
   if (lead.stage === "Visita") {
-    return "Pidio avanzar con una visita y falta retomar la coordinacion.";
+    return "Pidió avanzar con una visita y falta retomar la coordinación.";
   }
   if (lead.stage === "Seguimiento") {
     return "Quedo pendiente reactivar la conversacion comercial.";

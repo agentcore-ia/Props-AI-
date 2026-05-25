@@ -432,7 +432,7 @@ export function AgencySettingsWorkspace({
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Telefono</label>
+              <label className="text-sm font-medium">Teléfono</label>
               <Input
                 value={form.phone}
                 onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
@@ -450,7 +450,7 @@ export function AgencySettingsWorkspace({
               <Input value={selectedAgency?.owner_email ?? ""} disabled />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium">Tagline publica</label>
+              <label className="text-sm font-medium">Texto público de presentación</label>
               <Textarea
                 rows={3}
                 value={form.tagline}
@@ -463,17 +463,17 @@ export function AgencySettingsWorkspace({
                   <Clock3 className="size-4" />
                 </div>
                 <div className="flex-1 space-y-2">
-                  <label className="text-sm font-semibold">Horarios de atencion</label>
+                  <label className="text-sm font-semibold">Horarios de atención</label>
                   <Textarea
                     rows={4}
                     value={form.businessHours}
                     onChange={(event) =>
                       setForm((prev) => ({ ...prev, businessHours: event.target.value }))
                     }
-                    placeholder="Ej: Lunes a viernes de 9 a 18 hs. Sabados de 9 a 13 hs. Domingos cerrado."
+                    placeholder="Ej: lunes a viernes de 9 a 18 hs. Sábados de 9 a 13 hs. Domingos cerrado."
                   />
                   <p className="text-xs leading-5 text-muted-foreground">
-                    La IA usa este horario solo para responder si la inmobiliaria esta abierta o cerrada. Las consultas se siguen atendiendo igual fuera de horario.
+                    La IA usa este horario solo para responder si la inmobiliaria está abierta o cerrada. Las consultas se siguen atendiendo igual fuera de horario.
                   </p>
                 </div>
               </div>
@@ -509,7 +509,7 @@ export function AgencySettingsWorkspace({
               />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium">Codigo interno de WhatsApp</label>
+              <label className="text-sm font-medium">Identificador de WhatsApp</label>
               <Input
                 value={form.messagingInstance}
                 onChange={(event) =>
@@ -521,7 +521,7 @@ export function AgencySettingsWorkspace({
                 placeholder="props-mi-inmobiliaria"
               />
               <p className="text-xs text-muted-foreground">
-                Props usa este codigo interno para mantener conectados los mensajes de WhatsApp.
+                Props usa este identificador para mantener conectados los mensajes de WhatsApp de esta inmobiliaria.
               </p>
             </div>
             <div className="md:col-span-2 rounded-[22px] border bg-muted/20 p-4">
@@ -535,9 +535,9 @@ export function AgencySettingsWorkspace({
                   }
                 />
                 <span>
-                  <span className="block text-sm font-semibold">Responder WhatsApp automaticamente con IA</span>
+                  <span className="block text-sm font-semibold">Responder WhatsApp automáticamente con IA</span>
                   <span className="mt-1 block text-sm text-muted-foreground">
-                    Si esta apagado, Props sigue recibiendo mensajes y mostrandolos en Mensajes, pero no contesta solo. El equipo puede responder manualmente.
+                    Si está apagado, Props sigue recibiendo mensajes y mostrándolos en Mensajes, pero no contesta solo. El equipo puede responder manualmente.
                   </span>
                 </span>
               </label>
@@ -590,7 +590,7 @@ export function AgencySettingsWorkspace({
                 </div>
                 <p className="mt-3 text-sm text-muted-foreground">
                   {connectionState === "open"
-                    ? "El numero esta conectado y listo para enviar mensajes y avisos desde Props."
+                    ? "El número está conectado y listo para enviar mensajes y avisos desde Props."
                     : "Si está desconectado, abre el QR y escanealo desde WhatsApp > Dispositivos vinculados."}
                 </p>
                 {connectionMeta?.profileName ? (
@@ -609,7 +609,7 @@ export function AgencySettingsWorkspace({
                   Mensajeria lista
                 </div>
                 <p className="mt-3 text-sm text-muted-foreground">
-                  Al vincular WhatsApp, Props deja listo este numero para recibir consultas y enviar avisos automaticos.
+                  Al vincular WhatsApp, Props deja listo este número para recibir consultas y enviar avisos automáticos.
                 </p>
               </div>
             </div>
@@ -637,7 +637,7 @@ export function AgencySettingsWorkspace({
                   <p className="text-sm font-medium text-muted-foreground">Plan mensual</p>
                   <p className="mt-2 text-3xl font-semibold">$ 50.000</p>
                   <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-                    Incluye panel operativo, portafolio publico, automatizaciones de WhatsApp, aumentos, morosos, liquidaciones y asistente IA.
+                    Incluye panel operativo, portafolio público, automatizaciones de WhatsApp, aumentos, morosos, liquidaciones y asistente IA.
                   </p>
                 </div>
                 <Badge className="w-fit rounded-full border-0 bg-primary/10 px-3 py-1 text-primary">
@@ -653,7 +653,7 @@ export function AgencySettingsWorkspace({
               </div>
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" />
-                La suscripcion queda asociada a {selectedAgency?.name ?? "esta inmobiliaria"}.
+                La suscripción queda asociada a {selectedAgency?.name ?? "esta inmobiliaria"}.
               </div>
             </div>
 
@@ -677,7 +677,7 @@ export function AgencySettingsWorkspace({
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Cada inmobiliaria puede adaptar sus respuestas base para alquiler, venta, seguimiento, visita y rechazo amable. Props AI usa este tono al sugerir mensajes.
+            Cada inmobiliaria puede adaptar sus respuestas base para alquiler, venta, seguimiento, visita y rechazo amable. Props usa este tono al sugerir mensajes.
           </p>
           <div className="grid gap-4 lg:grid-cols-2">
             {templates.map((template) => (
@@ -737,7 +737,7 @@ export function AgencySettingsWorkspace({
             <DialogHeader>
               <DialogTitle>Vincular WhatsApp</DialogTitle>
               <DialogDescription>
-                Escanea el QR desde WhatsApp en el telefono de la inmobiliaria. Cuando conecte, Props usara este numero para mensajes y avisos automaticos.
+                Escaneá el QR desde WhatsApp en el teléfono de la inmobiliaria. Cuando conecte, Props usará este número para mensajes y avisos automáticos.
               </DialogDescription>
             </DialogHeader>
 
@@ -755,7 +755,7 @@ export function AgencySettingsWorkspace({
                   <div className="flex flex-col items-center gap-3 text-center">
                     <CheckCircle2 className="size-12 text-emerald-500" />
                     <p className="text-lg font-semibold">WhatsApp conectado</p>
-                    <p className="text-sm text-muted-foreground">El numero ya quedo listo para enviar y recibir mensajes.</p>
+                    <p className="text-sm text-muted-foreground">El número ya quedó listo para enviar y recibir mensajes.</p>
                   </div>
                 ) : (
                   <div className="text-center text-sm text-muted-foreground">
@@ -777,7 +777,7 @@ export function AgencySettingsWorkspace({
                   En el teléfono: WhatsApp → menú → <strong>Dispositivos vinculados</strong> → <strong>Vincular dispositivo</strong>. Luego escaneá este QR.
                 </p>
                 {qrCount > 0 ? (
-                  <p className="mt-3 text-xs">QR regenerado {qrCount} veces por Evolution.</p>
+                  <p className="mt-3 text-xs">QR regenerado {qrCount} veces.</p>
                 ) : null}
               </div>
 

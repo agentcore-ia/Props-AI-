@@ -15,8 +15,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Props AI",
-  description: "Dashboard SaaS para inmobiliarias modernas",
+  title: "Props",
+  description: "Control inmobiliario para operar propiedades, alquileres, mensajes y cobranzas.",
   icons: {
     icon: [
       { url: "/favicon.ico?v=props-20260524", sizes: "any" },

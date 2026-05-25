@@ -118,7 +118,7 @@ export function TenantCatalog({
                   <div className="mt-5 grid grid-cols-2 gap-2.5 sm:mt-6 sm:gap-3">
                     <ProfileInfo
                       icon={<MapPin className="size-4" />}
-                      label="Ubicacion"
+                      label="Ubicación"
                       value={agency.city}
                     />
                     <ProfileInfo
@@ -295,7 +295,7 @@ export function TenantCatalog({
         tenantSlug={agency.slug}
         properties={properties}
         mode="floating"
-        launcherText={`Te ayudo a encontrar tu proxima propiedad en ${agency.city}`}
+        launcherText={`Te ayudo a encontrar tu próxima propiedad en ${agency.city}`}
         heading={`Busquemos dentro de ${agency.name}`}
         welcomeMessage={`Decime zona, presupuesto o tipo de propiedad y te sugiero opciones reales de ${agency.name}.`}
       />

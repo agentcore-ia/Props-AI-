@@ -27,7 +27,7 @@ import {
 const highlights = [
   "Acompanamiento comercial personalizado",
   "Visitas coordinadas con respuesta agil",
-  "Analisis de opcion segun necesidad y presupuesto",
+  "Análisis de opción según necesidad y presupuesto",
 ];
 
 export function TenantPropertyDetail({
@@ -45,7 +45,7 @@ export function TenantPropertyDetail({
         <div className="rounded-[32px] border bg-white p-8 text-center shadow-sm">
           <h1 className="text-2xl font-semibold">Propiedad no encontrada</h1>
           <p className="mt-3 text-sm text-slate-600">
-            La publicacion que buscas no existe para este portafolio.
+            La publicación que buscás no existe para este portafolio.
           </p>
         </div>
       </div>
@@ -199,16 +199,16 @@ export function TenantPropertyDetail({
               tenantSlug={agency.slug}
               propertyId={property.id}
               compact
-              title="Solicitar mas informacion"
+              title="Solicitar más información"
               description="Consulta disponibilidad, coordinacion de visita o condiciones comerciales de esta propiedad."
             />
           </div>
         </section>
 
         <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.22)] sm:p-6">
-          <p className="text-sm font-medium text-slate-500">Ubicacion</p>
+          <p className="text-sm font-medium text-slate-500">Ubicación</p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-            Direccion cargada para llegar mejor a la visita
+            Dirección cargada para llegar mejor a la visita
           </h2>
           <div className="mt-6 overflow-hidden rounded-[28px] border border-slate-200 bg-white">
             <iframe

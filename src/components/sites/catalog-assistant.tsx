@@ -59,7 +59,7 @@ export function CatalogAssistant({
   tenantSlug,
   properties,
   mode = "inline",
-  launcherText = "Te ayudo a encontrar tu proxima propiedad",
+  launcherText = "Te ayudo a encontrar tu próxima propiedad",
   heading = "Contame que estas buscando",
   welcomeMessage = "Contame zona, presupuesto o tipo de propiedad y te muestro opciones reales.",
 }: {

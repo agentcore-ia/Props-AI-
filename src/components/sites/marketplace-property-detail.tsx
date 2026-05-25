@@ -54,7 +54,7 @@ export function MarketplacePropertyDetail({
         <div className="rounded-[32px] border bg-white p-8 text-center shadow-sm">
           <h1 className="text-2xl font-semibold">Propiedad no encontrada</h1>
           <p className="mt-3 text-sm text-slate-600">
-            La publicacion que buscas no existe o ya no esta disponible.
+            La publicación que buscás no existe o ya no está disponible.
           </p>
           <Link
             href="/"
@@ -195,7 +195,7 @@ export function MarketplacePropertyDetail({
             <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">
               <SpecCard icon={<BedDouble className="size-4" />} label="Dormitorios" value={formatDetailCount(listing.bedrooms)} />
               <SpecCard icon={<Bath className="size-4" />} label="Baños" value={formatDetailCount(listing.bathrooms)} />
-              <SpecCard icon={<Ruler className="size-4" />} label="Construccion" value={formatDetailArea(listing.area)} />
+              <SpecCard icon={<Ruler className="size-4" />} label="Construcción" value={formatDetailArea(listing.area)} />
               <SpecCard icon={<CalendarDays className="size-4" />} label="Disponible" value={listing.availableFrom || "Inmediata"} />
             </div>
           </div>
@@ -278,8 +278,8 @@ export function MarketplacePropertyDetail({
               propertyId={property.id}
               currentUser={currentUser}
               compact
-              title="Solicitar mas informacion"
-              description="Deja tus datos para coordinar visita, resolver dudas o recibir propiedades similares."
+              title="Solicitar más información"
+              description="Dejá tus datos para coordinar visita, resolver dudas o recibir propiedades similares."
             />
           </div>
         </section>
@@ -301,7 +301,7 @@ export function MarketplacePropertyDetail({
             <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)] sm:p-6">
               <p className="text-sm font-medium text-slate-500">Condiciones y requisitos</p>
               <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-                Informacion clave antes de consultar
+                Información clave antes de consultar
               </h2>
               <div className="mt-6 grid grid-cols-2 gap-3">
                 {keyFacts.map((item) => (
@@ -312,7 +312,7 @@ export function MarketplacePropertyDetail({
               <div className="mt-4 rounded-[22px] border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Requisitos</p>
                 <p className="mt-2 text-sm leading-7 text-slate-600">
-                  {listing.requirements || "La inmobiliaria no cargo requisitos adicionales por el momento."}
+                  {listing.requirements || "La inmobiliaria no cargó requisitos adicionales por el momento."}
                 </p>
               </div>
             </section>
@@ -320,9 +320,9 @@ export function MarketplacePropertyDetail({
 
           <div className="space-y-6">
             <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_28px_90px_-58px_rgba(15,23,42,0.22)] sm:p-6">
-              <p className="text-sm font-medium text-slate-500">Ubicacion</p>
+              <p className="text-sm font-medium text-slate-500">Ubicación</p>
               <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-                Direccion cargada para mapa y visita
+                Dirección cargada para mapa y visita
               </h2>
               <div className="mt-6 overflow-hidden rounded-[28px] border border-slate-200 bg-white">
                 <iframe

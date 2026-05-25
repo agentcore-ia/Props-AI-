@@ -728,7 +728,7 @@ export async function POST(request: Request) {
     : [];
 
   if (!prompt) {
-    return NextResponse.json({ error: "Escribe una consulta para Props AI." }, { status: 400 });
+    return NextResponse.json({ error: "Escribe una consulta para el asistente." }, { status: 400 });
   }
 
   const scope = getAgencyScopeFromUser(current);
@@ -812,8 +812,8 @@ export async function POST(request: Request) {
     console.error("[dashboard-assistant] OpenAI is not configured");
     return NextResponse.json(
       {
-        error: "OpenAI no esta configurado para el asistente del dashboard.",
-        detail: "Falta OPENAI_API_KEY en el entorno de produccion. El asistente no va a responder con textos genericos porque podria confundir al equipo.",
+        error: "El asistente no esta configurado para responder.",
+        detail: "Falta configurar el proveedor de IA en produccion. El asistente no va a responder con textos genericos porque podria confundir al equipo.",
         configured: false,
       },
       { status: 503 }
@@ -1255,15 +1255,15 @@ export async function POST(request: Request) {
   });
 
   if (!answer.ok) {
-    return NextResponse.json({ error: "No se pudo consultar OpenAI.", detail: answer.error }, { status: 502 });
+    return NextResponse.json({ error: "No se pudo consultar el asistente.", detail: answer.error }, { status: 502 });
   }
 
   if (!answer.reply) {
     console.error("[dashboard-assistant] OpenAI returned empty answer", { prompt });
     return NextResponse.json(
       {
-        error: "OpenAI devolvio una respuesta vacia.",
-        detail: "El asistente no va a usar respuestas genericas. Revisa el modelo OPENAI_MODEL o los logs de la API.",
+        error: "El asistente devolvio una respuesta vacia.",
+        detail: "El asistente no va a usar respuestas genericas. Revisa la configuracion del modelo o los logs del servidor.",
       },
       { status: 502 }
     );

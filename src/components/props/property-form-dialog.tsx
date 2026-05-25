@@ -840,7 +840,7 @@ export function PropertyFormDialog({
                     <SectionTitle
                       eyebrow="Alquiler"
                       title="Contrato y aumentos"
-                      description="Deja listo el contrato, la frecuencia del ajuste y el documento que luego interpreta Props AI."
+                      description="Dejá listo el contrato, la frecuencia del ajuste y el documento que luego interpreta Props."
                     />
                     <label className="flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-medium">
                       <input
@@ -983,7 +983,7 @@ export function PropertyFormDialog({
                             Adjuntar contrato
                           </div>
                           <p className="text-muted-foreground">
-                            Guarda el PDF, DOCX o TXT con las clausulas y deja el texto listo para Props AI.
+                            Guarda el PDF, DOCX o TXT con las cláusulas y deja el texto listo para Props.
                           </p>
                           <input
                             className="hidden"

@@ -365,7 +365,7 @@ export async function getEvolutionQr(instanceName: string) {
     );
   }
 
-  throw new Error(errors.at(-1) ?? "No se pudo obtener el QR de Evolution.");
+  throw new Error(errors.at(-1) ?? "No se pudo obtener el QR de WhatsApp.");
 }
 
 export async function getEvolutionQrWithRetry(instanceName: string, attempts = 5, delayMs = 800) {
@@ -395,7 +395,7 @@ export async function getEvolutionQrWithRetry(instanceName: string, attempts = 5
 
   throw lastError instanceof Error
     ? lastError
-    : new Error("No se pudo obtener el QR de Evolution.");
+    : new Error("No se pudo obtener el QR de WhatsApp.");
 }
 
 export async function restartEvolutionInstance(instanceName: string) {

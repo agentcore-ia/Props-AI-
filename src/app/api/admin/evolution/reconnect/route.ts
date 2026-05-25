@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "No se pudo reconectar la instancia de WhatsApp.",
+        error: "No se pudo generar una nueva vinculacion de WhatsApp. Volve a intentarlo en unos segundos.",
       },
       { status: 502 }
     );

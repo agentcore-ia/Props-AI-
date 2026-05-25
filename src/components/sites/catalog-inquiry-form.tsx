@@ -14,7 +14,7 @@ export function CatalogInquiryForm({
   tenantSlug,
   propertyId,
   title = "Quiero que me contacten",
-  description = "Deja tus datos y el equipo comercial te responde con opciones ajustadas a tu necesidad.",
+  description = "Dejá tus datos y el equipo comercial te responde con opciones ajustadas a tu necesidad.",
   compact = false,
   currentUser,
 }: {

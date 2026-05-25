@@ -38,10 +38,10 @@ export async function GET(request: Request) {
       },
       connection,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "No se pudo consultar la conexion de WhatsApp.",
+        error: "No se pudo consultar la conexion de WhatsApp.",
       },
       { status: 502 }
     );

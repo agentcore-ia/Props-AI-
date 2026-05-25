@@ -279,7 +279,7 @@ export function DashboardAssistant() {
                     )}
                   >
                     <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em] opacity-70">
-                      {message.role === "assistant" ? "Props AI" : "Equipo"}
+                      {message.role === "assistant" ? "Asistente Props" : "Equipo"}
                     </p>
                     <p className="whitespace-pre-wrap">{message.content}</p>
                     {message.actionResult ? (

@@ -43,10 +43,10 @@ export default async function LoginPage({
               <Building2 className="size-6" />
             </div>
             <div>
-              <p className="text-sm uppercase tracking-[0.28em] text-primary/80">Props AI</p>
+              <p className="text-sm uppercase tracking-[0.28em] text-primary/80">Props</p>
               <h1 className="mt-3 text-3xl font-semibold tracking-tight">Ingresar al dashboard</h1>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Accede al panel de operaciones de tu inmobiliaria.
+                Accedé al panel de operaciones de tu inmobiliaria.
               </p>
             </div>
           </div>

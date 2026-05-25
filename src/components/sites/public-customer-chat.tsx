@@ -151,7 +151,7 @@ export function PublicCustomerChat({
               Habla con la IA antes de contactar a la inmobiliaria
             </h2>
             <p className="mt-2 text-sm leading-7 text-slate-600">
-              Te ayuda a ordenar necesidades, hacer preguntas utiles y dejar una consulta clara para el equipo comercial.
+              Te ayuda a ordenar necesidades, hacer preguntas útiles y dejar una consulta clara para el equipo comercial.
             </p>
           </div>
         </div>

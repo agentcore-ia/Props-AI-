@@ -236,7 +236,7 @@ export function PublicMarketplace({
 
           <div className="flex items-center gap-3">
             <div className="hidden rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-500 sm:block">
-              {favoriteIds.length} favoritos · {comparisonIds.length}/3 comparacion
+              {favoriteIds.length} favoritos · {comparisonIds.length}/3 comparación
             </div>
             <PublicUserActions currentUser={currentUser} />
           </div>
@@ -394,7 +394,7 @@ export function PublicMarketplace({
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
                           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">
-                            Ubicacion exacta
+                            Ubicación exacta
                           </p>
                           <h3 className="mt-2 break-words text-xl font-semibold text-slate-950 sm:text-2xl">
                             {selectedMapListing.title}
@@ -502,7 +502,7 @@ export function PublicMarketplace({
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
                         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">
-                          Ubicacion exacta
+                          Ubicación exacta
                         </p>
                         <h3 className="mt-2 break-words text-xl font-semibold text-slate-950 sm:text-2xl">
                           {selectedMapListing.title}
@@ -570,7 +570,7 @@ export function PublicMarketplace({
           <section className="mt-8 space-y-6 sm:mt-10 sm:space-y-8">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <SectionHeading
-                eyebrow="Favoritos y comparacion"
+                eyebrow="Favoritos y comparación"
                 title="Tus propiedades seleccionadas"
                 description="Guarda favoritas y compara hasta 3 opciones para tomar mejores decisiones."
               />
@@ -594,7 +594,7 @@ export function PublicMarketplace({
               </div>
             ) : (
               <EmptyPanel
-                title="Todavia no agregaste favoritos"
+                title="Todavía no agregaste favoritos"
                 description="Desde Explorar o Mapa puedes guardar propiedades y traerlas aqui para compararlas."
               />
             )}
@@ -677,7 +677,7 @@ export function PublicMarketplace({
                     ? formatMoney(selectedMapListing.price, selectedMapListing.currency)
                     : "-"
                 }
-                hint="segun la propiedad seleccionada"
+                hint="según la propiedad seleccionada"
               />
               <InvestmentMetric
                 icon={<Radar className="size-5" />}
@@ -751,7 +751,7 @@ export function PublicMarketplace({
 
               <section className="rounded-[32px] border border-slate-200 bg-slate-950 p-5 text-white shadow-[0_28px_90px_-58px_rgba(15,23,42,0.36)] sm:p-6">
                 <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-100">
-                  Lectura rapida del mercado
+                  Lectura rápida del mercado
                 </p>
                 <h3 className="mt-2 text-3xl font-semibold tracking-tight">
                   Barrios y oportunidades con mejor contexto
@@ -784,7 +784,7 @@ export function PublicMarketplace({
       <CatalogAssistant
         properties={properties}
         mode="floating"
-        launcherText="Te ayudo a encontrar tu proxima propiedad"
+        launcherText="Te ayudo a encontrar tu próxima propiedad"
         heading="Decime que buscas"
         welcomeMessage="Puedo ayudarte a filtrar por barrio, precio, operacion o tipo de propiedad."
       />

@@ -47,7 +47,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "No se pudo obtener el QR de WhatsApp.",
+        error: "No se pudo generar el QR de WhatsApp. Volve a intentarlo en unos segundos.",
       },
       { status: 502 }
     );
