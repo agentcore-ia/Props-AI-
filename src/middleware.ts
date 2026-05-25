@@ -33,6 +33,10 @@ export async function middleware(request: NextRequest) {
     | null = null;
 
   if (resolved.kind === "app") {
+    if (pathname === "/") {
+      return NextResponse.next();
+    }
+
     session = await updateSession(request);
     let role: "superadmin" | "agency_admin" | "agent" | "customer" | null = null;
 
@@ -52,17 +56,6 @@ export async function middleware(request: NextRequest) {
     const isAuthRoute = pathname.startsWith("/auth");
     const isLogoutRoute = pathname === "/auth/logout";
     const isProtectedRoute = !isAuthRoute;
-
-    if (pathname === "/") {
-      const target = session.user
-        ? role === "customer"
-          ? buildMarketplaceUrl("/", request.headers)
-          : buildAbsoluteUrlFromNextRequest("/dashboard", request)
-        : buildAbsoluteUrlFromNextRequest("/auth/login", request);
-      const redirectResponse = NextResponse.redirect(target);
-      session.copyCookies(redirectResponse);
-      return redirectResponse;
-    }
 
     if (isProtectedRoute && session.user && role === "customer") {
       const redirectResponse = NextResponse.redirect(
