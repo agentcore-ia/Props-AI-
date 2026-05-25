@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -674,8 +674,19 @@ function MessageSuggestion({
 }) {
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [customMessage, setCustomMessage] = useState(message);
+
+  useEffect(() => {
+    setCustomMessage(message);
+  }, [message]);
 
   async function sendWhatsApp() {
+    const text = customMessage.trim();
+    if (!text) {
+      setStatus("Escribe un mensaje antes de enviarlo.");
+      return;
+    }
+
     setSending(true);
     setStatus(null);
     const response = await fetch("/api/admin/maintenance-tickets/whatsapp", {
@@ -684,7 +695,7 @@ function MessageSuggestion({
       body: JSON.stringify({
         ticketId,
         recipientRole,
-        message,
+        message: text,
       }),
     });
     const payload = await response.json().catch(() => null);
@@ -707,11 +718,27 @@ function MessageSuggestion({
         </div>
         <MessageCircleMore className="size-4 shrink-0 text-primary" />
       </div>
-      <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">{message}</p>
-      <Button variant="outline" size="sm" className="mt-3 rounded-xl" disabled={sending} onClick={sendWhatsApp}>
-        {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-        {sending ? "Enviando..." : "Enviar WhatsApp"}
-      </Button>
+      <Textarea
+        value={customMessage}
+        onChange={(event) => setCustomMessage(event.target.value)}
+        className="mt-3 min-h-28 resize-none rounded-2xl text-sm leading-6"
+        placeholder="Personaliza el mensaje antes de enviarlo..."
+      />
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-xl"
+          disabled={sending || customMessage === message}
+          onClick={() => setCustomMessage(message)}
+        >
+          Restaurar sugerido
+        </Button>
+        <Button size="sm" className="rounded-xl" disabled={sending || !customMessage.trim()} onClick={sendWhatsApp}>
+          {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+          {sending ? "Enviando..." : "Enviar WhatsApp"}
+        </Button>
+      </div>
       {status ? <p className="mt-2 text-xs text-muted-foreground">{status}</p> : null}
     </div>
   );
