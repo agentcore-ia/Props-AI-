@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createBrowserClient } from "@supabase/ssr";
 import {
   ArrowRight,
   Bot,
@@ -321,6 +322,42 @@ function buildAdminQuickReplies(lead: CrmLeadSummary): QuickReplyScenario[] {
   ];
 }
 
+function mapRealtimeLeadMessage(row: Record<string, unknown>): CrmLeadMessageSummary | null {
+  const id = typeof row.id === "string" ? row.id : null;
+  const leadId = typeof row.lead_id === "string" ? row.lead_id : null;
+  const agencyId = typeof row.agency_id === "string" ? row.agency_id : null;
+  const content = typeof row.content === "string" ? row.content : "";
+  const createdAt = typeof row.created_at === "string" ? row.created_at : new Date().toISOString();
+  const channel = typeof row.channel === "string" ? row.channel : "whatsapp";
+  const direction = typeof row.direction === "string" ? row.direction : "incoming";
+  const senderRole = typeof row.sender_role === "string" ? row.sender_role : "customer";
+
+  if (!id || !leadId || !agencyId || !content) {
+    return null;
+  }
+
+  return {
+    id,
+    leadId,
+    agencyId,
+    propertyId: typeof row.property_id === "string" ? row.property_id : null,
+    channel: ["whatsapp", "web", "instagram", "crm"].includes(channel)
+      ? (channel as CrmLeadMessageSummary["channel"])
+      : "whatsapp",
+    direction: direction === "outgoing" ? "outgoing" : "incoming",
+    senderRole: ["customer", "assistant", "agent", "system"].includes(senderRole)
+      ? (senderRole as CrmLeadMessageSummary["senderRole"])
+      : "customer",
+    content,
+    waMessageId: typeof row.wa_message_id === "string" ? row.wa_message_id : null,
+    metadata:
+      row.metadata && typeof row.metadata === "object"
+        ? (row.metadata as Record<string, unknown>)
+        : {},
+    createdAt,
+  };
+}
+
 export function InboxWorkspace({
   leads,
   messages,
@@ -345,6 +382,8 @@ export function InboxWorkspace({
   canResetMemory?: boolean;
 }) {
   const router = useRouter();
+  const [liveLeads, setLiveLeads] = useState(leads);
+  const [liveMessages, setLiveMessages] = useState(messages);
   const [selectedId, setSelectedId] = useState(
     leads.some((lead) => lead.id === initialLeadId) ? initialLeadId ?? "" : leads[0]?.id ?? ""
   );
@@ -358,60 +397,135 @@ export function InboxWorkspace({
   const [visitForm, setVisitForm] = useState({ scheduledFor: "", notes: "" });
   const messageScrollRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const liveLeadIdsRef = useRef(new Set(leads.map((lead) => lead.id)));
+
+  useEffect(() => {
+    setLiveLeads(leads);
+  }, [leads]);
+
+  useEffect(() => {
+    setLiveMessages(messages);
+  }, [messages]);
+
+  useEffect(() => {
+    liveLeadIdsRef.current = new Set(liveLeads.map((lead) => lead.id));
+  }, [liveLeads]);
 
   const messagesByLead = useMemo(() => {
     const grouped = new Map<string, CrmLeadMessageSummary[]>();
 
-    for (const message of messages) {
+    for (const message of liveMessages) {
       const current = grouped.get(message.leadId) ?? [];
       current.push(message);
       grouped.set(message.leadId, current);
     }
 
     return grouped;
-  }, [messages]);
+  }, [liveMessages]);
 
   const relatedLeadsByPerson = useMemo(() => {
     const grouped = new Map<string, CrmLeadSummary[]>();
-    for (const lead of leads) {
+    for (const lead of liveLeads) {
       const key = `${lead.email ?? ""}|${lead.phone ?? ""}|${lead.fullName.toLowerCase()}`;
       const current = grouped.get(key) ?? [];
       current.push(lead);
       grouped.set(key, current);
     }
     return grouped;
-  }, [leads]);
+  }, [liveLeads]);
 
   useEffect(() => {
-    if (initialLeadId && leads.some((lead) => lead.id === initialLeadId)) {
+    if (initialLeadId && liveLeads.some((lead) => lead.id === initialLeadId)) {
       setSelectedId(initialLeadId);
     }
-  }, [initialLeadId, leads]);
+  }, [initialLeadId, liveLeads]);
 
   useEffect(() => {
-    const refreshMessages = () => {
-      if (document.visibilityState === "visible" && !busy) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      return;
+    }
+
+    const client = createBrowserClient(supabaseUrl, supabaseKey);
+    const agencyIds = Array.from(new Set(liveLeads.map((lead) => lead.agencyId))).filter(Boolean);
+    const filter = agencyIds.length === 1 ? `agency_id=eq.${agencyIds[0]}` : undefined;
+    let refreshTimer: number | null = null;
+
+    const scheduleServerRefresh = () => {
+      if (refreshTimer !== null) return;
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
         router.refresh();
-      }
+      }, 700);
     };
 
-    const interval = window.setInterval(refreshMessages, 4000);
-    window.addEventListener("focus", refreshMessages);
-    document.addEventListener("visibilitychange", refreshMessages);
+    const channel = client
+      .channel(`crm-lead-messages-${filter ?? "all"}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "crm_lead_messages",
+          ...(filter ? { filter } : {}),
+        },
+        (payload) => {
+          const message = mapRealtimeLeadMessage(payload.new as Record<string, unknown>);
+          if (!message) return;
+
+          setLiveMessages((current) => {
+            if (current.some((item) => item.id === message.id)) {
+              return current;
+            }
+
+            return [...current, message].sort(
+              (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+            );
+          });
+
+          if (!liveLeadIdsRef.current.has(message.leadId)) {
+            scheduleServerRefresh();
+          } else {
+            scheduleServerRefresh();
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "crm_lead_messages",
+          ...(filter ? { filter } : {}),
+        },
+        (payload) => {
+          const message = mapRealtimeLeadMessage(payload.new as Record<string, unknown>);
+          if (!message) return;
+
+          setLiveMessages((current) =>
+            current.map((item) => (item.id === message.id ? message : item))
+          );
+        }
+      );
+
+    void channel.subscribe();
 
     return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refreshMessages);
-      document.removeEventListener("visibilitychange", refreshMessages);
+      if (refreshTimer !== null) {
+        window.clearTimeout(refreshTimer);
+      }
+      void client.removeChannel(channel);
     };
-  }, [busy, router]);
+  }, [liveLeads, router]);
 
   const filteredLeads = useMemo(() => {
     if (mode === "recepcion") {
-      return leads.filter((lead) => deriveConversationStatus(lead) !== "Cerrado");
+      return liveLeads.filter((lead) => deriveConversationStatus(lead) !== "Cerrado");
     }
-    return leads;
-  }, [leads, mode]);
+    return liveLeads;
+  }, [liveLeads, mode]);
 
   const selectedLead = useMemo(
     () => filteredLeads.find((lead) => lead.id === selectedId) ?? filteredLeads[0] ?? null,

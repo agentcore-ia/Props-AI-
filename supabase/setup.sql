@@ -537,6 +537,23 @@ create unique index if not exists crm_lead_messages_wa_message_id_idx
   on public.crm_lead_messages (wa_message_id)
   where wa_message_id is not null;
 
+alter table public.crm_lead_messages replica identity full;
+
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = 'crm_lead_messages'
+    )
+  then
+    alter publication supabase_realtime add table public.crm_lead_messages;
+  end if;
+end $$;
+
 create unique index if not exists client_memory_profiles_agency_phone_idx
   on public.client_memory_profiles (agency_id, normalized_phone)
   where normalized_phone is not null and btrim(normalized_phone) <> '';
@@ -768,6 +785,7 @@ drop policy if exists "Service role manages crm leads" on public.crm_leads;
 drop policy if exists "Service role manages visit appointments" on public.visit_appointments;
 drop policy if exists "Service role manages employee tasks" on public.employee_tasks;
 drop policy if exists "Service role manages crm lead messages" on public.crm_lead_messages;
+drop policy if exists "CRM users can read realtime lead messages" on public.crm_lead_messages;
 drop policy if exists "Service role manages agency message templates" on public.agency_message_templates;
 drop policy if exists "Service role manages client memory profiles" on public.client_memory_profiles;
 drop policy if exists "Service role manages client memory events" on public.client_memory_events;
@@ -876,6 +894,30 @@ on public.crm_lead_messages
 for all
 using (auth.role() = 'service_role')
 with check (auth.role() = 'service_role');
+
+create policy "CRM users can read realtime lead messages"
+on public.crm_lead_messages
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.profiles profile
+    where profile.id = auth.uid()
+      and (
+        profile.role = 'superadmin'
+        or (
+          profile.role in ('agency_admin', 'agent')
+          and exists (
+            select 1
+            from public.agencies agency
+            where agency.id = crm_lead_messages.agency_id
+              and agency.slug = profile.agency_slug
+          )
+        )
+      )
+  )
+);
 
 create policy "Service role manages agency message templates"
 on public.agency_message_templates

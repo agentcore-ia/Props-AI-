@@ -315,6 +315,173 @@ function buildDeterministicAnswer(input: {
   return null;
 }
 
+async function buildClientMemorySearchContext(input: {
+  prompt: string;
+  agencySlug?: string;
+}) {
+  const admin = createAdminClient();
+  let agencyQuery = admin.from("agencies").select("id, slug, name").order("name", { ascending: true });
+
+  if (input.agencySlug) {
+    agencyQuery = agencyQuery.eq("slug", input.agencySlug);
+  }
+
+  const { data: agencies, error: agenciesError } = await agencyQuery.limit(input.agencySlug ? 1 : 30);
+  if (agenciesError) {
+    console.error("[dashboard-assistant] memory agencies lookup failed", agenciesError);
+    return "Memoria de clientes: no se pudo consultar en este momento.";
+  }
+
+  const agencyRows = (agencies ?? []) as Array<{ id: string; slug: string; name: string }>;
+  const agencyIds = agencyRows.map((agency) => agency.id);
+  if (agencyIds.length === 0) {
+    return "Memoria de clientes: no hay inmobiliaria disponible para consultar.";
+  }
+
+  const normalizedPrompt = normalizeText(input.prompt);
+  const promptTokens = normalizedPrompt
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3);
+
+  const { data: profiles, error: profilesError } = await admin
+    .from("client_memory_profiles")
+    .select("id, agency_id, display_name, normalized_phone, email, summary, facts, preferences, tags, last_interaction_at")
+    .in("agency_id", agencyIds)
+    .order("last_interaction_at", { ascending: false })
+    .limit(80);
+
+  if (profilesError) {
+    console.error("[dashboard-assistant] memory profiles lookup failed", profilesError);
+    return "Memoria de clientes: no se pudo leer el historial de clientes.";
+  }
+
+  const profileRows = (profiles ?? []) as Array<{
+    id: string;
+    agency_id: string;
+    display_name: string;
+    normalized_phone: string | null;
+    email: string | null;
+    summary: string | null;
+    facts: Record<string, unknown> | null;
+    preferences: Record<string, unknown> | null;
+    tags: string[] | null;
+    last_interaction_at: string;
+  }>;
+
+  const scoredProfiles = profileRows
+    .map((profile) => {
+      const haystack = normalizeText(
+        [
+          profile.display_name,
+          profile.normalized_phone,
+          profile.email,
+          profile.summary,
+          JSON.stringify(profile.facts ?? {}),
+          JSON.stringify(profile.preferences ?? {}),
+          (profile.tags ?? []).join(" "),
+        ].join(" ")
+      );
+      let score = 0;
+
+      if (profile.display_name && normalizedPrompt.includes(normalizeText(profile.display_name))) {
+        score += 18;
+      }
+
+      if (profile.normalized_phone && normalizedPrompt.includes(profile.normalized_phone.slice(-8))) {
+        score += 18;
+      }
+
+      for (const token of promptTokens) {
+        if (haystack.includes(token)) {
+          score += token.length > 5 ? 3 : 1;
+        }
+      }
+
+      return { profile, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const hasMemoryIntent = /(chat|mensaje|conversacion|historial|cliente|inquilino|propietario|lead|pregunto|respondio|dijo|hablo|consulta)/.test(
+    normalizedPrompt
+  );
+
+  const selectedProfiles = (scoredProfiles.some((item) => item.score > 0) || hasMemoryIntent
+    ? scoredProfiles.filter((item) => (hasMemoryIntent ? item.score > 0 : item.score > 1)).slice(0, 8)
+    : []
+  ).map((item) => item.profile);
+
+  const fallbackProfiles =
+    selectedProfiles.length > 0
+      ? selectedProfiles
+      : hasMemoryIntent
+        ? profileRows.slice(0, 5)
+        : [];
+
+  if (fallbackProfiles.length === 0) {
+    return "Memoria de clientes: no hay perfiles relevantes para esta consulta.";
+  }
+
+  const memoryIds = fallbackProfiles.map((profile) => profile.id);
+  const [{ data: events }, { data: links }] = await Promise.all([
+    admin
+      .from("client_memory_events")
+      .select("memory_id, direction, role, content, metadata, created_at")
+      .in("memory_id", memoryIds)
+      .order("created_at", { ascending: false })
+      .limit(80),
+    admin
+      .from("client_memory_links")
+      .select("memory_id, entity_type, entity_id, label, metadata")
+      .in("memory_id", memoryIds),
+  ]);
+
+  const eventRows = (events ?? []) as Array<{
+    memory_id: string;
+    direction: string;
+    role: string;
+    content: string;
+    metadata: Record<string, unknown> | null;
+    created_at: string;
+  }>;
+  const linkRows = (links ?? []) as Array<{
+    memory_id: string;
+    entity_type: string;
+    entity_id: string;
+    label: string;
+    metadata: Record<string, unknown> | null;
+  }>;
+  const agencyNameById = new Map(agencyRows.map((agency) => [agency.id, agency.name]));
+
+  return fallbackProfiles
+    .map((profile) => {
+      const profileEvents = eventRows
+        .filter((event) => event.memory_id === profile.id)
+        .slice(0, 10)
+        .map(
+          (event) =>
+            `${event.created_at} | ${event.role}/${event.direction}: ${clip(event.content, 260)}`
+        )
+        .join("\n");
+      const profileLinks = linkRows
+        .filter((link) => link.memory_id === profile.id)
+        .map((link) => `${link.entity_type}: ${link.label || link.entity_id}`)
+        .join(" | ");
+
+      return [
+        `Cliente: ${profile.display_name} (${agencyNameById.get(profile.agency_id) ?? "inmobiliaria"})`,
+        `Telefono: ${profile.normalized_phone ?? "sin telefono"} | Email: ${profile.email ?? "sin email"}`,
+        `Resumen durable: ${profile.summary || "sin resumen"}`,
+        `Hechos: ${JSON.stringify(profile.facts ?? {})}`,
+        `Preferencias: ${JSON.stringify(profile.preferences ?? {})}`,
+        `Tags: ${(profile.tags ?? []).join(", ") || "sin tags"}`,
+        `Vinculos: ${profileLinks || "sin vinculos"}`,
+        `Eventos recientes:\n${profileEvents || "sin eventos recientes"}`,
+      ].join("\n");
+    })
+    .join("\n\n---\n\n");
+}
+
 function resolveContractFromPrompt(prompt: string, contracts: AssistantContractContext[]) {
   const normalizedPrompt = normalizeText(prompt);
   const scored = contracts
@@ -490,6 +657,7 @@ async function answerWithOpenAI(input: {
   tasksContext: string;
   contractsContext: string;
   delinquenciesContext: string;
+  clientMemoryContext: string;
   sectionGuide: string;
   todaySnapshot: Awaited<ReturnType<typeof getTodayWorkspaceSnapshot>>;
 }) {
@@ -513,7 +681,7 @@ async function answerWithOpenAI(input: {
             {
               type: "input_text",
               text:
-                "Sos Props AI, un copiloto para equipos inmobiliarios. Responde en espanol claro, corto y accionable. Puedes ayudar a operar el CRM, explicar como hacer tareas y orientar al equipo. Si faltan datos para ejecutar una accion, dilo con precision. No inventes estados ni resultados. Si el usuario pregunta como usar una seccion, explicalo con pasos concretos.",
+                "Sos Props AI, un copiloto para equipos inmobiliarios. Responde en espanol claro, corto y accionable. Puedes ayudar a operar el CRM, explicar como hacer tareas y orientar al equipo. Si faltan datos para ejecutar una accion, dilo con precision. No inventes estados ni resultados. Si el usuario pregunta por chats, clientes, inquilinos, propietarios o leads, usa la memoria de clientes y cita solo datos que esten en el contexto.",
             },
           ],
         },
@@ -522,7 +690,7 @@ async function answerWithOpenAI(input: {
           content: [
             {
               type: "input_text",
-              text: `Guia de secciones:\n${input.sectionGuide}\n\nPropiedades:\n${input.propertyContext}\n\nLeads:\n${input.leadsContext}\n\nVisitas:\n${input.visitsContext}\n\nTareas:\n${input.tasksContext}\n\nContratos:\n${input.contractsContext}\n\nMorosos:\n${input.delinquenciesContext}\n\nPanel de hoy: tareas ${input.todaySnapshot.counters.pendingTasks}, visitas ${input.todaySnapshot.counters.visitsToday}, leads urgentes ${input.todaySnapshot.counters.urgentLeads}, seguimientos ${input.todaySnapshot.counters.automaticFollowUps}.\n\nHistorial reciente:\n${historyContext || "Sin historial previo."}\n\nConsulta del equipo:\n${input.prompt}`,
+              text: `Guia de secciones:\n${input.sectionGuide}\n\nPropiedades:\n${input.propertyContext}\n\nLeads:\n${input.leadsContext}\n\nVisitas:\n${input.visitsContext}\n\nTareas:\n${input.tasksContext}\n\nContratos:\n${input.contractsContext}\n\nMorosos:\n${input.delinquenciesContext}\n\nMemoria de clientes, chats y perfiles:\n${input.clientMemoryContext}\n\nPanel de hoy: tareas ${input.todaySnapshot.counters.pendingTasks}, visitas ${input.todaySnapshot.counters.visitsToday}, leads urgentes ${input.todaySnapshot.counters.urgentLeads}, seguimientos ${input.todaySnapshot.counters.automaticFollowUps}.\n\nHistorial reciente:\n${historyContext || "Sin historial previo."}\n\nConsulta del equipo:\n${input.prompt}`,
             },
           ],
         },
@@ -615,6 +783,10 @@ export async function POST(request: Request) {
         `- ${item.tenantName} | ${item.propertyTitle} | alquiler pendiente ${item.rentDebtAmount} ${item.currency} | punitorios ${item.lateFeeAmount} ${item.currency} | total ${item.totalDebtAmount} ${item.currency} | atraso ${item.daysLate} dias | riesgo ${item.risk} | sugerencia ${item.suggestedAction}`
     )
     .join("\n");
+  const clientMemoryContext = await buildClientMemorySearchContext({
+    prompt,
+    agencySlug: scope?.agencySlug,
+  });
 
   const fallbackAction = inferAssistantAction(prompt);
   const deterministicReply =
@@ -1077,6 +1249,7 @@ export async function POST(request: Request) {
     tasksContext,
     contractsContext,
     delinquenciesContext,
+    clientMemoryContext,
     sectionGuide: buildSectionGuide(),
     todaySnapshot: today,
   });
