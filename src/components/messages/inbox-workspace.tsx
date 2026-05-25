@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import {
@@ -398,6 +398,8 @@ export function InboxWorkspace({
   const messageScrollRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const liveLeadIdsRef = useRef(new Set(leads.map((lead) => lead.id)));
+  const snapshotBusyRef = useRef(false);
+  const realtimeEventSeenRef = useRef(false);
 
   useEffect(() => {
     setLiveLeads(leads);
@@ -440,6 +442,34 @@ export function InboxWorkspace({
     }
   }, [initialLeadId, liveLeads]);
 
+  const syncInboxSnapshot = useCallback(async () => {
+    if (snapshotBusyRef.current) return;
+    if (document.visibilityState !== "visible") return;
+
+    snapshotBusyRef.current = true;
+
+    try {
+      const response = await fetch("/api/admin/messages/snapshot", {
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        return;
+      }
+
+      if (Array.isArray(payload?.leads)) {
+        setLiveLeads(payload.leads as CrmLeadSummary[]);
+      }
+
+      if (Array.isArray(payload?.messages)) {
+        setLiveMessages(payload.messages as CrmLeadMessageSummary[]);
+      }
+    } finally {
+      snapshotBusyRef.current = false;
+    }
+  }, []);
+
   useEffect(() => {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -457,7 +487,7 @@ export function InboxWorkspace({
       if (refreshTimer !== null) return;
       refreshTimer = window.setTimeout(() => {
         refreshTimer = null;
-        router.refresh();
+        void syncInboxSnapshot();
       }, 700);
     };
 
@@ -472,6 +502,7 @@ export function InboxWorkspace({
           ...(filter ? { filter } : {}),
         },
         (payload) => {
+          realtimeEventSeenRef.current = true;
           const message = mapRealtimeLeadMessage(payload.new as Record<string, unknown>);
           if (!message) return;
 
@@ -501,6 +532,7 @@ export function InboxWorkspace({
           ...(filter ? { filter } : {}),
         },
         (payload) => {
+          realtimeEventSeenRef.current = true;
           const message = mapRealtimeLeadMessage(payload.new as Record<string, unknown>);
           if (!message) return;
 
@@ -518,7 +550,26 @@ export function InboxWorkspace({
       }
       void client.removeChannel(channel);
     };
-  }, [liveLeads, router]);
+  }, [liveLeads, syncInboxSnapshot]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void syncInboxSnapshot();
+    }, realtimeEventSeenRef.current ? 10000 : 2500);
+
+    const handleFocus = () => {
+      void syncInboxSnapshot();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
+  }, [syncInboxSnapshot]);
 
   const filteredLeads = useMemo(() => {
     if (mode === "recepcion") {
