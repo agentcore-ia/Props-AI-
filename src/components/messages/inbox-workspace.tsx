@@ -674,23 +674,8 @@ export function InboxWorkspace({
     });
   }, [relatedLeadsByPerson, selectedLead, selectedMessages, visits]);
 
-  const selectedTimeline = useMemo<PersonTimelineEvent[]>(() => {
+  const selectedActivity = useMemo<PersonTimelineEvent[]>(() => {
     if (!selectedLead) return [];
-
-    const messageEvents = selectedMessages.map((message) => ({
-      id: `message-${message.id}`,
-      type: "Mensaje" as const,
-      title:
-        message.senderRole === "customer"
-          ? "Mensaje del cliente"
-          : message.senderRole === "assistant"
-            ? "Respuesta de IA"
-            : "Respuesta del equipo",
-      description: message.content,
-      at: message.createdAt,
-      tone: message.senderRole === "customer" ? ("info" as const) : ("success" as const),
-      href: `/mensajes?lead=${selectedLead.id}`,
-    }));
 
     const visitEvents = visits
       .filter((visit) => visit.leadId === selectedLead.id)
@@ -704,10 +689,48 @@ export function InboxWorkspace({
         href: "/agenda",
       }));
 
-    return [...messageEvents, ...visitEvents]
+    const taskEvents: PersonTimelineEvent[] = [];
+
+    if (!selectedLead.aiEnabled) {
+      taskEvents.push({
+        id: `ai-paused-${selectedLead.id}`,
+        type: "Tarea",
+        title: "IA pausada en este chat",
+        description: "El equipo toma la conversacion manualmente hasta volver a activar la IA.",
+        at: selectedLead.lastActivityAt,
+        tone: "warning",
+        href: `/mensajes?lead=${selectedLead.id}`,
+      });
+    }
+
+    if (selectedLead.needsResponse) {
+      taskEvents.push({
+        id: `human-response-${selectedLead.id}`,
+        type: "Tarea",
+        title: "Requiere accion del equipo",
+        description: selectedLead.aiReplyDraft || "Hay una consulta pendiente para resolver manualmente.",
+        at: selectedLead.nextFollowUpAt ?? selectedLead.lastActivityAt,
+        tone: selectedLead.priority === "Alta" ? "danger" : "warning",
+        href: `/mensajes?lead=${selectedLead.id}`,
+      });
+    }
+
+    if (selectedLead.lastContactedAt) {
+      taskEvents.push({
+        id: `last-contact-${selectedLead.id}`,
+        type: "Tarea",
+        title: "Ultimo contacto enviado",
+        description: "Se envio una respuesta o seguimiento al contacto desde Props.",
+        at: selectedLead.lastContactedAt,
+        tone: "success",
+        href: `/mensajes?lead=${selectedLead.id}`,
+      });
+    }
+
+    return [...taskEvents, ...visitEvents]
       .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
       .slice(0, 8);
-  }, [selectedLead, selectedMessages, visits]);
+  }, [selectedLead, visits]);
 
   useEffect(() => {
     const container = messageScrollRef.current;
@@ -1139,7 +1162,7 @@ export function InboxWorkspace({
             context={activeContactContext}
             lead={selectedLead}
             profile={selectedProfile}
-            timeline={selectedTimeline}
+            activity={selectedActivity}
           />
 
           <section className={cn("rounded-[26px] border bg-card p-4 shadow-sm", !isCommercialLead && "hidden")}>
@@ -1243,9 +1266,9 @@ export function InboxWorkspace({
               </div>
               <PersonTimeline
                 compact
-                title="Timeline del contacto"
-                events={selectedTimeline}
-                empty="Todavía no hay movimientos suficientes para este contacto."
+                title="Actividad importante"
+                events={selectedActivity}
+                empty="Todavia no hay acciones operativas para este contacto."
               />
             </div>
           </section>
@@ -1523,12 +1546,12 @@ function ContactProfilePanel({
   context,
   lead,
   profile,
-  timeline,
+  activity,
 }: {
   context: ContactContext;
   lead: CrmLeadSummary;
   profile: ReturnType<typeof buildLeadProfileSnapshot> | null;
-  timeline: PersonTimelineEvent[];
+  activity: PersonTimelineEvent[];
 }) {
   if (context.kind === "commercial") {
     return null;
@@ -1577,9 +1600,9 @@ function ContactProfilePanel({
           </div>
           <PersonTimeline
             compact
-            title="Timeline del inquilino"
-            events={timeline}
-            empty="Todavia no hay movimientos suficientes para este inquilino."
+            title="Actividad importante"
+            events={activity}
+            empty="Todavia no hay acciones operativas para este inquilino."
           />
         </div>
       </section>
@@ -1623,9 +1646,9 @@ function ContactProfilePanel({
           </div>
           <PersonTimeline
             compact
-            title="Timeline del propietario"
-            events={timeline}
-            empty="Todavia no hay movimientos suficientes para este propietario."
+            title="Actividad importante"
+            events={activity}
+            empty="Todavia no hay acciones operativas para este propietario."
           />
         </div>
       </section>
@@ -1651,9 +1674,9 @@ function ContactProfilePanel({
         </div>
         <PersonTimeline
           compact
-          title="Timeline"
-          events={timeline}
-          empty="Todavia no hay movimientos suficientes para este contacto."
+          title="Actividad importante"
+          events={activity}
+          empty="Todavia no hay acciones operativas para este contacto."
         />
       </div>
     </section>
