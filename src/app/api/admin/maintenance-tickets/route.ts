@@ -60,6 +60,10 @@ export async function POST(request: Request) {
   const requestedPriority = cleanText(body?.priority);
   const requestedStatus = cleanText(body?.status);
   const requestedPayer = cleanText(body?.payer);
+  const supplierId = cleanText(body?.supplierId) || null;
+  const supplierName = supplierId
+    ? await resolveSupplierName(admin, supplierId, agencyId)
+    : cleanText(body?.supplierName);
   const priority = allowedPriorities.has(requestedPriority) ? requestedPriority : "Media";
   const status = allowedStatuses.has(requestedStatus) ? requestedStatus : "Nuevo";
   const payer = allowedPayers.has(requestedPayer) ? requestedPayer : "A definir";
@@ -76,8 +80,8 @@ export async function POST(request: Request) {
       description: cleanText(body?.description),
       priority,
       status,
-      supplier_id: body?.supplierId || null,
-      supplier_name: cleanText(body?.supplierName),
+      supplier_id: supplierId,
+      supplier_name: supplierName,
       estimated_cost: Number(body?.estimatedCost ?? 0) || 0,
       payer,
       owner_approval_required: Boolean(body?.ownerApprovalRequired),
@@ -126,7 +130,13 @@ export async function PATCH(request: Request) {
   if (allowedStatuses.has(requestedStatus)) update.status = requestedStatus;
   if (allowedPriorities.has(requestedPriority)) update.priority = requestedPriority;
   if (allowedPayers.has(requestedPayer)) update.payer = requestedPayer;
-  if (typeof body?.supplierName === "string") update.supplier_name = body.supplierName.trim();
+  if (typeof body?.supplierId === "string") {
+    const supplierId = body.supplierId.trim() || null;
+    update.supplier_id = supplierId;
+    update.supplier_name = supplierId ? await resolveSupplierName(createAdminClient(), supplierId) : "";
+  } else if (typeof body?.supplierName === "string") {
+    update.supplier_name = body.supplierName.trim();
+  }
   if (Number.isFinite(Number(body?.estimatedCost))) update.estimated_cost = Number(body.estimatedCost);
   if (typeof body?.nextStep === "string") update.next_step = body.nextStep.trim();
   if (typeof body?.description === "string") update.description = body.description.trim();
@@ -147,4 +157,20 @@ export async function PATCH(request: Request) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+async function resolveSupplierName(
+  admin: ReturnType<typeof createAdminClient>,
+  supplierId: string,
+  agencyId?: string | null
+) {
+  let query = admin.from("suppliers").select("name").eq("id", supplierId);
+  if (agencyId) {
+    query = query.eq("agency_id", agencyId);
+  }
+  const { data, error } = await query.maybeSingle();
+  if (error) {
+    throw error;
+  }
+  return data?.name ?? "";
 }

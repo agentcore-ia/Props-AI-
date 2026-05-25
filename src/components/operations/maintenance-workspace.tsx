@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   CheckCircle2,
-  Clipboard,
-  ClipboardCheck,
+  Loader2,
   MessageCircleMore,
   Plus,
   Search,
@@ -21,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { MaintenanceTicketSummary } from "@/lib/operations-types";
+import type { MaintenanceTicketSummary, SupplierSummary } from "@/lib/operations-types";
 import type { LeaseRosterItem } from "@/lib/props-data";
 import { cn, formatMoney } from "@/lib/utils";
 
@@ -41,9 +40,11 @@ type FilterKey = (typeof filterOptions)[number]["key"];
 export function MaintenanceWorkspace({
   tickets,
   leases,
+  suppliers,
 }: {
   tickets: MaintenanceTicketSummary[];
   leases: LeaseRosterItem[];
+  suppliers: SupplierSummary[];
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -52,14 +53,13 @@ export function MaintenanceWorkspace({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [updatingTicketId, setUpdatingTicketId] = useState<string | null>(null);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [form, setForm] = useState({
     contractId: leases[0]?.contractId ?? "",
     title: "",
     description: "",
     priority: "Media",
     payer: "A definir",
-    supplierName: "",
+    supplierId: "",
     estimatedCost: "",
     ownerApprovalRequired: false,
     nextStep: "",
@@ -69,6 +69,7 @@ export function MaintenanceWorkspace({
   const approvalPending = tickets.filter((ticket) => ticket.ownerApprovalRequired && !ticket.ownerApprovedAt);
   const highPriority = activeTickets.filter((ticket) => ticket.priority === "Alta");
   const withSupplier = activeTickets.filter((ticket) => ticket.supplierName);
+  const activeSuppliers = suppliers.filter((supplier) => supplier.status === "Activo");
   const selectedLease = leases.find((lease) => lease.contractId === form.contractId) ?? leases[0] ?? null;
   const filteredLeases = useMemo(() => {
     const normalized = normalizeSearch(leaseQuery);
@@ -142,7 +143,7 @@ export function MaintenanceWorkspace({
       ...current,
       title: "",
       description: "",
-      supplierName: "",
+      supplierId: "",
       estimatedCost: "",
       nextStep: "",
       ownerApprovalRequired: false,
@@ -168,12 +169,6 @@ export function MaintenanceWorkspace({
 
     setFeedback(successMessage);
     router.refresh();
-  }
-
-  async function copyMessage(key: string, message: string) {
-    await navigator.clipboard.writeText(message);
-    setCopiedKey(key);
-    window.setTimeout(() => setCopiedKey(null), 1800);
   }
 
   return (
@@ -271,40 +266,62 @@ export function MaintenanceWorkspace({
             />
 
             <div className="grid gap-3 md:grid-cols-2">
-              <select
-                className="flex h-11 w-full rounded-2xl border bg-background px-3 text-sm outline-none"
-                value={form.priority}
-                onChange={(event) => setForm((prev) => ({ ...prev, priority: event.target.value }))}
-              >
-                {priorityOptions.map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
-              <select
-                className="flex h-11 w-full rounded-2xl border bg-background px-3 text-sm outline-none"
-                value={form.payer}
-                onChange={(event) => setForm((prev) => ({ ...prev, payer: event.target.value }))}
-              >
-                {["A definir", "Propietario", "Inquilino", "Inmobiliaria"].map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium">Prioridad del reclamo</span>
+                <select
+                  className="flex h-11 w-full rounded-2xl border bg-background px-3 text-sm outline-none"
+                  value={form.priority}
+                  onChange={(event) => setForm((prev) => ({ ...prev, priority: event.target.value }))}
+                >
+                  {priorityOptions.map((item) => (
+                    <option key={item}>{item}</option>
+                  ))}
+                </select>
+                <span className="text-xs text-muted-foreground">Alta si frena el uso de la propiedad o requiere respuesta urgente.</span>
+              </label>
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium">Quién paga o absorbe el gasto</span>
+                <select
+                  className="flex h-11 w-full rounded-2xl border bg-background px-3 text-sm outline-none"
+                  value={form.payer}
+                  onChange={(event) => setForm((prev) => ({ ...prev, payer: event.target.value }))}
+                >
+                  {["A definir", "Propietario", "Inquilino", "Inmobiliaria"].map((item) => (
+                    <option key={item}>{item}</option>
+                  ))}
+                </select>
+                <span className="text-xs text-muted-foreground">Si todavía no está claro, dejalo como “A definir”.</span>
+              </label>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
-              <Input
-                value={form.supplierName}
-                onChange={(event) => setForm((prev) => ({ ...prev, supplierName: event.target.value }))}
-                placeholder="Proveedor"
-                className="rounded-2xl"
-              />
-              <Input
-                inputMode="numeric"
-                value={form.estimatedCost}
-                onChange={(event) => setForm((prev) => ({ ...prev, estimatedCost: event.target.value }))}
-                placeholder="Costo estimado"
-                className="rounded-2xl"
-              />
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium">Proveedor asignado</span>
+                <select
+                  className="flex h-11 w-full rounded-2xl border bg-background px-3 text-sm outline-none"
+                  value={form.supplierId}
+                  onChange={(event) => setForm((prev) => ({ ...prev, supplierId: event.target.value }))}
+                >
+                  <option value="">Sin proveedor todavía</option>
+                  {activeSuppliers.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.name} {supplier.serviceType ? `· ${supplier.serviceType}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-muted-foreground">Sale de la sección Proveedores.</span>
+              </label>
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium">Costo estimado</span>
+                <Input
+                  inputMode="numeric"
+                  value={form.estimatedCost}
+                  onChange={(event) => setForm((prev) => ({ ...prev, estimatedCost: event.target.value }))}
+                  placeholder="Ej. 35000"
+                  className="rounded-2xl"
+                />
+                <span className="text-xs text-muted-foreground">Opcional. Sirve para pedir autorización al propietario.</span>
+              </label>
             </div>
 
             <button
@@ -382,9 +399,8 @@ export function MaintenanceWorkspace({
                 <TicketCard
                   key={ticket.id}
                   ticket={ticket}
-                  copiedKey={copiedKey}
+                  suppliers={activeSuppliers}
                   updating={updatingTicketId === ticket.id}
-                  onCopy={copyMessage}
                   onUpdate={updateTicket}
                 />
               ))
@@ -402,15 +418,13 @@ export function MaintenanceWorkspace({
 
 function TicketCard({
   ticket,
-  copiedKey,
+  suppliers,
   updating,
-  onCopy,
   onUpdate,
 }: {
   ticket: MaintenanceTicketSummary;
-  copiedKey: string | null;
+  suppliers: SupplierSummary[];
   updating: boolean;
-  onCopy: (key: string, message: string) => void | Promise<void>;
   onUpdate: (ticketId: string, update: Record<string, unknown>, successMessage?: string) => void | Promise<void>;
 }) {
   const ownerMessage = buildOwnerMessage(ticket);
@@ -437,12 +451,38 @@ function TicketCard({
           <div className="mt-3 grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-4">
             <Info label="Inquilino" value={ticket.tenantName || "Sin dato"} />
             <Info label="Propietario" value={ticket.ownerName || "Sin dato"} />
-            <Info label="Proveedor" value={ticket.supplierName || "Sin asignar"} />
+            <Info label="Proveedor asignado" value={ticket.supplierName || "Sin asignar"} />
             <Info
               label="Costo"
               value={ticket.estimatedCost > 0 ? formatMoney(ticket.estimatedCost, "ARS") : "A definir"}
             />
           </div>
+
+          <label className="mt-3 grid gap-1.5 text-sm md:max-w-md">
+            <span className="font-medium">Cambiar proveedor asignado</span>
+            <select
+              className="h-10 rounded-2xl border bg-background px-3 text-sm outline-none"
+              value={ticket.supplierId ?? ""}
+              disabled={updating}
+              onChange={(event) =>
+                onUpdate(
+                  ticket.id,
+                  { supplierId: event.target.value },
+                  event.target.value ? "Proveedor asignado al reclamo." : "Proveedor quitado del reclamo."
+                )
+              }
+            >
+              <option value="">Sin proveedor</option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {supplier.name} {supplier.serviceType ? `· ${supplier.serviceType}` : ""}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">
+              Esta lista viene de Proveedores. Si falta alguien, cargalo primero ahí.
+            </span>
+          </label>
 
           <div className="mt-3 rounded-2xl border bg-muted/20 p-3 text-sm">
             <p className="font-medium">Qué hay que resolver</p>
@@ -454,24 +494,24 @@ function TicketCard({
           <div className="mt-3 grid gap-2 lg:grid-cols-3">
             <MessageSuggestion
               title="Mensaje al proveedor"
-              description={ticket.supplierName ? "Para pedir disponibilidad o presupuesto." : "Primero asigná un proveedor; igual podés copiar el pedido."}
+              description={ticket.supplierName ? "Para pedir disponibilidad o presupuesto." : "Primero asigná un proveedor con teléfono cargado."}
               message={supplierMessage}
-              copied={copiedKey === `${ticket.id}-supplier`}
-              onCopy={() => onCopy(`${ticket.id}-supplier`, supplierMessage)}
+              recipientRole="supplier"
+              ticketId={ticket.id}
             />
             <MessageSuggestion
               title="Mensaje al inquilino"
               description="Para avisar que el reclamo quedó tomado."
               message={tenantMessage}
-              copied={copiedKey === `${ticket.id}-tenant`}
-              onCopy={() => onCopy(`${ticket.id}-tenant`, tenantMessage)}
+              recipientRole="tenant"
+              ticketId={ticket.id}
             />
             <MessageSuggestion
               title="Mensaje al propietario"
               description="Para pedir autorización o informar avance."
               message={ownerMessage}
-              copied={copiedKey === `${ticket.id}-owner`}
-              onCopy={() => onCopy(`${ticket.id}-owner`, ownerMessage)}
+              recipientRole="owner"
+              ticketId={ticket.id}
             />
           </div>
         </div>
@@ -623,15 +663,41 @@ function MessageSuggestion({
   title,
   description,
   message,
-  copied,
-  onCopy,
+  recipientRole,
+  ticketId,
 }: {
   title: string;
   description: string;
   message: string;
-  copied: boolean;
-  onCopy: () => void | Promise<void>;
+  recipientRole: "supplier" | "tenant" | "owner";
+  ticketId: string;
 }) {
+  const [sending, setSending] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+
+  async function sendWhatsApp() {
+    setSending(true);
+    setStatus(null);
+    const response = await fetch("/api/admin/maintenance-tickets/whatsapp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ticketId,
+        recipientRole,
+        message,
+      }),
+    });
+    const payload = await response.json().catch(() => null);
+    setSending(false);
+
+    if (!response.ok) {
+      setStatus(payload?.error ?? "No se pudo enviar el WhatsApp.");
+      return;
+    }
+
+    setStatus(`Enviado a ${payload?.sentTo ?? "contacto"}.`);
+  }
+
   return (
     <div className="rounded-2xl border bg-card p-3 text-sm">
       <div className="flex items-start justify-between gap-3">
@@ -642,10 +708,11 @@ function MessageSuggestion({
         <MessageCircleMore className="size-4 shrink-0 text-primary" />
       </div>
       <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">{message}</p>
-      <Button variant="outline" size="sm" className="mt-3 rounded-xl" onClick={onCopy}>
-        {copied ? <ClipboardCheck className="size-4" /> : <Clipboard className="size-4" />}
-        {copied ? "Copiado" : "Copiar"}
+      <Button variant="outline" size="sm" className="mt-3 rounded-xl" disabled={sending} onClick={sendWhatsApp}>
+        {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+        {sending ? "Enviando..." : "Enviar WhatsApp"}
       </Button>
+      {status ? <p className="mt-2 text-xs text-muted-foreground">{status}</p> : null}
     </div>
   );
 }
