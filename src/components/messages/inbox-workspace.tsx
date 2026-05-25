@@ -48,7 +48,11 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { cn, formatMoney, formatShortDate } from "@/lib/utils";
-import type { PersonTimelineEvent } from "@/lib/operations-types";
+import type {
+  OwnerRosterSummary,
+  PersonTimelineEvent,
+  TenantRosterSummary,
+} from "@/lib/operations-types";
 
 const conversationStatusTone = {
   Nuevo: "bg-sky-500/10 text-sky-700",
@@ -78,12 +82,253 @@ const channelLabel = {
   crm: "CRM",
 } as const;
 
+type QuickReplyScenario = {
+  key: string;
+  label: string;
+  message: string;
+  tone?: "default" | "outline" | "secondary" | "ghost" | "link" | "destructive";
+};
+
+type ContactContext =
+  | { kind: "tenant"; label: "Inquilino"; tenant: TenantRosterSummary }
+  | { kind: "owner"; label: "Propietario"; owner: OwnerRosterSummary }
+  | { kind: "admin"; label: "Administracion" }
+  | { kind: "commercial"; label: "Lead comercial" };
+
+function normalizeLookupText(value?: string | null) {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function normalizePhone(value?: string | null) {
+  return (value ?? "").replace(/\D/g, "");
+}
+
+function phonesMatch(a?: string | null, b?: string | null) {
+  const first = normalizePhone(a);
+  const second = normalizePhone(b);
+  if (!first || !second) return false;
+  if (first === second) return true;
+
+  const firstLocal = first.slice(-10);
+  const secondLocal = second.slice(-10);
+  if (firstLocal.length >= 8 && firstLocal === secondLocal) return true;
+
+  return false;
+}
+
+function containsAny(text: string, words: string[]) {
+  return words.some((word) => text.includes(word));
+}
+
+function buildConversationLookupText(
+  lead: CrmLeadSummary,
+  messages: CrmLeadMessageSummary[]
+) {
+  return normalizeLookupText(
+    [
+      lead.fullName,
+      lead.email,
+      lead.phone,
+      lead.source,
+      lead.stage,
+      lead.intent,
+      lead.propertyTitle,
+      lead.propertyLocation,
+      lead.lastCustomerMessage,
+      ...messages.map((message) => message.content),
+    ]
+      .filter(Boolean)
+      .join(" ")
+  );
+}
+
+function deriveContactContext({
+  lead,
+  messages,
+  tenants,
+  owners,
+}: {
+  lead: CrmLeadSummary;
+  messages: CrmLeadMessageSummary[];
+  tenants: TenantRosterSummary[];
+  owners: OwnerRosterSummary[];
+}): ContactContext {
+  const lookupText = buildConversationLookupText(lead, messages);
+  const leadName = normalizeLookupText(lead.fullName);
+  const tenantSignals = [
+    "comprobante",
+    "pago",
+    "pagar",
+    "deuda",
+    "mora",
+    "moroso",
+    "aumento",
+    "contrato",
+    "rescision",
+    "punitorio",
+    "alquiler pendiente",
+    "administracion",
+  ];
+  const ownerSignals = [
+    "propietario",
+    "liquidacion",
+    "liquidar",
+    "transferencia",
+    "honorarios",
+    "autorizacion",
+    "arreglo",
+  ];
+
+  const tenantByIdentity = tenants.find((tenant) => {
+    const tenantName = normalizeLookupText(tenant.tenantName);
+    return (
+      phonesMatch(lead.phone, tenant.tenantPhone) ||
+      (leadName.length > 2 && tenantName === leadName)
+    );
+  });
+
+  const ownerByIdentity = owners.find((owner) => {
+    const ownerName = normalizeLookupText(owner.ownerName);
+    return (
+      phonesMatch(lead.phone, owner.ownerPhone) ||
+      (leadName.length > 2 && ownerName === leadName)
+    );
+  });
+
+  if (tenantByIdentity) {
+    return { kind: "tenant", label: "Inquilino", tenant: tenantByIdentity };
+  }
+
+  if (ownerByIdentity) {
+    return { kind: "owner", label: "Propietario", owner: ownerByIdentity };
+  }
+
+  const tenantByProperty = tenants.find(
+    (tenant) =>
+      tenant.propertyId === lead.propertyId &&
+      containsAny(lookupText, tenantSignals)
+  );
+
+  if (tenantByProperty) {
+    return { kind: "tenant", label: "Inquilino", tenant: tenantByProperty };
+  }
+
+  const ownerByProperty = owners.find(
+    (owner) =>
+      owner.propertyId === lead.propertyId &&
+      containsAny(lookupText, ownerSignals)
+  );
+
+  if (ownerByProperty) {
+    return { kind: "owner", label: "Propietario", owner: ownerByProperty };
+  }
+
+  if (containsAny(lookupText, [...tenantSignals, ...ownerSignals])) {
+    return { kind: "admin", label: "Administracion" };
+  }
+
+  return { kind: "commercial", label: "Lead comercial" };
+}
+
+function buildTenantQuickReplies(tenant: TenantRosterSummary): QuickReplyScenario[] {
+  const rent = formatMoney(tenant.currentRent, "ARS");
+  const property = tenant.propertyTitle;
+  const nextAdjustment = tenant.nextAdjustmentDate
+    ? formatShortDate(tenant.nextAdjustmentDate)
+    : "a confirmar";
+  const paymentStatus = tenant.latestCollectionStatus ?? "sin estado cargado";
+  const month = tenant.latestCollectionMonth ?? "el periodo actual";
+
+  return [
+    {
+      key: "tenant-payment-status",
+      label: "Informar estado de pago",
+      message: `Hola ${tenant.tenantName}, te escribimos por ${property}. Para ${month} figura estado ${paymentStatus}. El alquiler registrado es ${rent}. Si ya pagaste, envianos el comprobante asi actualizamos la cuenta.`,
+      tone: "default",
+    },
+    {
+      key: "tenant-proof",
+      label: "Pedir comprobante",
+      message: `Hola ${tenant.tenantName}, ¿nos envias el comprobante del pago de ${property} cuando puedas? Asi dejamos actualizado el alquiler.`,
+    },
+    {
+      key: "tenant-adjustment",
+      label: "Explicar aumento",
+      message: `Hola ${tenant.tenantName}, tu alquiler actual registrado para ${property} es ${rent}. El proximo ajuste figura para el ${nextAdjustment}. Si queres, administracion te confirma el calculo exacto cuando corresponda aplicarlo.`,
+    },
+    {
+      key: "tenant-admin",
+      label: "Derivar administracion",
+      message: `Hola ${tenant.tenantName}, dejamos asentada tu consulta sobre ${property} para administracion. Te van a responder con la confirmacion correspondiente.`,
+    },
+  ];
+}
+
+function buildOwnerQuickReplies(owner: OwnerRosterSummary): QuickReplyScenario[] {
+  const rent = formatMoney(owner.currentRent, "ARS");
+  const payout = owner.latestOwnerPayoutAmount
+    ? formatMoney(owner.latestOwnerPayoutAmount, "ARS")
+    : "a confirmar";
+  const month = owner.latestSettlementMonth ?? "el ultimo periodo";
+
+  return [
+    {
+      key: "owner-status",
+      label: "Enviar estado",
+      message: `Hola ${owner.ownerName}, te compartimos el estado de ${owner.propertyTitle}. El alquiler base registrado es ${rent} y la ultima liquidacion (${month}) figura por ${payout}.`,
+      tone: "default",
+    },
+    {
+      key: "owner-settlement",
+      label: "Enviar liquidacion",
+      message: `Hola ${owner.ownerName}, dejamos lista la informacion de liquidacion de ${owner.propertyTitle} para ${month}. Si queres, te enviamos el comprobante por este medio.`,
+    },
+    {
+      key: "owner-authorization",
+      label: "Pedir autorizacion",
+      message: `Hola ${owner.ownerName}, necesitamos tu autorizacion para avanzar con una gestion vinculada a ${owner.propertyTitle}. Te pasamos el detalle y el costo estimado para que nos confirmes.`,
+    },
+    {
+      key: "owner-admin",
+      label: "Derivar administracion",
+      message: `Hola ${owner.ownerName}, dejamos tu consulta asentada para administracion. Te respondemos con el detalle correspondiente apenas lo revisen.`,
+    },
+  ];
+}
+
+function buildAdminQuickReplies(lead: CrmLeadSummary): QuickReplyScenario[] {
+  return [
+    {
+      key: "admin-note",
+      label: "Tomar nota",
+      message: `Hola ${lead.fullName}, dejamos tu consulta asentada para que el equipo la revise y te responda con la informacion correcta.`,
+      tone: "default",
+    },
+    {
+      key: "admin-detail",
+      label: "Pedir detalle",
+      message: `Hola ${lead.fullName}, ¿nos compartis un poco mas de detalle para ubicar el caso correcto? Puede ser propiedad, contrato, periodo o nombre del titular.`,
+    },
+    {
+      key: "admin-followup",
+      label: "Avisar seguimiento",
+      message: `Hola ${lead.fullName}, ya derivamos tu consulta al area correspondiente. Te contactamos apenas tengamos la confirmacion.`,
+    },
+  ];
+}
+
 export function InboxWorkspace({
   leads,
   messages,
   properties,
   visits,
   templates,
+  tenants,
+  owners,
   initialMode = "completo",
   initialLeadId,
   canResetMemory = false,
@@ -93,6 +338,8 @@ export function InboxWorkspace({
   properties: Property[];
   visits: VisitAppointmentSummary[];
   templates: AgencyMessageTemplateSummary[];
+  tenants: TenantRosterSummary[];
+  owners: OwnerRosterSummary[];
   initialMode?: "completo" | "recepcion";
   initialLeadId?: string;
   canResetMemory?: boolean;
@@ -166,9 +413,25 @@ export function InboxWorkspace({
     [properties, selectedLead]
   );
 
+  const contactContext = useMemo(
+    () =>
+      selectedLead
+        ? deriveContactContext({
+            lead: selectedLead,
+            messages: selectedMessages,
+            tenants,
+            owners,
+          })
+        : null,
+    [owners, selectedLead, selectedMessages, tenants]
+  );
+
   const similarProperties = useMemo(
-    () => (selectedLead ? findSimilarProperties(selectedLead, properties, 4) : []),
-    [properties, selectedLead]
+    () =>
+      selectedLead && contactContext?.kind === "commercial"
+        ? findSimilarProperties(selectedLead, properties, 4)
+        : [],
+    [contactContext?.kind, properties, selectedLead]
   );
 
   const selectedTemplates = useMemo(
@@ -180,16 +443,29 @@ export function InboxWorkspace({
   );
 
   const quickReplies = useMemo(
-    () =>
-      selectedLead
-        ? buildQuickReplyScenarios({
-            lead: selectedLead,
-            property: selectedProperty,
-            similarProperties,
-            templates: selectedTemplates,
-          })
-        : [],
-    [selectedLead, selectedProperty, selectedTemplates, similarProperties]
+    () => {
+      if (!selectedLead || !contactContext) return [];
+
+      if (contactContext.kind === "tenant") {
+        return buildTenantQuickReplies(contactContext.tenant);
+      }
+
+      if (contactContext.kind === "owner") {
+        return buildOwnerQuickReplies(contactContext.owner);
+      }
+
+      if (contactContext.kind === "admin") {
+        return buildAdminQuickReplies(selectedLead);
+      }
+
+      return buildQuickReplyScenarios({
+        lead: selectedLead,
+        property: selectedProperty,
+        similarProperties,
+        templates: selectedTemplates,
+      });
+    },
+    [contactContext, selectedLead, selectedProperty, selectedTemplates, similarProperties]
   );
 
   const selectedProfile = useMemo(() => {
@@ -358,6 +634,10 @@ export function InboxWorkspace({
     router.refresh();
   }
 
+  const activeContactContext =
+    contactContext ?? ({ kind: "commercial", label: "Lead comercial" } as ContactContext);
+  const isCommercialLead = activeContactContext.kind === "commercial";
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -524,7 +804,7 @@ export function InboxWorkspace({
                   {reply.label}
                 </Button>
               ))}
-              {similarProperties.length >= 2 ? (
+              {isCommercialLead && similarProperties.length >= 2 ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -572,7 +852,14 @@ export function InboxWorkspace({
         </div>
 
         <div className="min-h-0 space-y-3 xl:overflow-y-auto xl:pr-1">
-          <section className="rounded-[26px] border bg-card p-4 shadow-sm">
+          <ContactProfilePanel
+            context={activeContactContext}
+            lead={selectedLead}
+            profile={selectedProfile}
+            timeline={selectedTimeline}
+          />
+
+          <section className={cn("rounded-[26px] border bg-card p-4 shadow-sm", !isCommercialLead && "hidden")}>
             <div className="flex items-center gap-2">
               <Sparkles className="size-4 text-primary" />
               <h3 className="font-semibold">Ficha del cliente</h3>
@@ -680,7 +967,7 @@ export function InboxWorkspace({
             </div>
           </section>
 
-          <section className="rounded-[30px] border bg-card p-5 shadow-sm">
+          <section className={cn("rounded-[30px] border bg-card p-5 shadow-sm", !isCommercialLead && "hidden")}>
             <div className="flex items-center gap-2">
               <MessageCircle className="size-4 text-primary" />
               <h3 className="font-semibold">Ademas de esta propiedad, mostrale estas</h3>
@@ -715,7 +1002,7 @@ export function InboxWorkspace({
             </div>
           </section>
 
-          <section className="rounded-[30px] border bg-card p-5 shadow-sm">
+          <section className={cn("rounded-[30px] border bg-card p-5 shadow-sm", !isCommercialLead && "hidden")}>
             <div className="flex items-center gap-2">
               <CheckCheck className="size-4 text-primary" />
               <h3 className="font-semibold">Visita y seguimiento</h3>
@@ -946,5 +1233,248 @@ function MessageBubble({
         <p>{content}</p>
       </div>
     </div>
+  );
+}
+
+function ContactProfilePanel({
+  context,
+  lead,
+  profile,
+  timeline,
+}: {
+  context: ContactContext;
+  lead: CrmLeadSummary;
+  profile: ReturnType<typeof buildLeadProfileSnapshot> | null;
+  timeline: PersonTimelineEvent[];
+}) {
+  if (context.kind === "commercial") {
+    return null;
+  }
+
+  const asked = profile?.whatTheyAsked.length
+    ? profile.whatTheyAsked.slice(0, 3)
+    : ["Todavia no tenemos preguntas anteriores guardadas."];
+  const answered = profile?.whatWeAnswered.length
+    ? profile.whatWeAnswered.slice(0, 3)
+    : ["Todavia no hay respuestas salientes registradas."];
+
+  if (context.kind === "tenant") {
+    const tenant = context.tenant;
+    return (
+      <section className="rounded-[26px] border bg-card p-4 shadow-sm">
+        <PanelTitle title="Ficha del inquilino" badge="Administracion" />
+        <div className="mt-4 space-y-3 text-sm text-muted-foreground">
+          <PropertyContextCard
+            agencySlug={lead.agencySlug}
+            propertyId={tenant.propertyId}
+            title={tenant.propertyTitle}
+            location={tenant.propertyLocation}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <InfoTile label="Alquiler actual" value={formatMoney(tenant.currentRent, "ARS")} />
+            <InfoTile
+              label="Proximo ajuste"
+              value={tenant.nextAdjustmentDate ? formatShortDate(tenant.nextAdjustmentDate) : "Sin fecha"}
+            />
+            <InfoTile label="Contrato" value={tenant.contractStatus} />
+            <InfoTile
+              label="Cobranza"
+              value={tenant.latestCollectionStatus ?? "Sin registrar"}
+              detail={tenant.latestCollectionMonth ?? undefined}
+            />
+          </div>
+          <ConversationSummary asked={asked} answered={answered} />
+          <div className="rounded-2xl border bg-primary/5 p-3">
+            <p className="font-medium text-foreground">Siguiente accion sugerida</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {tenant.latestCollectionStatus === "Mora" || tenant.latestCollectionStatus === "Pendiente"
+                ? "Confirmar pago o pedir comprobante antes de seguir la gestion."
+                : "Responder solo la consulta administrativa de este contrato."}
+            </p>
+          </div>
+          <PersonTimeline
+            compact
+            title="Timeline del inquilino"
+            events={timeline}
+            empty="Todavia no hay movimientos suficientes para este inquilino."
+          />
+        </div>
+      </section>
+    );
+  }
+
+  if (context.kind === "owner") {
+    const owner = context.owner;
+    return (
+      <section className="rounded-[26px] border bg-card p-4 shadow-sm">
+        <PanelTitle title="Ficha del propietario" badge="Administracion" />
+        <div className="mt-4 space-y-3 text-sm text-muted-foreground">
+          <PropertyContextCard
+            agencySlug={lead.agencySlug}
+            propertyId={owner.propertyId}
+            title={owner.propertyTitle}
+            location={owner.propertyLocation}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <InfoTile label="Participacion" value={`${owner.participationPercent}%`} />
+            <InfoTile label="Alquiler base" value={formatMoney(owner.currentRent, "ARS")} />
+            <InfoTile
+              label="Ultima liquidacion"
+              value={owner.latestSettlementMonth ?? "Sin liquidar"}
+            />
+            <InfoTile
+              label="Neto propietario"
+              value={
+                owner.latestOwnerPayoutAmount
+                  ? formatMoney(owner.latestOwnerPayoutAmount, "ARS")
+                  : "A confirmar"
+              }
+            />
+          </div>
+          <ConversationSummary asked={asked} answered={answered} />
+          <div className="rounded-2xl border bg-primary/5 p-3">
+            <p className="font-medium text-foreground">Siguiente accion sugerida</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Responder con datos de liquidacion, autorizacion o estado de la propiedad. No ofrecer inventario comercial.
+            </p>
+          </div>
+          <PersonTimeline
+            compact
+            title="Timeline del propietario"
+            events={timeline}
+            empty="Todavia no hay movimientos suficientes para este propietario."
+          />
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-[26px] border bg-card p-4 shadow-sm">
+      <PanelTitle title="Ficha administrativa" badge="Sin identificar" />
+      <div className="mt-4 space-y-3 text-sm text-muted-foreground">
+        <PropertyContextCard
+          agencySlug={lead.agencySlug}
+          propertyId={lead.propertyId}
+          title={lead.propertyTitle || "Consulta general"}
+          location={lead.propertyLocation || "Sin ubicacion"}
+        />
+        <ConversationSummary asked={asked} answered={answered} />
+        <div className="rounded-2xl border bg-amber-500/10 p-3 text-amber-700">
+          <p className="font-medium">Falta identificar el contacto</p>
+          <p className="mt-1 text-sm">
+            Antes de responder, pedi propiedad, contrato o titular para no mezclar datos de otra persona.
+          </p>
+        </div>
+        <PersonTimeline
+          compact
+          title="Timeline"
+          events={timeline}
+          empty="Todavia no hay movimientos suficientes para este contacto."
+        />
+      </div>
+    </section>
+  );
+}
+
+function PanelTitle({ title, badge }: { title: string; badge: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
+        <Sparkles className="size-4 text-primary" />
+        <h3 className="font-semibold">{title}</h3>
+      </div>
+      <Badge variant="outline" className="rounded-full">
+        {badge}
+      </Badge>
+    </div>
+  );
+}
+
+function PropertyContextCard({
+  agencySlug,
+  propertyId,
+  title,
+  location,
+}: {
+  agencySlug: string;
+  propertyId?: string | null;
+  title: string;
+  location: string;
+}) {
+  return (
+    <div className="rounded-2xl border bg-muted/20 p-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        Propiedad vinculada
+      </p>
+      <div className="mt-2 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="line-clamp-2 font-medium text-foreground">{title}</p>
+          <p className="mt-1 line-clamp-1 text-xs">{location}</p>
+        </div>
+        {propertyId ? (
+          <Link
+            href={buildShortPropertyPath(agencySlug, propertyId)}
+            target="_blank"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border bg-background"
+          >
+            <ArrowRight className="size-4" />
+          </Link>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function InfoTile({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+}) {
+  return (
+    <div className="rounded-2xl border bg-muted/20 p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 font-semibold text-foreground">{value}</p>
+      {detail ? <p className="mt-1 text-xs">{detail}</p> : null}
+    </div>
+  );
+}
+
+function ConversationSummary({
+  asked,
+  answered,
+}: {
+  asked: string[];
+  answered: string[];
+}) {
+  return (
+    <>
+      <div>
+        <p className="font-medium text-foreground">Resumen de consulta</p>
+        <ul className="mt-1 space-y-1.5">
+          {asked.map((item) => (
+            <li key={item} className="line-clamp-2">
+              - {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div>
+        <p className="font-medium text-foreground">Ultimas respuestas</p>
+        <ul className="mt-1 space-y-1.5">
+          {answered.map((item) => (
+            <li key={item} className="line-clamp-2">
+              - {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </>
   );
 }

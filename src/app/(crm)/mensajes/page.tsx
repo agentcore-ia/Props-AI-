@@ -5,7 +5,9 @@ import {
   listAgencyMessageTemplates,
   listCrmLeadMessages,
   listCrmLeads,
+  listOwnerRoster,
   listProperties,
+  listTenantRoster,
   listVisitAppointments,
 } from "@/lib/props-data";
 
@@ -22,11 +24,13 @@ export default async function MessagesPage({
   }
 
   const scope = getAgencyScopeFromUser(currentUser);
-  const [leads, properties, visits, templates] = await Promise.all([
+  const [leads, properties, visits, templates, tenants, owners] = await Promise.all([
     listCrmLeads(scope),
     listProperties(scope?.agencySlug ? { tenantSlug: scope.agencySlug } : undefined),
     listVisitAppointments(scope),
     listAgencyMessageTemplates(scope),
+    listTenantRoster(scope),
+    listOwnerRoster(scope),
   ]);
   const visibleLeads = leads.filter(
     (lead) => lead.needsResponse || lead.stage !== "Cerrado"
@@ -43,6 +47,8 @@ export default async function MessagesPage({
       properties={properties}
       visits={visits}
       templates={templates}
+      tenants={tenants}
+      owners={owners}
       initialMode={searchParams?.modo === "recepcion" ? "recepcion" : "completo"}
       initialLeadId={searchParams?.lead}
       canResetMemory={scope?.agencySlug === "ceballos"}
