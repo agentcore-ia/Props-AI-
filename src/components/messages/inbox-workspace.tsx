@@ -400,6 +400,10 @@ export function InboxWorkspace({
   const liveLeadIdsRef = useRef(new Set(leads.map((lead) => lead.id)));
   const snapshotBusyRef = useRef(false);
   const realtimeEventSeenRef = useRef(false);
+  const realtimeAgencyId = useMemo(() => {
+    const agencyIds = Array.from(new Set(leads.map((lead) => lead.agencyId).filter(Boolean)));
+    return agencyIds.length === 1 ? agencyIds[0] : null;
+  }, [leads]);
 
   useEffect(() => {
     setLiveLeads(leads);
@@ -451,6 +455,10 @@ export function InboxWorkspace({
     try {
       const response = await fetch("/api/admin/messages/snapshot", {
         cache: "no-store",
+        credentials: "same-origin",
+        headers: {
+          accept: "application/json",
+        },
       });
       const payload = await response.json().catch(() => null);
 
@@ -479,8 +487,7 @@ export function InboxWorkspace({
     }
 
     const client = createBrowserClient(supabaseUrl, supabaseKey);
-    const agencyIds = Array.from(new Set(liveLeads.map((lead) => lead.agencyId))).filter(Boolean);
-    const filter = agencyIds.length === 1 ? `agency_id=eq.${agencyIds[0]}` : undefined;
+    const filter = realtimeAgencyId ? `agency_id=eq.${realtimeAgencyId}` : undefined;
     let refreshTimer: number | null = null;
 
     const scheduleServerRefresh = () => {
@@ -550,9 +557,11 @@ export function InboxWorkspace({
       }
       void client.removeChannel(channel);
     };
-  }, [liveLeads, syncInboxSnapshot]);
+  }, [realtimeAgencyId, syncInboxSnapshot]);
 
   useEffect(() => {
+    void syncInboxSnapshot();
+
     const interval = window.setInterval(() => {
       void syncInboxSnapshot();
     }, realtimeEventSeenRef.current ? 10000 : 2500);
