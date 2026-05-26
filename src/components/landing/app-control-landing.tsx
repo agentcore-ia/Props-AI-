@@ -63,7 +63,7 @@ const coreFeatures = [
     icon: Home,
     title: "Portafolio y marketplace",
     description:
-      "Cada inmobiliaria tiene su perfil con propiedades, links cortos y fichas listas para compartir. Si quiere, también publica en Props.com.ar.",
+      "Cada inmobiliaria tiene su perfil con propiedades y fichas listas para compartir. Si quiere, también publica en Props.com.ar.",
   },
   {
     icon: Wrench,
@@ -88,30 +88,30 @@ const dailyFlow = [
   "Agendar visitas y recordar horarios",
 ];
 
-const roleCards = [
+const workflowCards = [
   {
-    title: "Recepción",
+    title: "Atención y mensajes",
     description:
-      "Ve mensajes nuevos, responde con sugerencias, agenda visitas y deriva al asesor sin perder contexto.",
-    items: ["Consultas nuevas", "Respuestas rápidas", "Visitas y recordatorios"],
+      "Mensajes nuevos, consultas web, WhatsApp y respuestas sugeridas quedan ordenados para no perder oportunidades.",
+    items: ["Consultas nuevas", "Respuestas rápidas", "Seguimiento"],
   },
   {
-    title: "Administración",
+    title: "Alquileres y cobros",
     description:
-      "Controla cobros, aumentos, morosos, contratos, comprobantes y liquidaciones a propietarios.",
-    items: ["Cobros del mes", "Aumentos IPC/ICL", "Liquidaciones y pagos"],
+      "Contratos, aumentos, comprobantes, morosos y liquidaciones se conectan en el mismo flujo operativo.",
+    items: ["Registrar alquiler", "Avisar aumento", "Liquidar propietario"],
   },
   {
-    title: "Comercial",
+    title: "Propiedades y leads",
     description:
-      "Tiene leads ordenados, propiedades sugeridas, seguimiento automático y fichas listas para compartir.",
-    items: ["Lead scoring", "Matching de propiedades", "Seguimiento por WhatsApp"],
+      "Publicaciones, visitas y próximos pasos comerciales se organizan para avanzar con cada interesado.",
+    items: ["Publicar propiedad", "Precalificar lead", "Coordinar visita"],
   },
   {
-    title: "Dueño o encargado",
+    title: "Operación diaria",
     description:
-      "Mira el estado general de la operación, caja, pendientes, reclamos, cartera y actividad del equipo.",
-    items: ["Dashboard diario", "Alertas inteligentes", "Control de cartera"],
+      "El dashboard muestra tareas, visitas, recontactos, reclamos y pendientes para saber qué resolver primero.",
+    items: ["Qué hacer hoy", "Alertas inteligentes", "Reclamos"],
   },
 ];
 
@@ -375,17 +375,17 @@ export function AppControlLanding() {
 
       <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <SectionIntro
-          eyebrow="Para cada rol"
-          title="Cada persona ve lo que necesita para trabajar rápido."
-          description="Un recepcionista no necesita lo mismo que administración, comercial o el dueño. Props ordena la información para que cada uno pueda actuar."
+          eyebrow="Trabajo ordenado"
+          title="Cada tarea tiene su lugar, sin mezclar toda la operación."
+          description="Props organiza mensajes, alquileres, cobros, propiedades, reclamos y propietarios para que el equipo entre directo a lo que necesita resolver."
         />
         <div className="mt-8 grid gap-4 lg:grid-cols-4">
-          {roleCards.map((role) => (
-            <article key={role.title} className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
-              <p className="text-xl font-black">{role.title}</p>
-              <p className="mt-3 min-h-[112px] leading-7 text-slate-600">{role.description}</p>
+          {workflowCards.map((workflow) => (
+            <article key={workflow.title} className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-xl font-black">{workflow.title}</p>
+              <p className="mt-3 min-h-[112px] leading-7 text-slate-600">{workflow.description}</p>
               <div className="mt-5 space-y-2">
-                {role.items.map((item) => (
+                {workflow.items.map((item) => (
                   <div key={item} className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                     <CheckCircle2 className="size-4 text-blue-600" />
                     {item}
@@ -410,7 +410,7 @@ export function AppControlLanding() {
               inmobiliaria responsable y consultar con IA antes de contactar al equipo.
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              {["Links cortos", "Mapa de propiedades", "Fotos por WhatsApp", "Consultas guardadas"].map((item) => (
+              {["Fichas listas para compartir", "Mapa de propiedades", "Fotos por WhatsApp", "Consultas guardadas"].map((item) => (
                 <div key={item} className="rounded-2xl bg-slate-50 px-4 py-3 font-semibold text-slate-700">
                   {item}
                 </div>
@@ -428,7 +428,7 @@ export function AppControlLanding() {
               La IA usa contexto del cliente para responder mejor, sin mezclar información entre cuentas.
             </p>
             <div className="mt-6 space-y-3">
-              {["Historial por cliente", "Memoria de conversaciones", "Datos de contratos", "Permisos por cuenta"].map((item) => (
+              {["Historial por cliente", "Memoria de conversaciones", "Datos de contratos", "Datos por inmobiliaria"].map((item) => (
                 <div key={item} className="flex items-center gap-3 rounded-2xl bg-white/[0.05] px-4 py-3">
                   <CheckCircle2 className="size-5 text-emerald-300" />
                   <span className="font-semibold text-slate-100">{item}</span>
