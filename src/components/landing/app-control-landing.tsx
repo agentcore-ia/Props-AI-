@@ -508,11 +508,12 @@ export function AppControlLanding() {
               Contacto comercial
             </p>
             <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl">
-              Te mostramos Props con casos reales de inmobiliaria.
+              Activá Props en tu inmobiliaria.
             </h2>
             <p className="mt-5 text-lg leading-8 text-slate-300">
-              Completá el formulario y coordinamos una demo enfocada en lo que más impacto tenga para tu operación:
-              WhatsApp, aumentos, morosos, cobros, liquidaciones, reclamos o publicación de propiedades.
+              Props ya centraliza mensajes, alquileres, cobros, aumentos, morosos, liquidaciones,
+              reclamos y publicación de propiedades. Completá el formulario y te ayudamos a configurarlo
+              para tu forma de trabajar.
             </p>
             <div className="mt-7 grid gap-3 sm:grid-cols-2">
               {["Demo guiada", "Diagnóstico operativo", "Configuración inicial", "Acompañamiento"].map((item) => (

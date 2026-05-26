@@ -80,11 +80,11 @@ export function AppControlContactForm() {
         <div>
           <p className="text-sm font-black uppercase tracking-[0.22em] text-blue-600">Hablar con Props</p>
           <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-            Querés ver cómo funcionaría en tu inmobiliaria?
+            Querés implementar Props en tu inmobiliaria?
           </h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Dejanos tus datos y te mostramos cómo automatizar mensajes, aumentos, morosos,
-            liquidaciones y publicación de propiedades.
+            Dejanos tus datos y te contactamos para activar el sistema, cargar tu operación y dejar listas
+            las automatizaciones clave.
           </p>
         </div>
       </div>
