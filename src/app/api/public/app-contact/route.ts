@@ -14,14 +14,12 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
 
   const fullName = normalizeText(body?.fullName);
-  const agencyName = normalizeText(body?.agencyName);
   const email = normalizeEmail(body?.email);
   const phone = normalizeText(body?.phone);
-  const message = normalizeText(body?.message);
 
-  if (!fullName || !agencyName || !email || !phone || !message) {
+  if (!fullName || !email || !phone) {
     return NextResponse.json(
-      { error: "Completá nombre, inmobiliaria, email, WhatsApp y mensaje." },
+      { error: "Completá nombre, email y celular." },
       { status: 400 }
     );
   }
@@ -37,10 +35,10 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
     const { error } = await admin.from("app_contact_requests").insert({
       full_name: fullName,
-      agency_name: agencyName,
+      agency_name: "Sin informar",
       email,
       phone,
-      message,
+      message: "Solicitó contacto desde la landing de Props Control.",
       source: "app_control_landing",
       status: "Nuevo",
     });

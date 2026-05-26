@@ -5,18 +5,14 @@ import { Loader2, Send, Sparkles } from "lucide-react";
 
 type FormState = {
   fullName: string;
-  agencyName: string;
   email: string;
   phone: string;
-  message: string;
 };
 
 const initialForm: FormState = {
   fullName: "",
-  agencyName: "",
   email: "",
   phone: "",
-  message: "",
 };
 
 const fieldClass =
@@ -83,8 +79,7 @@ export function AppControlContactForm() {
             Querés implementar Props en tu inmobiliaria?
           </h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Dejanos tus datos y te contactamos para activar el sistema, cargar tu operación y dejar listas
-            las automatizaciones clave.
+            Dejanos tu nombre, email y celular. El equipo de Props te contacta para coordinar el próximo paso.
           </p>
         </div>
       </div>
@@ -98,16 +93,6 @@ export function AppControlContactForm() {
               value={form.fullName}
               onChange={(event) => updateField("fullName", event.target.value)}
               placeholder="Tu nombre"
-              className={fieldClass}
-            />
-          </label>
-          <label className="space-y-2">
-            <span className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Inmobiliaria</span>
-            <input
-              required
-              value={form.agencyName}
-              onChange={(event) => updateField("agencyName", event.target.value)}
-              placeholder="Nombre de la inmobiliaria"
               className={fieldClass}
             />
           </label>
@@ -133,17 +118,6 @@ export function AppControlContactForm() {
             />
           </label>
         </div>
-
-        <label className="block space-y-2">
-          <span className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Qué querés resolver</span>
-          <textarea
-            required
-            value={form.message}
-            onChange={(event) => updateField("message", event.target.value)}
-            placeholder="Ej: quiero automatizar aumentos, avisos de morosos y liquidaciones a propietarios."
-            className={`${fieldClass} min-h-32 resize-none leading-6`}
-          />
-        </label>
 
         {status ? (
           <div

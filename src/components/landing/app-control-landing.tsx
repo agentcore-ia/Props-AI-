@@ -511,7 +511,7 @@ export function AppControlLanding() {
               Activá Props en tu inmobiliaria.
             </h2>
             <p className="mt-5 text-lg leading-8 text-slate-300">
-              Props ya centraliza mensajes, alquileres, cobros, aumentos, morosos, liquidaciones,
+              Props centraliza mensajes, alquileres, cobros, aumentos, morosos, liquidaciones,
               reclamos y publicación de propiedades. Completá el formulario y te ayudamos a configurarlo
               para tu forma de trabajar.
             </p>
