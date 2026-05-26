@@ -9,6 +9,7 @@ import {
   Bot,
   Building2,
   CircleAlert,
+  ClipboardList,
   Landmark,
   KeyRound,
   LayoutDashboard,
@@ -96,6 +97,7 @@ const adminNavigation: NavigationGroup[] = [
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { href: "/inmobiliarias", label: "Inmobiliarias", icon: Users },
+      { href: "/solicitudes", label: "Solicitudes", icon: ClipboardList },
       { href: "/configuracion", label: "Ajustes", icon: Settings },
     ],
   },
