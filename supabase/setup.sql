@@ -123,6 +123,23 @@ create table if not exists public.catalog_inquiries (
   created_at timestamptz not null default timezone('utc'::text, now())
 );
 
+create table if not exists public.app_contact_requests (
+  id uuid primary key default gen_random_uuid(),
+  full_name text not null,
+  agency_name text not null,
+  email text not null,
+  phone text not null,
+  message text not null,
+  source text not null default 'app_control_landing',
+  status text not null default 'Nuevo' check (status in ('Nuevo', 'Contactado', 'Demo agendada', 'Cerrado', 'Descartado')),
+  notes text not null default '',
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now())
+);
+
+create index if not exists app_contact_requests_status_created_idx
+  on public.app_contact_requests (status, created_at desc);
+
 create table if not exists public.marketplace_conversations (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid not null references auth.users (id) on delete cascade,
@@ -612,6 +629,7 @@ alter table public.profiles enable row level security;
 alter table public.agencies enable row level security;
 alter table public.properties enable row level security;
 alter table public.catalog_inquiries enable row level security;
+alter table public.app_contact_requests enable row level security;
 alter table public.marketplace_conversations enable row level security;
 alter table public.marketplace_messages enable row level security;
 alter table public.rental_contracts enable row level security;
@@ -776,6 +794,7 @@ drop policy if exists "Users can update their own profile" on public.profiles;
 drop policy if exists "Public can view agencies" on public.agencies;
 drop policy if exists "Public can view properties" on public.properties;
 drop policy if exists "Service role manages inquiries" on public.catalog_inquiries;
+drop policy if exists "Service role manages app contact requests" on public.app_contact_requests;
 drop policy if exists "Users can view their own conversations" on public.marketplace_conversations;
 drop policy if exists "Users can view their own marketplace messages" on public.marketplace_messages;
 drop policy if exists "Service role manages marketplace conversations" on public.marketplace_conversations;
@@ -817,6 +836,12 @@ using (true);
 
 create policy "Service role manages inquiries"
 on public.catalog_inquiries
+for all
+using (auth.role() = 'service_role')
+with check (auth.role() = 'service_role');
+
+create policy "Service role manages app contact requests"
+on public.app_contact_requests
 for all
 using (auth.role() = 'service_role')
 with check (auth.role() = 'service_role');

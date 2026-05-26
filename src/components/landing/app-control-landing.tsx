@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+import { AppControlContactForm } from "@/components/landing/app-control-contact-form";
+
 const coreFeatures = [
   {
     icon: MessageCircle,
@@ -167,6 +169,12 @@ export function AppControlLanding() {
           </Link>
 
           <div className="flex items-center gap-2">
+            <a
+              href="#contacto"
+              className="hidden rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950 md:inline-flex"
+            >
+              Contacto
+            </a>
             <Link
               href="https://props.com.ar"
               className="hidden rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950 sm:inline-flex"
@@ -212,10 +220,10 @@ export function AppControlLanding() {
                 <ArrowRight className="size-5" />
               </Link>
               <a
-                href="https://props.com.ar"
+                href="#contacto"
                 className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-4 text-base font-bold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
               >
-                Ver propiedades publicadas
+                Quiero que me contacten
               </a>
             </div>
             <div className="mt-8 grid max-w-2xl gap-3 sm:grid-cols-3">
@@ -490,6 +498,31 @@ export function AppControlLanding() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+          <div className="rounded-[34px] border border-slate-200 bg-slate-950 p-7 text-white shadow-[0_24px_90px_-60px_rgba(15,23,42,0.75)] sm:p-9">
+            <p className="text-sm font-black uppercase tracking-[0.24em] text-blue-200">
+              Contacto comercial
+            </p>
+            <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl">
+              Te mostramos Props con casos reales de inmobiliaria.
+            </h2>
+            <p className="mt-5 text-lg leading-8 text-slate-300">
+              Completá el formulario y coordinamos una demo enfocada en lo que más impacto tenga para tu operación:
+              WhatsApp, aumentos, morosos, cobros, liquidaciones, reclamos o publicación de propiedades.
+            </p>
+            <div className="mt-7 grid gap-3 sm:grid-cols-2">
+              {["Demo guiada", "Diagnóstico operativo", "Configuración inicial", "Acompañamiento"].map((item) => (
+                <div key={item} className="rounded-2xl bg-white/[0.06] px-4 py-3 font-semibold text-slate-100">
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+          <AppControlContactForm />
         </div>
       </section>
 
