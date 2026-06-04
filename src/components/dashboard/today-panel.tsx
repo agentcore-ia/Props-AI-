@@ -316,6 +316,10 @@ export function TodayPanel({ snapshot }: { snapshot: TodayWorkspaceSnapshot }) {
 
 function deriveChannelLabel(source: string) {
   const normalized = source.toLowerCase();
+  if (normalized.includes("zonaprop")) return "Zonaprop";
+  if (normalized.includes("argenprop")) return "Argenprop";
+  if (normalized.includes("mercadolibre")) return "Mercado Libre";
+  if (normalized.includes("portal")) return "Portal";
   if (normalized.includes("whatsapp")) return "WhatsApp";
   if (normalized.includes("instagram")) return "Instagram";
   if (normalized.includes("web") || normalized.includes("marketplace") || normalized.includes("catalog")) {

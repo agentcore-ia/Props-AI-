@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Clock3,
+  Copy,
   CreditCard,
   ExternalLink,
+  KeyRound,
   Loader2,
   MessageCircle,
   QrCode,
@@ -53,6 +55,15 @@ type ManagedAgency = {
 };
 
 type ConnectionState = "loading" | "open" | "close" | "error";
+
+type PortalIntegration = {
+  id: string;
+  portal: "email" | "zonaprop" | "argenprop" | "mercadolibre" | "otro";
+  label: string;
+  inboundToken: string;
+  enabled: boolean;
+  lastEventAt: string | null;
+};
 
 function normalizeInstance(value: string) {
   return value
@@ -123,6 +134,11 @@ export function AgencySettingsWorkspace({
   const [templatesBusy, setTemplatesBusy] = useState(false);
   const [subscriptionBusy, setSubscriptionBusy] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+  const [portalIntegrations, setPortalIntegrations] = useState<PortalIntegration[]>([]);
+  const [portalBusy, setPortalBusy] = useState(false);
+  const [portalMessage, setPortalMessage] = useState<string | null>(null);
+  const [portalError, setPortalError] = useState<string | null>(null);
+  const [portalEndpoint, setPortalEndpoint] = useState("/api/integrations/portal-leads");
   const selectedAgency = useMemo(
     () => agencies.find((agency) => agency.slug === selectedSlug) ?? null,
     [agencies, selectedSlug]
@@ -150,6 +166,10 @@ export function AgencySettingsWorkspace({
   }, [selectedAgency]);
 
   useEffect(() => {
+    setPortalEndpoint(`${window.location.origin}/api/integrations/portal-leads`);
+  }, []);
+
+  useEffect(() => {
     if (!selectedAgency) return;
 
     let cancelled = false;
@@ -170,6 +190,40 @@ export function AgencySettingsWorkspace({
     }
 
     void loadTemplates();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAgency]);
+
+  useEffect(() => {
+    if (!selectedAgency) return;
+
+    let cancelled = false;
+    const agencySlug = selectedAgency.slug;
+
+    async function loadPortalIntegrations() {
+      setPortalBusy(true);
+      setPortalError(null);
+
+      const response = await fetch(
+        `/api/admin/portal-integrations?agencySlug=${encodeURIComponent(agencySlug)}`,
+        { cache: "no-store" }
+      );
+      const payload = await response.json().catch(() => null);
+
+      if (cancelled) return;
+      setPortalBusy(false);
+
+      if (!response.ok) {
+        setPortalError(payload?.error ?? "No se pudieron cargar las integraciones.");
+        return;
+      }
+
+      setPortalIntegrations(payload?.integrations ?? []);
+    }
+
+    void loadPortalIntegrations();
 
     return () => {
       cancelled = true;
@@ -384,6 +438,44 @@ export function AgencySettingsWorkspace({
     window.location.href = payload.checkoutUrl;
   }
 
+  async function handleCopyPortalText(text: string, label: string) {
+    await navigator.clipboard.writeText(text);
+    setPortalMessage(`${label} copiado.`);
+    setTimeout(() => setPortalMessage(null), 2500);
+  }
+
+  async function handleRegeneratePortalToken(portal: PortalIntegration["portal"]) {
+    if (!selectedAgency) return;
+    setPortalBusy(true);
+    setPortalError(null);
+    setPortalMessage(null);
+
+    const response = await fetch("/api/admin/portal-integrations", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        agencySlug: selectedAgency.slug,
+        portal,
+        action: "regenerate_token",
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+    setPortalBusy(false);
+
+    if (!response.ok) {
+      setPortalError(payload?.error ?? "No se pudo generar un nuevo token.");
+      return;
+    }
+
+    setPortalIntegrations((current) =>
+      current.map((integration) =>
+        integration.portal === portal ? payload.integration : integration
+      )
+    );
+    setPortalMessage("Clave actualizada. Si ya estaba conectada, reemplazala en la integracion externa.");
+  }
+
   const statusCopy = getStatusCopy(connectionState);
 
   return (
@@ -560,6 +652,114 @@ export function AgencySettingsWorkspace({
                 {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
                 Guardar cambios
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[32px] border-0 shadow-sm xl:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Webhook className="size-5 text-primary" />
+              Consultas de portales
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+              <div className="rounded-[26px] border bg-muted/25 p-4">
+                <p className="text-sm font-semibold">URL de recepción</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Usala para que un correo derivado o una integracion directa envie consultas externas a la bandeja de Props.
+                </p>
+                <div className="mt-4 flex gap-2 rounded-2xl border bg-background p-2">
+                  <code className="min-w-0 flex-1 truncate px-2 py-1 text-xs text-muted-foreground">
+                    {portalEndpoint}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl"
+                    onClick={() => void handleCopyPortalText(portalEndpoint, "URL")}
+                  >
+                    <Copy className="size-3.5" />
+                    Copiar
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-[26px] border bg-muted/25 p-4">
+                <p className="text-sm font-semibold">Formato esperado</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Enviar por POST: token, portal, nombre, email o telefono, mensaje y, si existe, titulo o link de la propiedad.
+                </p>
+                <pre className="mt-4 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs leading-5 text-slate-100">
+{`{
+  "token": "TOKEN",
+  "portal": "zonaprop",
+  "name": "Maria Gomez",
+  "phone": "5491123456789",
+  "message": "Consulta por visita",
+  "propertyTitle": "Depto 2 ambientes"
+}`}
+                </pre>
+              </div>
+            </div>
+
+            {portalError ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {portalError}
+              </div>
+            ) : null}
+
+            {portalMessage ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                {portalMessage}
+              </div>
+            ) : null}
+
+            <div className="grid gap-3 lg:grid-cols-2">
+              {portalIntegrations.map((integration) => (
+                <div key={integration.id} className="rounded-[24px] border bg-background p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold">{integration.label}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {integration.lastEventAt
+                          ? `Ultima consulta: ${new Date(integration.lastEventAt).toLocaleString("es-AR")}`
+                          : "Todavia no recibio consultas."}
+                      </p>
+                    </div>
+                    <Badge className="rounded-full border-0 bg-primary/10 px-3 py-1 text-primary">
+                      {integration.enabled ? "Activo" : "Pausado"}
+                    </Badge>
+                  </div>
+
+                  <div className="mt-4 flex gap-2 rounded-2xl border bg-muted/20 p-2">
+                    <code className="min-w-0 flex-1 truncate px-2 py-1 text-xs text-muted-foreground">
+                      {integration.inboundToken}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl"
+                      onClick={() => void handleCopyPortalText(integration.inboundToken, "Token")}
+                    >
+                      <Copy className="size-3.5" />
+                      Copiar
+                    </Button>
+                  </div>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-3 rounded-xl"
+                    disabled={portalBusy}
+                    onClick={() => void handleRegeneratePortalToken(integration.portal)}
+                  >
+                    <KeyRound className="size-3.5" />
+                    Generar nuevo token
+                  </Button>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

@@ -124,6 +124,10 @@ export function deriveConversationStatus(lead: CrmLeadSummary): ConversationStat
 
 export function deriveSourceChannel(source: string) {
   const normalized = source.toLowerCase();
+  if (normalized.includes("zonaprop")) return "Zonaprop";
+  if (normalized.includes("argenprop")) return "Argenprop";
+  if (normalized.includes("mercadolibre")) return "Mercado Libre";
+  if (normalized.includes("portal_") || normalized.includes("portal")) return "Portal";
   if (normalized.includes("instagram")) return "Instagram";
   if (normalized.includes("web") || normalized.includes("marketplace") || normalized.includes("catalog")) {
     return "Web";
